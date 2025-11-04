@@ -1,0 +1,41 @@
+// navigation/appNavigation.type.ts
+import type { RouteProp } from '@react-navigation/native';
+import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
+
+export enum Screen {
+  HomeScreen = 'HomeScreen',
+  HelpScreen = 'HelpScreen',
+  WeekScreen = 'WeekScreen',
+  DailyCalendarScreen = 'DailyCalendarScreen',
+  MonthlyCalenderScreen = 'MonthlyCalenderScreen',
+  RemindersScreen = 'RemindersScreen',
+  CreateTaskScreen = 'CreateTaskScreen',
+  CreateEventScreen = 'CreateEventScreen',
+  CreateOutOfOfficeScreen = 'CreateOutOfOfficeScreen',
+  SettingsScreen = 'SettingsScreen',
+  DeletedEventsScreen = 'DeletedEventsScreen',
+  IntegrationScreen = 'IntegrationScreen',
+}
+
+export type RootStackParamList = {
+  [Screen.HomeScreen]: undefined;
+  [Screen.WeekScreen]: undefined;
+  [Screen.HelpScreen]: undefined;
+  [Screen.DailyCalendarScreen]: undefined;
+  [Screen.MonthlyCalenderScreen]: undefined;
+  [Screen.RemindersScreen]: undefined;
+  [Screen.CreateTaskScreen]: undefined;
+  [Screen.CreateEventScreen]: undefined;
+  [Screen.CreateOutOfOfficeScreen]: undefined;
+  [Screen.SettingsScreen]: undefined;
+  [Screen.DeletedEventsScreen]: undefined;
+  [Screen.IntegrationScreen]: undefined;
+};
+
+export type AppNavigationProp = NativeStackNavigationProp<RootStackParamList>;
+
+export type HomeScreenRoute = RouteProp<RootStackParamList, Screen.HomeScreen>;
+export type HelpScreenRoute = RouteProp<RootStackParamList, Screen.HelpScreen>;
+export type WeekScreenRoute = RouteProp<RootStackParamList, Screen.WeekScreen>;
+export type DailyCalendarScreenRoute = RouteProp<RootStackParamList, Screen.DailyCalendarScreen>;
+export type RemindersScreenRoute = RouteProp<RootStackParamList, Screen.RemindersScreen>;

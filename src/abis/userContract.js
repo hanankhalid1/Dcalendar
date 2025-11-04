@@ -1,0 +1,928 @@
+const userContract = [
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: false,
+        internalType: 'address',
+        name: 'previousAdmin',
+        type: 'address',
+      },
+      {
+        indexed: false,
+        internalType: 'address',
+        name: 'newAdmin',
+        type: 'address',
+      },
+    ],
+    name: 'AdminChanged',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'beacon',
+        type: 'address',
+      },
+    ],
+    name: 'BeaconUpgraded',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'previousOwner',
+        type: 'address',
+      },
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'newOwner',
+        type: 'address',
+      },
+    ],
+    name: 'OwnershipTransferred',
+    type: 'event',
+  },
+  {
+    anonymous: false,
+    inputs: [
+      {
+        indexed: true,
+        internalType: 'address',
+        name: 'implementation',
+        type: 'address',
+      },
+    ],
+    name: 'Upgraded',
+    type: 'event',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+    ],
+    name: 'allUsers',
+    outputs: [
+      {
+        internalType: 'string',
+        name: '',
+        type: 'string',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'newOwner',
+        type: 'address',
+      },
+    ],
+    name: 'changeOwner',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: '_organizationId',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_role',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_userName',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_domain',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_name',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_publicKey',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_walletAddress',
+        type: 'string',
+      },
+      {
+        internalType: 'bool',
+        name: '_status',
+        type: 'bool',
+      },
+      {
+        components: [
+          {
+            internalType: 'string',
+            name: 'key',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'value',
+            type: 'string',
+          },
+        ],
+        internalType: 'struct Attribute[]',
+        name: '_attributes',
+        type: 'tuple[]',
+      },
+    ],
+    name: 'createUserAccount',
+    outputs: [
+      {
+        internalType: 'bool',
+        name: '',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: '_walletAddress',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_userName',
+        type: 'string',
+      },
+    ],
+    name: 'deleteUserAccount',
+    outputs: [
+      {
+        internalType: 'bool',
+        name: '',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: 'walletAddress',
+        type: 'string',
+      },
+    ],
+    name: 'getAdminLevelUsers',
+    outputs: [
+      {
+        components: [
+          {
+            internalType: 'uint256',
+            name: 'userId',
+            type: 'uint256',
+          },
+          {
+            internalType: 'string',
+            name: 'organizationId',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'role',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'userName',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'domain',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'name',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'publicKey',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'walletAddress',
+            type: 'string',
+          },
+          {
+            internalType: 'uint256',
+            name: 'creationDate',
+            type: 'uint256',
+          },
+          {
+            internalType: 'bool',
+            name: 'status',
+            type: 'bool',
+          },
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'key',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'value',
+                type: 'string',
+              },
+            ],
+            internalType: 'struct Attribute[]',
+            name: 'attributes',
+            type: 'tuple[]',
+          },
+        ],
+        internalType: 'struct User[]',
+        name: '',
+        type: 'tuple[]',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'getAllUsers',
+    outputs: [
+      {
+        internalType: 'string[]',
+        name: '',
+        type: 'string[]',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: 'username',
+        type: 'string',
+      },
+    ],
+    name: 'getPublicKeyOfUser',
+    outputs: [
+      {
+        internalType: 'string',
+        name: '',
+        type: 'string',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: 'username',
+        type: 'string',
+      },
+    ],
+    name: 'getUserByUsername',
+    outputs: [
+      {
+        components: [
+          {
+            internalType: 'uint256',
+            name: 'userId',
+            type: 'uint256',
+          },
+          {
+            internalType: 'string',
+            name: 'organizationId',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'role',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'userName',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'domain',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'name',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'publicKey',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'walletAddress',
+            type: 'string',
+          },
+          {
+            internalType: 'uint256',
+            name: 'creationDate',
+            type: 'uint256',
+          },
+          {
+            internalType: 'bool',
+            name: 'status',
+            type: 'bool',
+          },
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'key',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'value',
+                type: 'string',
+              },
+            ],
+            internalType: 'struct Attribute[]',
+            name: 'attributes',
+            type: 'tuple[]',
+          },
+        ],
+        internalType: 'struct User',
+        name: 'foundUser',
+        type: 'tuple',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: '_user',
+        type: 'string',
+      },
+    ],
+    name: 'getUserDataByName',
+    outputs: [
+      {
+        internalType: 'string',
+        name: '',
+        type: 'string',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: 'domain',
+        type: 'string',
+      },
+    ],
+    name: 'getUserDetailsByDomain',
+    outputs: [
+      {
+        components: [
+          {
+            internalType: 'uint256',
+            name: 'userId',
+            type: 'uint256',
+          },
+          {
+            internalType: 'string',
+            name: 'organizationId',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'role',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'userName',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'domain',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'name',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'publicKey',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'walletAddress',
+            type: 'string',
+          },
+          {
+            internalType: 'uint256',
+            name: 'creationDate',
+            type: 'uint256',
+          },
+          {
+            internalType: 'bool',
+            name: 'status',
+            type: 'bool',
+          },
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'key',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'value',
+                type: 'string',
+              },
+            ],
+            internalType: 'struct Attribute[]',
+            name: 'attributes',
+            type: 'tuple[]',
+          },
+        ],
+        internalType: 'struct User[]',
+        name: '',
+        type: 'tuple[]',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: 'userAddress',
+        type: 'string',
+      },
+    ],
+    name: 'getUserDetailsForWallet',
+    outputs: [
+      {
+        components: [
+          {
+            internalType: 'uint256',
+            name: 'userId',
+            type: 'uint256',
+          },
+          {
+            internalType: 'string',
+            name: 'organizationId',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'role',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'userName',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'domain',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'name',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'publicKey',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'walletAddress',
+            type: 'string',
+          },
+          {
+            internalType: 'uint256',
+            name: 'creationDate',
+            type: 'uint256',
+          },
+          {
+            internalType: 'bool',
+            name: 'status',
+            type: 'bool',
+          },
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'key',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'value',
+                type: 'string',
+              },
+            ],
+            internalType: 'struct Attribute[]',
+            name: 'attributes',
+            type: 'tuple[]',
+          },
+        ],
+        internalType: 'struct User[]',
+        name: '',
+        type: 'tuple[]',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: '_userAddress',
+        type: 'string',
+      },
+    ],
+    name: 'getUsers',
+    outputs: [
+      {
+        components: [
+          {
+            internalType: 'uint256',
+            name: 'userId',
+            type: 'uint256',
+          },
+          {
+            internalType: 'string',
+            name: 'organizationId',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'role',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'userName',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'domain',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'name',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'publicKey',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'walletAddress',
+            type: 'string',
+          },
+          {
+            internalType: 'uint256',
+            name: 'creationDate',
+            type: 'uint256',
+          },
+          {
+            internalType: 'bool',
+            name: 'status',
+            type: 'bool',
+          },
+          {
+            components: [
+              {
+                internalType: 'string',
+                name: 'key',
+                type: 'string',
+              },
+              {
+                internalType: 'string',
+                name: 'value',
+                type: 'string',
+              },
+            ],
+            internalType: 'struct Attribute[]',
+            name: 'attributes',
+            type: 'tuple[]',
+          },
+        ],
+        internalType: 'struct User[]',
+        name: '',
+        type: 'tuple[]',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'initialize',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'owner',
+    outputs: [
+      {
+        internalType: 'address',
+        name: '',
+        type: 'address',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'proxiableUUID',
+    outputs: [
+      {
+        internalType: 'bytes32',
+        name: '',
+        type: 'bytes32',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [],
+    name: 'renounceOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'newOwner',
+        type: 'address',
+      },
+    ],
+    name: 'transferOwnership',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: '_walletAddress',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_userName',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_publicKey',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: 'organizationId',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_role',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: '_name',
+        type: 'string',
+      },
+      {
+        internalType: 'bool',
+        name: '_status',
+        type: 'bool',
+      },
+      {
+        components: [
+          {
+            internalType: 'string',
+            name: 'key',
+            type: 'string',
+          },
+          {
+            internalType: 'string',
+            name: 'value',
+            type: 'string',
+          },
+        ],
+        internalType: 'struct Attribute[]',
+        name: '_attributes',
+        type: 'tuple[]',
+      },
+    ],
+    name: 'updateUserAccount',
+    outputs: [
+      {
+        internalType: 'bool',
+        name: '',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'newImplementation',
+        type: 'address',
+      },
+    ],
+    name: 'upgradeTo',
+    outputs: [],
+    stateMutability: 'nonpayable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'address',
+        name: 'newImplementation',
+        type: 'address',
+      },
+      {
+        internalType: 'bytes',
+        name: 'data',
+        type: 'bytes',
+      },
+    ],
+    name: 'upgradeToAndCall',
+    outputs: [],
+    stateMutability: 'payable',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: '_user',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: 'senderAddress',
+        type: 'string',
+      },
+    ],
+    name: 'userAuthentication',
+    outputs: [
+      {
+        internalType: 'bool',
+        name: '',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+  {
+    inputs: [
+      {
+        internalType: 'string',
+        name: '',
+        type: 'string',
+      },
+      {
+        internalType: 'uint256',
+        name: '',
+        type: 'uint256',
+      },
+    ],
+    name: 'users',
+    outputs: [
+      {
+        internalType: 'uint256',
+        name: 'userId',
+        type: 'uint256',
+      },
+      {
+        internalType: 'string',
+        name: 'organizationId',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: 'role',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: 'userName',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: 'domain',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: 'name',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: 'publicKey',
+        type: 'string',
+      },
+      {
+        internalType: 'string',
+        name: 'walletAddress',
+        type: 'string',
+      },
+      {
+        internalType: 'uint256',
+        name: 'creationDate',
+        type: 'uint256',
+      },
+      {
+        internalType: 'bool',
+        name: 'status',
+        type: 'bool',
+      },
+    ],
+    stateMutability: 'view',
+    type: 'function',
+  },
+];
+export default userContract;

@@ -1,0 +1,420 @@
+import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import React, { useState } from 'react';
+import LinearGradient from 'react-native-linear-gradient';
+import Icon from 'react-native-vector-icons/Ionicons';
+
+interface CalendarComponentProps {
+  onDateSelect?: (date: Date) => void;
+  currentDate?: Date;
+  selectedDate?: Date | null;
+}
+
+const CalendarComponent: React.FC<CalendarComponentProps> = ({
+  onDateSelect,
+  currentDate: propCurrentDate,
+  selectedDate: propSelectedDate,
+}) => {
+  const [currentDate, setCurrentDate] = useState(() => {
+    const date = propCurrentDate || new Date();
+    // Normalize to noon to avoid timezone issues
+    return new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      12,
+      0,
+      0,
+      0,
+    );
+  });
+  const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
+    const date = propSelectedDate || new Date();
+    // Normalize to noon to avoid timezone issues
+    return new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      12,
+      0,
+      0,
+      0,
+    );
+  });
+
+  // Update local state when props change
+  React.useEffect(() => {
+    if (propCurrentDate) {
+      const normalizedDate = new Date(
+        propCurrentDate.getFullYear(),
+        propCurrentDate.getMonth(),
+        propCurrentDate.getDate(),
+        12,
+        0,
+        0,
+        0,
+      );
+      setCurrentDate(normalizedDate);
+    }
+  }, [propCurrentDate]);
+
+  React.useEffect(() => {
+    if (propSelectedDate) {
+      const normalizedDate = new Date(
+        propSelectedDate.getFullYear(),
+        propSelectedDate.getMonth(),
+        propSelectedDate.getDate(),
+        12,
+        0,
+        0,
+        0,
+      );
+      setSelectedDate(normalizedDate);
+    }
+  }, [propSelectedDate]);
+
+  const monthNames = [
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
+  ];
+
+  const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear();
+    const month = date.getMonth();
+
+    // Create first day of month with fixed time
+    const firstDay = new Date(year, month, 1, 12, 0, 0, 0);
+    const lastDay = new Date(year, month + 1, 0, 12, 0, 0, 0);
+    const daysInMonth = lastDay.getDate();
+    const startingDayOfWeek = firstDay.getDay(); // 0 = Sunday, 1 = Monday, etc.
+
+    console.log(
+      `CalendarComponent - Building calendar for ${monthNames[month]} ${year}`,
+    );
+    console.log(
+      `CalendarComponent - First day of month: ${firstDay.toLocaleDateString(
+        'en-US',
+        { weekday: 'long' },
+      )} (day ${startingDayOfWeek})`,
+    );
+    console.log(`CalendarComponent - Days in month: ${daysInMonth}`);
+
+    const days = [];
+
+    // Add previous month's trailing days
+    const prevMonth = new Date(year, month - 1, 0, 12, 0, 0, 0);
+    const prevMonthDays = prevMonth.getDate();
+
+    // Fill in the days from the previous month that appear in the first week
+    // startingDayOfWeek tells us which day of the week the 1st falls on
+    // If it's 1 (Monday), we need 0 previous days
+    // If it's 2 (Tuesday), we need 1 previous day (Monday)
+    // If it's 0 (Sunday), we need 6 previous days (Mon-Sat)
+    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+      days.push({
+        day: prevMonthDays - i,
+        isCurrentMonth: false,
+        isSelected: false,
+      });
+    }
+
+    // Add current month's days
+    for (let day = 1; day <= daysInMonth; day++) {
+      // Create date with fixed time to avoid timezone issues
+      const dayDate = new Date(year, month, day, 12, 0, 0, 0);
+      const today = new Date();
+      // Normalize today's date to avoid timezone issues
+      const todayNormalized = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        12,
+        0,
+        0,
+        0,
+      );
+
+      // Check if this is today's date (only in current month)
+      const isToday =
+        dayDate.getDate() === todayNormalized.getDate() &&
+        dayDate.getMonth() === todayNormalized.getMonth() &&
+        dayDate.getFullYear() === todayNormalized.getFullYear();
+
+      // Check if this is the selected date (only if selectedDate is provided)
+      const isSelected =
+        selectedDate &&
+        dayDate.getDate() === selectedDate.getDate() &&
+        dayDate.getMonth() === selectedDate.getMonth() &&
+        dayDate.getFullYear() === selectedDate.getFullYear();
+
+      // Debug specific dates
+      if (day === 22 && month === 8 && year === 2025) {
+        console.log(
+          `CalendarComponent - September 22, 2025: day of week = ${dayDate.getDay()}, should be 1 (Monday)`,
+        );
+      }
+
+      days.push({
+        day,
+        isCurrentMonth: true,
+        isSelected: isSelected || isToday, // Highlight if selected OR if it's today
+        isToday: isToday,
+      });
+    }
+
+    // Add next month's leading days to fill the grid (6 weeks * 7 days = 42 total)
+    const totalGridSize = 42; // 6 weeks * 7 days
+    const remainingDays = totalGridSize - days.length;
+    console.log(
+      `CalendarComponent - Days so far: ${days.length}, Need ${remainingDays} more days to reach ${totalGridSize}`,
+    );
+
+    for (let day = 1; day <= remainingDays; day++) {
+      days.push({
+        day,
+        isCurrentMonth: false,
+        isSelected: false,
+      });
+    }
+
+    console.log(`CalendarComponent - Total days in grid: ${days.length}`);
+    console.log(
+      `CalendarComponent - First few days:`,
+      days
+        .slice(0, 10)
+        .map(d => `${d.day}(${d.isCurrentMonth ? 'current' : 'other'})`)
+        .join(', '),
+    );
+
+    return days;
+  };
+
+  const navigateMonth = (direction: 'prev' | 'next') => {
+    const newDate = new Date(currentDate);
+    if (direction === 'prev') {
+      newDate.setMonth(newDate.getMonth() - 1);
+    } else {
+      newDate.setMonth(newDate.getMonth() + 1);
+    }
+    console.log(
+      'CalendarComponent - Navigated to:',
+      newDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+      }),
+    );
+    setCurrentDate(newDate);
+  };
+
+  const handleDatePress = (day: number) => {
+    // Create date with fixed time to avoid timezone issues
+    const selectedDateObj = new Date(
+      currentDate.getFullYear(),
+      currentDate.getMonth(),
+      day,
+      12,
+      0,
+      0,
+      0,
+    );
+    console.log('CalendarComponent - Date selected:', selectedDateObj);
+    console.log('CalendarComponent - Day of week:', selectedDateObj.getDay());
+    setSelectedDate(selectedDateObj);
+    onDateSelect?.(selectedDateObj);
+  };
+
+  const days = getDaysInMonth(currentDate);
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => navigateMonth('prev')}
+        >
+          <Icon name="arrow-back" size={16} color="#6c757d" />
+        </TouchableOpacity>
+
+        <Text style={styles.monthYear}>
+          {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+        </Text>
+
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => navigateMonth('next')}
+        >
+          <Icon name="arrow-forward" size={16} color="#6c757d" />
+        </TouchableOpacity>
+      </View>
+
+      {/* Weekday Headers */}
+      <View style={styles.weekdayRow}>
+        {weekDays.map((day, index) => (
+          <Text key={index} style={styles.weekdayText}>
+            {day}
+          </Text>
+        ))}
+      </View>
+
+      {/* Calendar Grid */}
+      <View style={styles.calendarGrid}>
+        {days.map((dayData, index) => (
+          <TouchableOpacity
+            key={index}
+            style={styles.dayCell}
+            onPress={() =>
+              dayData.isCurrentMonth && handleDatePress(dayData.day)
+            }
+          >
+            {dayData.isSelected && dayData.isCurrentMonth ? (
+              dayData.isToday ? (
+                // Today's date - different style
+                <LinearGradient
+                  colors={['#FF6B6B', '#FF8E53']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.todayDay}
+                >
+                  <Text style={styles.todayDayText}>{dayData.day}</Text>
+                </LinearGradient>
+              ) : (
+                // Selected date (not today)
+                <LinearGradient
+                  colors={['#18F06E', '#0B6DE0']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.selectedDay}
+                >
+                  <Text style={styles.selectedDayText}>{dayData.day}</Text>
+                </LinearGradient>
+              )
+            ) : (
+              <Text
+                style={[
+                  styles.dayText,
+                  !dayData.isCurrentMonth && styles.inactiveDayText,
+                ]}
+              >
+                {dayData.day}
+              </Text>
+            )}
+          </TouchableOpacity>
+        ))}
+      </View>
+    </View>
+  );
+};
+
+export default CalendarComponent;
+
+const styles = StyleSheet.create({
+  container: {
+    backgroundColor: '#ffffff',
+    borderRadius: 12,
+    padding: 16,
+    marginHorizontal: 0,
+    marginVertical: 8,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 6,
+    },
+    shadowOpacity: 0.2,
+    shadowRadius: 12,
+    elevation: 12,
+    borderWidth: 1,
+    borderColor: '#e0e0e0',
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 20,
+  },
+  navButton: {
+    width: 32,
+    height: 32,
+    backgroundColor: '#e9ecef',
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  monthYear: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#2d4150',
+  },
+  weekdayRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-around',
+    marginBottom: 12,
+  },
+  weekdayText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#6c757d',
+    width: '13%',
+    textAlign: 'center',
+    minWidth: 40,
+  },
+  calendarGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  dayCell: {
+    width: '13%', // 7 days = ~14.28% each, but use 13% to account for margins
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    minWidth: 40,
+  },
+  dayText: {
+    fontSize: 16,
+    fontWeight: '500',
+    color: '#2d4150',
+  },
+  inactiveDayText: {
+    color: '#adb5bd',
+  },
+  selectedDay: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  selectedDayText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+  todayDay: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  todayDayText: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#ffffff',
+  },
+});

@@ -1,0 +1,3022 @@
+import { useNavigation, useRoute } from '@react-navigation/native';
+import React, { useEffect, useState } from 'react';
+import {
+  Alert,
+  FlatList,
+  Image,
+  Modal,
+  ScrollView,
+  StatusBar,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
+import FeatherIcon from 'react-native-vector-icons/Feather';
+import {
+  borderRadius,
+  colors,
+  fontSize,
+  shadows,
+  spacing,
+} from '../utils/LightTheme';
+import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
+import { useApiClient } from '../hooks/useApi';
+import { useEventsStore } from '../stores/useEventsStore';
+
+
+import CalendarWithTime from '../components/CalendarWithTime';
+
+import AdvancedOptions from '../components/createEvent/AdvancedOptions';
+import GradientText from '../components/home/GradientText';
+import { Colors } from '../constants/Colors';
+import { NECJSPRIVATE_KEY } from '../constants/Config';
+import {
+  dayAbbreviations,
+  dayNames,
+  eventTypes,
+  guestData,
+  recurrenceOptions,
+  timezones,
+} from '../constants/dummyData';
+import { AppNavigationProp, Screen } from '../navigations/appNavigation.type';
+import { generateEventUID } from '../utils/eventUtils';
+
+import GuestSelector from '../components/createEvent/GuestSelector';
+import { BlockchainService } from '../services/BlockChainService';
+import { useActiveAccount } from '../stores/useActiveAccount';
+import { useToken } from '../stores/useTokenStore';
+
+const CreateEventScreen = () => {
+  const navigation: any = useNavigation<AppNavigationProp>();
+  const activeAccount = useActiveAccount(state => state.account);
+  const token = useToken(state => state.token);
+  const route = useRoute<any>();
+  const { mode, eventData: editEventData } = route.params || {};
+  const { getUserEvents } = useEventsStore();
+
+  // Initialize blockchain service and get contract instance
+  // Form state
+  const [title, setTitle] = useState(editEventData?.title ?? '');
+  const [description, setDescription] = useState(editEventData?.description ?? '');
+  const [location, setLocation] = useState(editEventData?.location ?? '');
+  const [videoConferencing, setVideoConferencing] = useState(editEventData?.videoConferencing ?? '');
+  const [notificationMinutes, setNotificationMinutes] = useState('0');
+  const [selectedTimeUnit, setSelectedTimeUnit] = useState('Minutes');
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(editEventData?.selectedStartDate ? new Date(editEventData.selectedStartDate) : null);
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(editEventData?.selectedEndDate ? new Date(editEventData.selectedEndDate) : null);
+  const [selectedStartTime, setSelectedStartTime] = useState(editEventData?.selectedStartTime || '');
+  const [selectedEndTime, setSelectedEndTime] = useState(editEventData?.selectedEndTime || '');
+  const [showDetailedDateTime, setShowDetailedDateTime] = useState(!!editEventData);
+  const [calendarMode, setCalendarMode] = useState<'from' | 'to'>('from');
+  const [showEventTypeDropdown, setShowEventTypeDropdown] = useState(false);
+  const [selectedEventType, setSelectedEventType] = useState(editEventData?.selectedEventType || 'Event');
+  const [isLoading, setIsLoading] = useState(false);
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showGuestDropdown, setShowGuestDropdown] = useState(false);
+  const [selectedGuests, setSelectedGuests] = useState<string[]>([]);
+  const [selectedPermission, setSelectedPermission] = useState<string>('');
+  const [showVideoConferencingOptions, setShowVideoConferencingOptions] = useState(false);
+  const [selectedVideoConferencing, setSelectedVideoConferencing] = useState('');
+  const [showGuestModal, setShowGuestModal] = useState(false);
+  const [guestSearchQuery, setGuestSearchQuery] = useState('');
+  const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
+  const [selectedRecurrence, setSelectedRecurrence] = useState('Does not repeat');
+  const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
+  const [customRecurrence, setCustomRecurrence] = useState(() => {
+    const weekday =
+      selectedStartDate
+        ? selectedStartDate.toLocaleDateString('en-US', { weekday: 'long' })
+        : 'Thursday'; // default fallback
+    return {
+
+      repeatEvery: '1',
+      repeatUnit: 'Week',
+      repeatOn: [weekday],
+      endsType: 'Never',
+      endsDate: '',
+      endsAfter: '13',
+    }
+  });
+  const [showTimezoneModal, setShowTimezoneModal] = useState(false);
+  const [selectedTimezone, setSelectedTimezone] = useState('');
+  const [timezoneSearchQuery, setTimezoneSearchQuery] = useState('');
+  const [searchQuery, setsearchQuery] = useState("")
+  const [locationSuggestions, setLocationSuggestions] = React.useState<any[]>([]);
+  const [showLocationModal, setShowLocationModal] = React.useState(false);
+  const [isLoadingLocations, setIsLoadingLocations] = React.useState(false);
+  const { api } = useApiClient();
+  const [isAllDayEvent, setIsAllDayEvent] = useState(false);
+
+  const endsOptions = ['Never', 'On', 'After'];
+
+  const isAllDayEventCheck = (fromTime: string, toTime: string): boolean => {
+    if (!fromTime || !toTime) {
+      return false;
+    }
+
+    // Handle date-only format (e.g., YYYYMMDD) - shouldn't happen with our format
+    if (!fromTime.includes('T') || !toTime.includes('T')) {
+      return true;
+    }
+
+    // Extract time components
+    const fromTimeOnly = fromTime.split('T')[1];
+    const toTimeOnly = toTime.split('T')[1];
+
+    // ✅ The All-Day signature: T000000 for both start and end
+    const isStartMidnight = fromTimeOnly && fromTimeOnly.startsWith('000000');
+    const isEndMidnight = toTimeOnly && toTimeOnly.startsWith('000000');
+
+    console.log('isAllDayEventCheck details:', {
+      fromTime,
+      toTime,
+      fromTimeOnly,
+      toTimeOnly,
+      isStartMidnight,
+      isEndMidnight,
+      result: isStartMidnight && isEndMidnight
+    });
+
+    return isStartMidnight && isEndMidnight;
+  };
+  // Helper function to parse event data from the list/tags array
+  const parseEventData = (eventData: any) => {
+    // Handle both 'list' and 'tags' array structures
+    const dataArray = eventData?.list || eventData?.tags;
+    console.log('Data array found:', dataArray);
+    if (!eventData || !dataArray) {
+      console.log('No data array found in event data');
+      return {};
+    }
+
+    console.log("Edit event data", eventData);
+    const parsedData: any = {};
+
+    // Parse each item in the array
+    dataArray.forEach((item: any) => {
+      console.log('Processing item:', item);
+      const { key, value } = item;
+
+      switch (key) {
+        case 'location':
+          parsedData.location = value;
+          console.log('Set location:', value);
+          break;
+        case 'locationType':
+          parsedData.locationType = value;
+          console.log('Set locationType:', value);
+          break;
+        case 'guest':
+          if (!parsedData.guests) parsedData.guests = [];
+          parsedData.guests.push(value);
+          console.log('Added guest:', value);
+          break;
+        case 'busy':
+          parsedData.busy = value;
+          console.log('Set busy:', value);
+          break;
+        case 'visibility':
+          parsedData.visibility = value;
+          console.log('Set visibility:', value);
+          break;
+        case 'notification':
+          parsedData.notification = value;
+          console.log('Set notification:', value);
+          break;
+        case 'guest_permission':
+          parsedData.guest_permission = value;
+          console.log('Set guest_permission:', value);
+          break;
+        case 'seconds':
+          parsedData.seconds = value;
+          console.log('Set seconds:', value);
+          break;
+        case 'trigger':
+          parsedData.trigger = value;
+          console.log('Set trigger:', value);
+          break;
+        case 'organizer':
+          parsedData.organizer = value;
+          console.log('Set organizer:', value);
+          break;
+        case 'timezone':
+          parsedData.timezone = value;
+          console.log('Set timezone:', value);
+          break;
+        case 'repeatEvent':
+          parsedData.repeatEvent = value;
+          console.log('Set repeatEvent:', value);
+          break;
+        case 'isDeleted':
+          parsedData.isDeleted = value;
+          console.log('Set isDeleted:', value);
+          break;
+        case 'deletedTime':
+          parsedData.deletedTime = value;
+          console.log('Set deletedTime:', value);
+          break;
+        default:
+          console.log('Unknown key:', key, 'with value:', value);
+          break;
+      }
+    });
+
+    return parsedData;
+  };
+
+  // Helper function to parse date and time from separate strings
+  const parseDateAndTime = (dateString: string, timeString: string) => {
+    try {
+      // Parse date string like "Wed Sep 24 2025"
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        console.error('Invalid date string:', dateString);
+        return { startDate: null, startTime: '', endDate: null, endTime: '' };
+      }
+
+      // ✅ Handle all-day events (no time string or empty time string)
+      if (!timeString || timeString.trim() === '') {
+        return {
+          startDate: date,
+          startTime: '',
+          endDate: date,
+          endTime: ''
+        };
+      }
+
+      // Parse time string like "9:00 PM - 10:00 PM"
+      const timeParts = timeString.split(' - ');
+      if (timeParts.length !== 2) {
+        console.error('Invalid time format:', timeString);
+        return { startDate: null, startTime: '', endDate: null, endTime: '' };
+      }
+
+      const startTime = timeParts[0].trim();
+      const endTime = timeParts[1].trim();
+
+      // For now, assume both start and end are on the same date
+      // You might want to handle cases where events span multiple days
+      return {
+        startDate: date,
+        startTime: startTime,
+        endDate: date,
+        endTime: endTime
+      };
+    } catch (error) {
+      console.error('Error parsing date and time:', dateString, timeString, error);
+      return { startDate: null, startTime: '', endDate: null, endTime: '' };
+    }
+  };
+
+  // Helper function to parse datetime from different formats
+  const parseDateTime = (dateTimeString: string) => {
+    if (!dateTimeString) return { date: null, time: '' };
+
+    let date: Date;
+    let timeString = '';
+
+    try {
+      // Handle ISO format (2025-09-19T05:00:00.000Z)
+      if (dateTimeString.includes('T') && dateTimeString.includes('Z')) {
+        date = new Date(dateTimeString);
+        if (isNaN(date.getTime())) {
+          console.error('Invalid ISO date:', dateTimeString);
+          return { date: null, time: '' };
+        }
+        timeString = date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      }
+      // ✅ Handle YYYYMMDDTHHMMSS format (20250924T210000)
+      else if (dateTimeString.match(/^\d{8}T\d{6}$/)) {
+        const year = dateTimeString.substring(0, 4);
+        const month = dateTimeString.substring(4, 6);
+        const day = dateTimeString.substring(6, 8);
+        const timePart = dateTimeString.substring(9); // Get HHMMSS
+        const hour = dateTimeString.substring(9, 11);
+        const minute = dateTimeString.substring(11, 13);
+        const second = dateTimeString.substring(13, 15);
+
+        // ✅ CHECK IF IT'S MIDNIGHT (ALL-DAY EVENT)
+        if (timePart === '000000') {
+          // Return date only, no time for all-day events
+          date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          return { date, time: '' };
+        }
+
+        // Parse as normal timed event
+        date = new Date(
+          parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hour),
+          parseInt(minute),
+          parseInt(second)
+        );
+
+        if (isNaN(date.getTime())) {
+          console.error('Invalid YYYYMMDDTHHMMSS date:', dateTimeString);
+          return { date: null, time: '' };
+        }
+
+        // ✅ Convert to 12-hour format manually to avoid locale issues
+        const hourNum = parseInt(hour);
+        const minuteNum = parseInt(minute);
+
+        let displayHour = hourNum;
+        let period = 'AM';
+
+        if (hourNum >= 12) {
+          period = 'PM';
+          if (hourNum > 12) {
+            displayHour = hourNum - 12;
+          }
+        } else if (hourNum === 0) {
+          displayHour = 12;
+        }
+
+        timeString = `${displayHour.toString().padStart(2, '0')}:${minuteNum.toString().padStart(2, '0')} ${period}`;
+      }
+      // ✅ Handle date-only format (YYYYMMDD) - treat as all-day
+      else if (dateTimeString.match(/^\d{8}$/)) {
+        const year = dateTimeString.substring(0, 4);
+        const month = dateTimeString.substring(4, 6);
+        const day = dateTimeString.substring(6, 8);
+
+        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (isNaN(date.getTime())) {
+          console.error('Invalid YYYYMMDD date:', dateTimeString);
+          return { date: null, time: '' };
+        }
+
+        // Return empty time for date-only format
+        return { date, time: '' };
+      }
+      // Handle other formats
+      else {
+        date = new Date(dateTimeString);
+        if (isNaN(date.getTime())) {
+          console.error('Invalid date format:', dateTimeString);
+          return { date: null, time: '' };
+        }
+        timeString = date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      }
+
+      console.log('parseDateTime result:', {
+        input: dateTimeString,
+        date: date.toISOString(),
+        time: timeString
+      });
+
+      return { date, time: timeString };
+    } catch (error) {
+      console.error('Error parsing datetime:', dateTimeString, error);
+      return { date: null, time: '' };
+    }
+  };
+  useEffect(() => {
+    console.log('Edit Event Data:', JSON.stringify(editEventData));
+
+    if (editEventData && mode === 'edit') {
+      const parsedData = parseEventData(editEventData);
+      console.log('Parsed Data from tags/list:', parsedData);
+
+      setTitle(editEventData.title || '');
+      setDescription(editEventData.description || '');
+      setLocation(parsedData.location || '');
+
+      if (parsedData.locationType) {
+        setSelectedVideoConferencing(parsedData.locationType);
+        setShowVideoConferencingOptions(true);
+      }
+
+      // ✅ CHECK IF IT'S AN ALL-DAY EVENT FIRST
+      if (editEventData.fromTime && editEventData.toTime) {
+        const isAllDay = isAllDayEventCheck(editEventData.fromTime, editEventData.toTime);
+
+        console.log('All-day event check:', {
+          fromTime: editEventData.fromTime,
+          toTime: editEventData.toTime,
+          isAllDay,
+          checkDetails: {
+            hasT: editEventData.fromTime.includes('T'),
+            fromTimeOnly: editEventData.fromTime.split('T')[1],
+            toTimeOnly: editEventData.toTime.split('T')[1]
+          }
+        });
+
+        // ✅ SET ALL-DAY STATE IMMEDIATELY
+        setIsAllDayEvent(isAllDay);
+
+        // Parse start date/time
+        const startDateTime = parseDateTime(editEventData.fromTime);
+        if (startDateTime.date) {
+          setSelectedStartDate(startDateTime.date);
+          // ✅ Only set time for non-all-day events
+          setSelectedStartTime(isAllDay ? '' : (startDateTime.time || ''));
+        }
+
+        // Parse end date/time
+        const endDateTime = parseDateTime(editEventData.toTime);
+        if (endDateTime.date) {
+          // ✅ For all-day events, subtract 1 day from stored end date
+          if (isAllDay) {
+            const displayEndDate = new Date(endDateTime.date);
+            displayEndDate.setDate(displayEndDate.getDate() - 1);
+            setSelectedEndDate(displayEndDate);
+            setSelectedEndTime('');
+
+            console.log('All-day event - Adjusted end date:', {
+              storedEndDate: endDateTime.date.toISOString(),
+              displayEndDate: displayEndDate.toISOString()
+            });
+          } else {
+            setSelectedEndDate(endDateTime.date);
+            setSelectedEndTime(endDateTime.time || '');
+          }
+        }
+      } else if (editEventData.date && editEventData.time) {
+        console.log('Parsing date and time:', editEventData.date, editEventData.time);
+        const dateTime = parseDateAndTime(editEventData.date, editEventData.time);
+        console.log('Parsed date and time result:', dateTime);
+
+        if (dateTime.startDate) {
+          setSelectedStartDate(dateTime.startDate);
+          setSelectedStartTime(dateTime.startTime);
+        }
+        if (dateTime.endDate) {
+          setSelectedEndDate(dateTime.endDate);
+          setSelectedEndTime(dateTime.endTime);
+        }
+      }
+
+      // Set other fields...
+      if (parsedData.timezone) {
+        setSelectedTimezone(parsedData.timezone);
+      }
+
+      if (parsedData.guests && parsedData.guests.length > 0) {
+        setSelectedGuests(parsedData.guests);
+        setShowGuestDropdown(true);
+      }
+
+      if (parsedData.guest_permission) {
+        setSelectedPermission(parsedData.guest_permission);
+      }
+
+      if (parsedData.seconds) {
+        const minutes = Math.floor(parseInt(parsedData.seconds) / 60);
+        setNotificationMinutes(minutes.toString());
+        setShowAdvanced(true);
+      }
+
+      if (parsedData.repeatEvent) {
+        setSelectedRecurrence(parsedData.repeatEvent);
+      }
+
+      if ((editEventData.fromTime && editEventData.toTime) || (editEventData.date && editEventData.time)) {
+        setShowDetailedDateTime(true);
+      }
+
+
+    }
+  }, [editEventData, mode]);
+
+  useEffect(() => {
+    if (selectedStartDate) {
+      const weekday = selectedStartDate.toLocaleDateString('en-US', { weekday: 'long' });
+      setCustomRecurrence(prev => ({
+        ...prev,
+        repeatOn: [weekday],
+      }));
+    }
+  }, [selectedStartDate]);
+
+  // Location search function
+  const fetchSuggestions = async (query: string) => {
+    if (!query || query.length < 2) {
+      setLocationSuggestions([]);
+      setShowLocationModal(false);
+      return;
+    }
+
+    try {
+      setIsLoadingLocations(true);
+      const url = `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(
+        query,
+      )}`;
+      const response = await fetch(url, {
+        method: 'GET',
+        headers: {
+          'User-Agent': 'DCalendar-Mobile/1.0',
+        },
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data: any[] = await response.json();
+
+      const formattedSuggestions = data.map(location => ({
+        value: location.place_id,
+        label: location.display_name,
+        lat: location.lat,
+        lon: location.lon,
+      }));
+
+      const suggestionsWithInput = [
+        { value: query, label: query },
+        ...formattedSuggestions,
+      ];
+      setLocationSuggestions(suggestionsWithInput);
+      // Always show modal when we have suggestions, even if it's already open
+      setShowLocationModal(true);
+    } catch (error) {
+      console.error('Error fetching location suggestions:', error);
+      setLocationSuggestions([{ value: query, label: query }]);
+      setShowLocationModal(true);
+    } finally {
+      setIsLoadingLocations(false);
+    }
+  };
+
+  // Debounced location search
+  const debouncedFetchSuggestions = React.useCallback(
+    React.useMemo(() => {
+      let timeoutId: NodeJS.Timeout;
+      return (query: string) => {
+        clearTimeout(timeoutId);
+        timeoutId = setTimeout(() => fetchSuggestions(query), 300);
+      };
+    }, []),
+    [],
+  );
+
+  // Handle location selection
+  const handleLocationSelect = (selectedLocation: any) => {
+    setLocation(selectedLocation.label);
+    setShowLocationModal(false);
+    setLocationSuggestions([]);
+  };
+
+  // Handle location input focus - allow continued typing
+  const handleLocationFocus = () => {
+    if (location && location.length >= 2) {
+      debouncedFetchSuggestions(location);
+    }
+  };
+
+  const repeatUnits = ['Day', 'Week', 'Month', 'Year'];
+
+  const getCurrentTimezone = React.useCallback(() => {
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timezoneData = timezones.find(tz => tz.id === timezone);
+    return (
+      timezoneData || { id: timezone, name: timezone, offset: 'GMT+00:00' }
+    );
+  }, []);
+
+  // Initialize with current timezone
+  React.useEffect(() => {
+    if (!selectedTimezone) {
+      const currentTz = getCurrentTimezone();
+      setSelectedTimezone(currentTz.id);
+    }
+  }, [selectedTimezone]);
+
+  const handleEventTypeSelect = (eventType: string) => {
+    setSelectedEventType(eventType);
+    setShowEventTypeDropdown(false);
+
+    // Navigate to corresponding screen
+    if (eventType === 'Task') {
+      navigation.navigate(Screen.CreateTaskScreen);
+    } else if (eventType === 'Out of office') {
+      navigation.navigate(Screen.CreateOutOfOfficeScreen);
+    } else if (eventType === 'Event') {
+      // Stay on current screen
+      return;
+    }
+    // Add navigation for other event types as needed
+  };
+
+  const handleRecurrenceSelect = (recurrence: string) => {
+    if (recurrence === 'Custom...') {
+      setShowRecurrenceDropdown(false);
+      setShowCustomRecurrenceModal(true);
+    } else {
+      setSelectedRecurrence(recurrence);
+      setShowRecurrenceDropdown(false);
+    }
+  };
+
+  const handleCustomRecurrenceDone = () => {
+    // Generate custom recurrence text based on settings
+    const { repeatEvery, repeatUnit, repeatOn, endsType } = customRecurrence;
+    let customText = `Every ${repeatEvery} ${repeatUnit.toLowerCase()}`;
+
+    if (repeatUnit === 'Week' && repeatOn.length > 0) {
+      customText += ` on ${repeatOn.join(', ')}`;
+    }
+
+    if (endsType === 'After') {
+      customText += ` (${customRecurrence.endsAfter} times)`;
+    } else if (endsType === 'On') {
+      customText += ` (until ${customRecurrence.endsDate})`;
+    }
+
+    setSelectedRecurrence(customText);
+    setShowCustomRecurrenceModal(false);
+  };
+
+  const handleTimezoneSelect = (timezoneId: string) => {
+    setSelectedTimezone(timezoneId);
+    setShowTimezoneModal(false);
+    setTimezoneSearchQuery('');
+  };
+
+  const handleUseCurrentTimezone = () => {
+    const currentTz = getCurrentTimezone();
+    setSelectedTimezone(currentTz.id);
+    setShowTimezoneModal(false);
+    setTimezoneSearchQuery('');
+  };
+
+  const getSelectedTimezoneData = () => {
+    return (
+      timezones.find(tz => tz.id === selectedTimezone) || getCurrentTimezone()
+    );
+  };
+
+  const getFilteredTimezones = () => {
+    if (!timezoneSearchQuery) return timezones;
+    return timezones.filter(
+      tz =>
+        tz.name.toLowerCase().includes(timezoneSearchQuery.toLowerCase()) ||
+        tz.id.toLowerCase().includes(timezoneSearchQuery.toLowerCase()),
+    );
+  };
+
+  const handleDayToggle = (day: string) => {
+    setCustomRecurrence(prev => ({
+      ...prev,
+      repeatOn: prev.repeatOn.includes(day)
+        ? prev.repeatOn.filter(d => d !== day)
+        : [...prev.repeatOn, day],
+    }));
+  };
+
+  const handleGuestSelect = (guestEmail: string) => {
+    setSelectedGuests(prev => {
+      const newSelection = prev.includes(guestEmail)
+        ? prev.filter(email => email !== guestEmail)
+        : [...prev, guestEmail];
+
+      return newSelection;
+    });
+  };
+
+
+  // Filter guests based on search query
+  const filteredGuests = guestData.filter(
+    (guest) =>
+      guest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      guest.username.toLowerCase().includes(searchQuery.toLowerCase()),
+  );
+
+  const closeGuestDropdown = () => {
+    setShowGuestDropdown(false);
+  };
+
+  const handleDateTimeSelect = (date: Date, time: string) => {
+    console.log('>>>>>>>> DATE SELECTED <<<<<<<<', {
+      date: date.toISOString(),
+      dateFormatted: date.toLocaleDateString(),
+      time: time,
+      timeStringified: JSON.stringify(time),
+      mode: calendarMode
+    });
+    if (calendarMode === 'from') {
+      setSelectedStartDate(date);
+      setSelectedStartTime(time);
+
+      // If no end date is set, set it to the same date
+      if (!selectedEndDate) {
+        setSelectedEndDate(date);
+      }
+
+      // If no end time is set, suggest 1 hour later
+      if (!selectedEndTime) {
+        const suggestedEndTime = addMinutesToTime(time, 60);
+        setSelectedEndTime(suggestedEndTime);
+      }
+    } else {
+      setSelectedEndDate(date);
+      setSelectedEndTime(time);
+    }
+
+    // Show detailed date time section if we have both dates and times
+    if ((calendarMode === 'from' && selectedEndDate && selectedEndTime) ||
+      (calendarMode === 'to' && selectedStartDate && selectedStartTime)) {
+      setShowDetailedDateTime(true);
+    }
+  };
+
+  // Helper function to add minutes to a time string
+  const addMinutesToTime = (timeString: string, minutesToAdd: number): string => {
+    const [time, period] = timeString.split(' ');
+    const [hours, minutes] = time.split(':').map(Number);
+    let totalMinutes = hours * 60 + minutes;
+
+    if (period === 'PM' && hours !== 12) {
+      totalMinutes += 12 * 60;
+    } else if (period === 'AM' && hours === 12) {
+      totalMinutes -= 12 * 60;
+    }
+
+    totalMinutes += minutesToAdd;
+
+    // Convert back to time string
+    const newHours = Math.floor(totalMinutes / 60) % 24;
+    const newMinutes = totalMinutes % 60;
+
+    let displayHours = newHours;
+    let newPeriod = 'AM';
+
+    if (newHours === 0) {
+      displayHours = 12;
+    } else if (newHours === 12) {
+      newPeriod = 'PM';
+    } else if (newHours > 12) {
+      displayHours = newHours - 12;
+      newPeriod = 'PM';
+    }
+
+    return `${displayHours}:${newMinutes.toString().padStart(2, '0')} ${newPeriod}`;
+  };
+
+  // Form validation
+  const validateForm = () => {
+    if (!title.trim()) {
+      Alert.alert('Error', 'Please enter a title for the event');
+      return false;
+    }
+    if (!selectedStartDate) {
+      Alert.alert('Error', 'Please select a start date for the event');
+      return false;
+    }
+    if (!selectedEndDate) {
+      Alert.alert('Error', 'Please select an end date for the event');
+      return false;
+    }
+
+    // ✅ Only validate times if NOT an all-day event
+    if (!isAllDayEvent) {
+      if (!selectedStartTime) {
+        Alert.alert('Error', 'Please select a start time for the event');
+        return false;
+      }
+      if (!selectedEndTime) {
+        Alert.alert('Error', 'Please select an end time for the event');
+        return false;
+      }
+
+      // Validate that end date/time is after start date/time
+      const startDateTime = new Date(selectedStartDate);
+      const endDateTime = new Date(selectedEndDate);
+
+      const [startTime, startPeriod] = selectedStartTime.split(' ');
+      const [startHours, startMinutes] = startTime.split(':').map(Number);
+      let finalStartHours = startHours;
+      if (startPeriod === 'PM' && startHours !== 12) {
+        finalStartHours = startHours + 12;
+      } else if (startPeriod === 'AM' && startHours === 12) {
+        finalStartHours = 0;
+      }
+      startDateTime.setHours(finalStartHours, startMinutes, 0, 0);
+
+      const [endTime, endPeriod] = selectedEndTime.split(' ');
+      const [endHours, endMinutes] = endTime.split(':').map(Number);
+      let finalEndHours = endHours;
+      if (endPeriod === 'PM' && endHours !== 12) {
+        finalEndHours = endHours + 12;
+      } else if (endPeriod === 'AM' && endHours === 12) {
+        finalEndHours = 0;
+      }
+      endDateTime.setHours(finalEndHours, endMinutes, 0, 0);
+
+      if (endDateTime <= startDateTime) {
+        Alert.alert('Error', 'End date and time must be after start date and time');
+        return false;
+      }
+    } else {
+      // ✅ For all-day events, just validate that end date is not before start date
+      const startDateTime = new Date(selectedStartDate);
+      const endDateTime = new Date(selectedEndDate);
+
+      if (endDateTime < startDateTime) {
+        Alert.alert('Error', 'End date must be on or after start date for all-day events');
+        return false;
+      }
+    }
+
+    if (!activeAccount) {
+      Alert.alert('Error', 'No active account found. Please log in again.');
+      return false;
+    }
+    return true;
+  };
+
+
+  const handleEditEvent = async (event: any, activeAccount: any) => {
+    let txHash = null; // Store blockchain transaction hash
+    let apiResponse = null;
+
+    try {
+      console.log("CreateEventScreen: Active account ==>", activeAccount);
+      console.log("CreateEventScreen: Event to update ==>", event);
+      console.log("CreateEventScreen: Event UUID to update ==>", event.uuid);
+      // 1. Build the required server payload structure
+      const repeatEvents = (event?.list || [])
+        .filter((data: any) => data.key === "repeatEvent")
+        .map((data: any) => data.value)
+        .filter((value: any) => value !== null);
+      // ... [Same customRepeat and meetingEventIdValue extraction logic] ...
+      const customRepeat = (event?.list || [])
+        .filter((data: any) => data.key === "customRepeatEvent")
+        .map((data: any) => data.value)
+        .filter((value: any) => value !== null);
+      const meetingEventIdValue = (event?.list || [])
+        .find((i: any) => i.key === 'meetingEventId')?.value || '';
+
+      const updatePayload = {
+        events: [{
+          uid: event?.uid,
+          fromTime: event?.fromTime,
+          toTime: event?.toTime,
+          repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
+          customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
+          meetingEventId: meetingEventIdValue
+        }],
+        active: activeAccount?.userName,
+        type: 'update',
+      };
+
+      console.log("CreateEventScreen: Update payload ==>", updatePayload);
+
+      // 2. 🎯 CRITICAL: EXECUTE BLOCKCHAIN SEQUENTIALLY
+      const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+      txHash = await blockchainService.updateEvent(event, activeAccount, token);
+
+      if (!txHash) {
+        Alert.alert('Blockchain Error', 'Failed to confirm blockchain update.');
+        return; // Stop if blockchain fails
+      }
+      console.log('Blockchain update successful:', txHash);
+
+      // 3. 🎯 CRITICAL: EXECUTE API SEQUENTIALLY (ONLY AFTER BLOCKCHAIN SUCCESS)
+      apiResponse = await api('POST', '/updateevents', updatePayload);
+      console.log('API response data:', apiResponse.data);
+
+      if (apiResponse?.data) {
+        // 5. Final Success Alert and Navigation
+        await getUserEvents(activeAccount.userName, api);
+        navigation.goBack();
+        Alert.alert('Success', 'Event Updated Successfully');
+      } else {
+        Alert.alert('Failed', 'Failed to Update Event');
+      }
+
+    }
+    catch (error) {
+      console.log('CreateEventScreen: Error updating event ==>', error);
+
+      const errorMessage = txHash
+        ? "Server sync failed after blockchain success."
+        : "Event update failed (Blockchain or API).";
+
+      Alert.alert('Error', errorMessage);
+    }
+  };
+  const handleCreateEvent = async (eventData: any, activeAccount: any) => {
+    try {
+      console.log("Active account: ", activeAccount.userName);
+      console.log("Create event payload: ", eventData);
+      const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+      const response = await blockchainService.createEvent(
+        eventData,
+        activeAccount,
+        token,
+      );
+      if (response) {
+        // Build updatePayload similar to handleEditEvent
+        const repeatEvents = (eventData?.list || [])
+          .filter((data: any) => data.key === "repeatEvent")
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+        const customRepeat = (eventData?.list || [])
+          .filter((data: any) => data.key === "customRepeatEvent")
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+        const meetingEventIdValue = (eventData?.list || [])
+          .find((i: any) => i.key === 'meetingEventId')?.value || '';
+
+        const updatePayload = {
+          events: [{
+            uid: eventData?.uid,
+            fromTime: eventData?.fromTime,
+            toTime: eventData?.toTime,
+            repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
+            customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
+            meetingEventId: meetingEventIdValue
+          }],
+          active: activeAccount?.userName,
+          type: 'update',
+        };
+        // Call the same API as edit
+        const apiResponse = await api('POST', '/updateevents', updatePayload);
+        console.log('API response data (create):', apiResponse.data);
+
+        await getUserEvents(activeAccount.userName, api);
+
+        navigation.goBack();
+
+
+
+
+        Alert.alert('Event created', 'Event Created Successfully');
+      } else {
+        Alert.alert('Event Creation Failed', 'Failed to Create Event');
+      }
+    } catch (error) {
+      console.log(error);
+      Alert.alert('Error', 'Failed to Create Event');
+    }
+  };
+
+  const handleSaveEvent = async () => {
+    if (!validateForm()) return;
+
+    setIsLoading(true);
+    // const storedAccount = await AsyncStorage.getItem('currentAccount');
+    // const storedToken = await AsyncStorage.getItem('token');
+
+    if (!activeAccount || !token) {
+      Alert.alert('Error', 'Authentication data not found');
+      setIsLoading(false);
+      return;
+    }
+
+    try {
+      // Convert date and time to timestamp format (YYYYMMDDTHHMMSS)
+      const formatToISO8601Local = (date: Date, time: string, isAllDay: boolean = false
+      ): string => {
+        console.log('DEBUG - Input date:', date);
+        console.log('DEBUG - Input time:', time);
+
+        // Validate inputs
+        if (!date || !time) {
+          console.error('DEBUG - Invalid inputs:', { date, time });
+          return '';
+        }
+
+        if (isAllDay) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const result = `${year}${month}${day}T000000`;
+          console.log('DEBUG - All-day format result:', result);
+          return result;
+        }
+
+        // For timed events, time is required
+        if (!time) {
+          console.error('DEBUG - Time required for non-all-day event');
+          return '';
+        }
+        // Handle AM/PM format properly - normalize whitespace first
+        const normalizedTime = time.replace(/\s+/g, ' ').trim();
+        console.log('DEBUG - Original time:', JSON.stringify(time));
+        console.log('DEBUG - Normalized time:', JSON.stringify(normalizedTime));
+
+        const timeParts = normalizedTime.split(' ');
+        console.log('DEBUG - Split result:', timeParts);
+
+        if (timeParts.length !== 2) {
+          console.error('DEBUG - Time format should be "HH:MM AM/PM", got:', normalizedTime);
+          return '';
+        }
+
+        const [timePart, period] = timeParts;
+        console.log('DEBUG - timePart:', timePart, 'period:', period);
+
+        if (!timePart || !period) {
+          console.error('DEBUG - Invalid time format:', time);
+          return '';
+        }
+
+        const [hours, minutes] = timePart.split(':').map(Number);
+        console.log('DEBUG - hours:', hours, 'minutes:', minutes);
+
+        if (isNaN(hours) || isNaN(minutes)) {
+          console.error('DEBUG - Invalid hours/minutes:', { hours, minutes });
+          return '';
+        }
+
+        let finalHours = hours;
+
+        // Convert to 24-hour format
+        if (period === 'PM' && hours !== 12) {
+          finalHours = hours + 12;
+        } else if (period === 'AM' && hours === 12) {
+          finalHours = 0;
+        }
+
+        console.log('DEBUG - finalHours:', finalHours);
+
+        const newDate = new Date(date);
+        newDate.setHours(finalHours, minutes, 0, 0);
+
+        console.log('DEBUG - newDate after setHours:', newDate);
+
+        // Format as YYYYMMDDTHHMMSS
+        const year = newDate.getFullYear();
+        const month = String(newDate.getMonth() + 1).padStart(2, '0');
+        const day = String(newDate.getDate()).padStart(2, '0');
+        const hour = String(newDate.getHours()).padStart(2, '0');
+        const minute = String(newDate.getMinutes()).padStart(2, '0');
+        const second = String(newDate.getSeconds()).padStart(2, '0');
+
+        const result = `${year}${month}${day}T${hour}${minute}${second}`;
+        console.log('DEBUG - Final result:', result);
+
+        // Validate the result
+        if (result.includes('NaN') || result.length !== 15) {
+          console.error('DEBUG - Invalid result generated:', result);
+          return '';
+        }
+
+        return result;
+      };
+
+      const getNextDay = (date: Date): Date => {
+        const nextDay = new Date(date);
+        nextDay.setDate(nextDay.getDate() + 1);
+        return nextDay;
+      };
+
+      console.log('CreateEventScreen: Event data ==>', editEventData);
+      // Prepare event data in the new format
+      const eventData = {
+        uuid: editEventData?.uuid || '', // Keep uuid if editing
+        uid: editEventData?.id || editEventData?.uid || generateEventUID(), // Generate UID using the utility method
+        title: title.trim(),
+        description: description.trim(),
+        fromTime: formatToISO8601Local(
+          selectedStartDate,
+          selectedStartTime || '12:00 AM',  // Use midnight if no time
+          isAllDayEvent
+        ),
+        toTime: formatToISO8601Local(
+          isAllDayEvent ? getNextDay(selectedEndDate) : selectedEndDate,  // ✅ Add 1 day for all-day
+          selectedEndTime || '12:00 AM',  // Use midnight if no time
+          isAllDayEvent
+        ),
+        organizer:
+          activeAccount?.email ||
+          activeAccount?.userName ||
+          activeAccount?.address ||
+          '',
+        guests: selectedGuests,
+        location: location.trim() || videoConferencing.trim(),
+        locationType: (videoConferencing.trim() ? 'inperson' : 'inperson') as
+          | 'inperson'
+          | 'zoom'
+          | 'google', // Default to inperson for now
+        busy: 'Busy',
+        visibility: 'Default Visibility',
+        notification: 'Email',
+        guest_permission: selectedPermission || 'Modify event',
+        seconds: parseInt(notificationMinutes || '0', 10) * 60, // Convert minutes to seconds
+        trigger: `PT${notificationMinutes || '0'}M`, // ISO 8601 duration
+        timezone: selectedTimezone || 'UTC',
+        repeatEvent:
+          selectedRecurrence !== 'Does not repeat'
+            ? selectedRecurrence
+            : undefined,
+        customRepeatEvent: undefined,
+        list: [],
+      };
+
+      console.log('>>>>>>>> START DATE/TIME <<<<<<<<', {
+        startDate: selectedStartDate?.toISOString(),
+        startDateFormatted: selectedStartDate?.toLocaleDateString(),
+        startTime: selectedStartTime
+      });
+      console.log('>>>>>>>> END DATE/TIME <<<<<<<<', {
+        endDate: selectedEndDate?.toISOString(),
+        endDateFormatted: selectedEndDate?.toLocaleDateString(),
+        endTime: selectedEndTime
+      });
+      console.log('>>>>>>>> EDIT EVENT DATA <<<<<<<<', eventData);
+      // return;
+      if (mode == 'edit') {
+        await handleEditEvent(eventData, activeAccount);
+        return;
+      } else {
+        await handleCreateEvent(eventData, activeAccount);
+      }
+    } catch (error: any) {
+      console.error('Error creating event:', error);
+      Alert.alert(
+        'Error',
+        error.message || 'Failed to create event. Please try again.',
+      );
+    } finally {
+      setIsLoading(false);
+      return;
+    }
+  };
+
+  const handleClose = () => {
+    navigation.goBack();
+  };
+
+  return (
+    <View style={styles.container}>
+      <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+
+      {/* Invisible overlay to close dropdowns when clicking outside */}
+      {(showEventTypeDropdown || showGuestDropdown) && (
+        <TouchableOpacity
+          style={styles.dropdownOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            setShowEventTypeDropdown(false);
+            closeGuestDropdown();
+          }}
+        />
+      )}
+
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
+          <Text style={styles.closeButtonText}>✕</Text>
+        </TouchableOpacity>
+
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>
+            {mode === 'edit' ? 'Edit ' : 'Create '}
+          </Text>
+          <TouchableOpacity
+            style={styles.eventTypeContainer}
+            onPress={() => setShowEventTypeDropdown(!showEventTypeDropdown)}
+          >
+            <GradientText
+              style={styles.eventTypeText}
+              colors={[Colors.primaryGreen, Colors.primaryblue]}
+            >
+              {selectedEventType}
+            </GradientText>
+            <Image
+              style={styles.arrowDropdown}
+              source={require('../assets/images/CreateEventImages/arrowDropdown.png')}
+            />
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Event Type Dropdown */}
+      {showEventTypeDropdown && (
+        <View style={styles.eventTypeDropdown}>
+          {eventTypes.map(eventType => (
+            <TouchableOpacity
+              key={eventType.id}
+              style={styles.eventTypeItem}
+              onPress={() => handleEventTypeSelect(eventType.name)}
+            >
+              <Text style={styles.eventTypeItemText}>{eventType.name}</Text>
+              {selectedEventType === eventType.name && (
+                <LinearGradient
+                  colors={['#18F06E', '#0B6DE0']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.eventTypeCheckmark}
+                >
+                  <FeatherIcon name="check" size={12} color="white" />
+                </LinearGradient>
+              )}
+            </TouchableOpacity>
+          ))}
+        </View>
+      )}
+
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Title Input */}
+        <View style={styles.inputSection}>
+          <TextInput
+            style={styles.titleInput}
+            placeholder="Add title"
+            placeholderTextColor={colors.grey400}
+            value={title}
+            onChangeText={setTitle}
+          />
+          <View style={styles.inputUnderline} />
+        </View>
+
+        {/* Pick date and time */}
+        <View style={styles.dateTimeSection}>
+          <View style={styles.dateTimeDisplay}>
+            <Text style={styles.dateTimeLabel}>Date & Time</Text>
+            <View style={styles.dateTimeRow}>
+              <TouchableOpacity
+                style={styles.timeSlot}
+                onPress={() => {
+                  setCalendarMode('from');
+                  setShowCalendarModal(true);
+                }}
+              >
+                <Text style={styles.timeSlotLabel}>From</Text>
+                <Text style={styles.timeSlotValue}>
+                  {selectedStartDate ? (
+                    isAllDayEvent ? (
+                      // ✅ All-day: Show only date
+                      selectedStartDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })
+                    ) : selectedStartTime ? (
+                      // ✅ Timed: Show date and time
+                      `${selectedStartDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })} ${selectedStartTime}`
+                    ) : (
+                      'Select start time'
+                    )
+                  ) : (
+                    'Select start date'
+                  )}
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.timeSlot}
+                onPress={() => {
+                  setCalendarMode('to');
+                  setShowCalendarModal(true);
+                }}
+              >
+                <Text style={styles.timeSlotLabel}>To</Text>
+                <Text style={styles.timeSlotValue}>
+                  {selectedEndDate ? (
+                    isAllDayEvent ? (
+                      // ✅ All-day: Show only date
+                      selectedEndDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric'
+                      })
+                    ) : selectedEndTime ? (
+                      // ✅ Timed: Show date and time
+                      `${selectedEndDate.toLocaleDateString('en-US', {
+                        month: 'short',
+                        day: 'numeric',
+                      })} ${selectedEndTime}`
+                    ) : (
+                      'Select end time'
+                    )
+                  ) : (
+                    'Select end date'
+                  )}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+
+        <TouchableOpacity
+          style={styles.allDayToggle}
+          onPress={() => {
+            const newIsAllDay = !isAllDayEvent;
+            setIsAllDayEvent(newIsAllDay);
+
+            if (newIsAllDay) {
+              // ✅ When switching TO all-day:
+              setSelectedStartTime('');
+              setSelectedEndTime('');
+
+              if (selectedStartDate) {
+                // Important: Create a new Date object to avoid modifying the start date state directly.
+                setSelectedEndDate(new Date(selectedStartDate.getTime()));
+              } else {
+                // Optional: If no start date is set, set both to today/default
+                const today = new Date();
+                setSelectedStartDate(today);
+                setSelectedEndDate(today);
+              }
+
+            } else {
+              // ✅ When switching FROM all-day, clear times so user must select
+              setSelectedStartTime('');
+              setSelectedEndTime('');
+            }
+          }}
+        >
+          <View style={[
+            styles.checkbox,
+            isAllDayEvent && styles.checkboxSelected
+          ]}>
+            {isAllDayEvent && (
+              <FeatherIcon name="check" size={14} color="white" />
+            )}
+          </View>
+          <Text style={styles.allDayText}>All-day event</Text>
+        </TouchableOpacity>
+
+        {/* Timezone Tag */}
+        <TouchableOpacity
+          style={styles.timezoneTag}
+          onPress={() => setShowTimezoneModal(true)}
+        >
+          <Text style={styles.timezoneTagText}>
+            {getSelectedTimezoneData().name}
+          </Text>
+        </TouchableOpacity>
+
+        <View style={styles.divider} />
+
+        {/* Recurrence Dropdown - Only show when date and time are selected */}
+        {showDetailedDateTime && (
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginTop: spacing.md,
+            }}
+          >
+            <FeatherIcon name="repeat" size={20} color="#6C6C6C" />
+            <TouchableOpacity
+              style={styles.recurrenceContainer}
+              onPress={() => setShowRecurrenceDropdown(!showRecurrenceDropdown)}
+            >
+              <Text style={styles.selectorText}>{selectedRecurrence}</Text>
+              <Image
+                style={{ marginLeft: scaleWidth(10) }}
+                source={require('../assets/images/CreateEventImages/smallArrowDropdown.png')}
+              />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Recurrence Dropdown */}
+        {showRecurrenceDropdown && (
+          <>
+            {/* Overlay to close recurrence dropdown when clicking outside */}
+            <TouchableOpacity
+              style={styles.recurrenceOverlay}
+              activeOpacity={1}
+              onPress={() => setShowRecurrenceDropdown(false)}
+            />
+            <View style={styles.recurrenceDropdown}>
+              <ScrollView
+                style={styles.recurrenceDropdownScroll}
+                showsVerticalScrollIndicator={false}
+                nestedScrollEnabled={true}
+              >
+                {recurrenceOptions.map((option, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[
+                      styles.recurrenceItem,
+                      selectedRecurrence === option &&
+                      styles.recurrenceItemSelected,
+                    ]}
+                    onPress={() => handleRecurrenceSelect(option)}
+                  >
+                    <Text
+                      style={[
+                        styles.recurrenceItemText,
+                        selectedRecurrence === option &&
+                        styles.recurrenceItemTextSelected,
+                      ]}
+                    >
+                      {option}
+                    </Text>
+                    {selectedRecurrence === option && (
+                      <LinearGradient
+                        colors={['#18F06E', '#0B6DE0']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.recurrenceCheckmark}
+                      >
+                        <FeatherIcon name="check" size={12} color="white" />
+                      </LinearGradient>
+                    )}
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
+            </View>
+          </>
+        )}
+
+        {showDetailedDateTime && <View style={styles.divider} />}
+
+        {/* Guest Selector */}
+        <GuestSelector
+          isVisible={showGuestDropdown}
+          selectedGuests={selectedGuests}
+          onGuestSelect={handleGuestSelect}
+          onToggleDropdown={() => setShowGuestDropdown(!showGuestDropdown)}
+          showGuestModal={showGuestModal}
+          onToggleGuestModal={() => setShowGuestModal(!showGuestModal)}
+          searchQuery={guestSearchQuery}
+          onSearchQueryChange={setGuestSearchQuery}
+        />
+
+        <View style={styles.divider} />
+
+        {/* Add video conferencing */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: spacing.md,
+          }}
+        >
+          <FeatherIcon name="video" size={20} color="#6C6C6C" />
+          <View>
+            <TouchableOpacity
+              onPress={() =>
+                setShowVideoConferencingOptions(!showVideoConferencingOptions)
+              }
+            >
+              <Text style={styles.selectorText}>Add video conferencing</Text>
+            </TouchableOpacity>
+          </View>
+
+          <Image
+            style={{
+              marginLeft: scaleWidth(5),
+              height: scaleHeight(12.87),
+              width: scaleWidth(12.87),
+            }}
+            source={require('../assets/images/addIcon.png')}
+          />
+        </View>
+
+        <View style={styles.divider} />
+
+        {/* Video Conferencing Options */}
+        {showVideoConferencingOptions && (
+          <View style={styles.videoConferencingOptions}>
+            <TouchableOpacity
+              style={[
+                styles.videoConferencingButton,
+                selectedVideoConferencing === 'inperson' &&
+                styles.videoConferencingButtonSelected,
+              ]}
+              onPress={() => setSelectedVideoConferencing('in-person')}
+            >
+              <View style={styles.videoConferencingIconContainer}>
+                <FeatherIcon name="map-pin" size={16} color="#6C6C6C" />
+              </View>
+              <Text
+                style={[
+                  styles.videoConferencingButtonText,
+                  selectedVideoConferencing === 'inperson' &&
+                  styles.videoConferencingButtonTextSelected,
+                ]}
+              >
+                In-person
+              </Text>
+            </TouchableOpacity>
+
+             {/* <TouchableOpacity
+              style={[
+                styles.videoConferencingButton,
+                selectedVideoConferencing === 'zoom' &&
+                styles.videoConferencingButtonSelected,
+              ]}
+              onPress={() => setSelectedVideoConferencing('zoom')}
+            >
+              <View style={styles.videoConferencingIconContainer}>
+                <FeatherIcon name="video" size={16} color="#0B6DE0" />
+              </View>
+              <Text
+                style={[
+                  styles.videoConferencingButtonText,
+                  selectedVideoConferencing === 'zoom' &&
+                  styles.videoConferencingButtonTextSelected,
+                ]}
+              >
+                Zoom
+              </Text>
+            </TouchableOpacity> */}
+
+            <TouchableOpacity
+              style={[
+                styles.videoConferencingButton,
+                selectedVideoConferencing === 'google-meet' &&
+                styles.videoConferencingButtonSelected,
+              ]}
+              onPress={() => setSelectedVideoConferencing('google-meet')}
+            >
+              <View style={styles.videoConferencingIconContainer}>
+                <FeatherIcon name="video" size={16} color="#34A853" />
+              </View>
+              <Text
+                style={[
+                  styles.videoConferencingButtonText,
+                  selectedVideoConferencing === 'google-meet' &&
+                  styles.videoConferencingButtonTextSelected,
+                ]}
+              >
+                Google Meet
+              </Text>
+            </TouchableOpacity> */
+          </View>
+        )}
+
+        {/* Add location */}
+        <View
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            marginTop: spacing.md,
+            marginBottom: spacing.md,
+          }}
+        >
+          <FeatherIcon name="map-pin" size={20} color="#6C6C6C" />
+          <TextInput
+            style={[
+              styles.selectorText,
+              { flex: 1, marginHorizontal: spacing.sm },
+            ]}
+            placeholder="Add location"
+            placeholderTextColor={colors.grey400}
+            value={location}
+            onChangeText={text => {
+              setLocation(text);
+              debouncedFetchSuggestions(text);
+            }}
+            onFocus={handleLocationFocus}
+            autoCorrect={false}
+            autoCapitalize="none"
+          />
+          <Image
+            style={{ marginLeft: scaleWidth(10) }}
+            source={require('../assets/images/addIcon.png')}
+          />
+        </View>
+
+        {/* Add Notification time */}
+        {/* <View style={styles.notificationRow}>
+          <FeatherIcon name="bell" size={20} color="#6C6C6C" />
+          <Text style={styles.selectorText}>Add Notification time</Text>
+
+          <View style={styles.notificationInputContainer}>
+            <TextInput
+              style={styles.notificationInput}
+              value={notificationMinutes}
+              onChangeText={
+                text => setNotificationMinutes(text.replace(/[^0-9]/g, '')) // only digits
+              }
+              keyboardType="numeric"
+              placeholder="10"
+              placeholderTextColor="#9E9E9E"
+              maxLength={3}
+              scrollEnabled={false}
+              multiline={false}
+            />
+            <View style={styles.timeUnitDropdown}>
+              <Text style={styles.timeUnitText}>minutes</Text>
+              <FeatherIcon name="chevron-down" size={14} color="#130F26" />
+            </View>
+          </View>
+        </View> */}
+
+        <View style={styles.divider} />
+
+        {/* Advanced Options - Only show when expanded */}
+        {showAdvanced && (
+          <AdvancedOptions
+            notificationMinutes={parseInt(notificationMinutes) || 0}
+            onNotificationMinutesChange={minutes =>
+              setNotificationMinutes(minutes.toString())
+            }
+            selectedTimeUnit={selectedTimeUnit}
+            onTimeUnitChange={setSelectedTimeUnit}
+            onAddNotification={() => {
+              // Handle add notification
+              console.log('Add notification pressed');
+            }}
+            organizerName="Farhanur Rahman"
+            onOrganizerPress={() => {
+              // Handle organizer selection
+              console.log('Organizer pressed');
+            }}
+            status="Busy"
+            visibility="Default visibility"
+            onStatusPress={() => {
+              // Handle status selection
+              console.log('Status pressed');
+            }}
+            onVisibilityPress={() => {
+              // Handle visibility selection
+              console.log('Visibility pressed');
+            }}
+          />
+        )}
+
+        {/* Add description */}
+        <View style={styles.descriptionContainer}>
+          <TextInput
+            style={styles.descriptionInput}
+            placeholder="Add description"
+            placeholderTextColor={colors.grey400}
+            multiline
+            numberOfLines={4}
+            value={description}
+            onChangeText={setDescription}
+          />
+        </View>
+
+        {/* Bottom Action Bar */}
+        <View style={styles.bottomActionBar}>
+          <TouchableOpacity
+            style={styles.advanceOptionsButton}
+            onPress={() => setShowAdvanced(!showAdvanced)}
+          >
+            <Text style={styles.advanceOptionsText}>Advanced options</Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+            onPress={handleSaveEvent}
+            disabled={isLoading}
+          >
+            <LinearGradient
+              colors={
+                isLoading ? ['#CCCCCC', '#AAAAAA'] : ['#18F06E', '#0B6DE0']
+              }
+              start={{ x: 0, y: 0.5 }}
+              end={{ x: 1, y: 0.5 }}
+              style={styles.gradient}
+            >
+              <Text style={styles.saveButtonText}>
+                {isLoading ? 'Saving...' : 'Save'}
+              </Text>
+            </LinearGradient>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+
+
+      {/* Calendar with Time Modal */}
+      <CalendarWithTime
+        isVisible={showCalendarModal}
+        onClose={() => setShowCalendarModal(false)}
+        onDateTimeSelect={handleDateTimeSelect}
+        mode={calendarMode}
+        selectedDate={calendarMode === 'from' ? selectedStartDate || undefined : selectedEndDate || undefined}
+        selectedTime={calendarMode === 'from' ? selectedStartTime : selectedEndTime}
+      />
+
+      {/* Timezone Selection Modal */}
+      <Modal
+        visible={showTimezoneModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowTimezoneModal(false)}
+      >
+        <View style={styles.timezoneModalOverlay}>
+          <View style={styles.timezoneModal}>
+            {/* Modal Header */}
+            <View style={styles.timezoneModalHeader}>
+              <Text style={styles.timezoneModalTitle}>Event time zone</Text>
+              <TouchableOpacity
+                style={styles.timezoneModalCloseButton}
+                onPress={() => setShowTimezoneModal(false)}
+              >
+                <Text style={styles.timezoneModalCloseText}>✕</Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Current Timezone Display */}
+            <View style={styles.currentTimezoneContainer}>
+              <TextInput
+                style={styles.currentTimezoneInput}
+                value={getSelectedTimezoneData().name}
+                editable={false}
+              />
+            </View>
+
+            {/* Timezone List */}
+            <FlatList
+              data={getFilteredTimezones()}
+              keyExtractor={item => item.id}
+              style={styles.timezoneList}
+              showsVerticalScrollIndicator={false}
+              renderItem={({ item }) => (
+                <TouchableOpacity
+                  style={[
+                    styles.timezoneItem,
+                    selectedTimezone === item.id && styles.timezoneItemSelected,
+                  ]}
+                  onPress={() => handleTimezoneSelect(item.id)}
+                >
+                  <Text
+                    style={[
+                      styles.timezoneItemText,
+                      selectedTimezone === item.id &&
+                      styles.timezoneItemTextSelected,
+                    ]}
+                  >
+                    ({item.offset}) {item.name}
+                  </Text>
+                </TouchableOpacity>
+              )}
+            />
+
+            {/* Modal Footer */}
+            <View style={styles.timezoneModalFooter}>
+              <TouchableOpacity
+                style={styles.timezoneModalButton}
+                onPress={handleUseCurrentTimezone}
+              >
+                <Text style={styles.timezoneModalButtonText}>
+                  Use current time zone
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.timezoneModalButton}
+                onPress={() => setShowTimezoneModal(false)}
+              >
+                <Text style={styles.timezoneModalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.timezoneModalOkButton}
+                onPress={() => setShowTimezoneModal(false)}
+              >
+                <LinearGradient
+                  colors={['#18F06E', '#0B6DE0']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.timezoneModalOkGradient}
+                >
+                  <Text style={styles.timezoneModalOkText}>Ok</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Custom Recurrence Modal */}
+      <Modal
+        visible={showCustomRecurrenceModal}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={() => setShowCustomRecurrenceModal(false)}
+      >
+        <View style={styles.customModalOverlay}>
+          <View style={styles.customRecurrenceModalContainer}>
+            {/* Modal Header */}
+            <View style={styles.customModalHeader}>
+              <Text style={styles.customModalTitle}>Custom recurrence</Text>
+            </View>
+
+            <View style={styles.customRecurrenceContent}>
+              {/* Repeat every section */}
+              <View style={styles.customRecurrenceSection}>
+                <Text style={styles.customRecurrenceSectionTitle}>
+                  Repeat every
+                </Text>
+                <View style={styles.customRepeatEveryRow}>
+                  <TextInput
+                    style={styles.customRepeatEveryInput}
+                    value={customRecurrence.repeatEvery}
+                    onChangeText={text =>
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        repeatEvery: text,
+                      }))
+                    }
+                    keyboardType="numeric"
+                    maxLength={2}
+                  />
+                  <View style={styles.customRepeatUnitDropdown}>
+                    <Text style={styles.customRepeatUnitText}>
+                      {customRecurrence.repeatUnit}
+                    </Text>
+                    <FeatherIcon
+                      name="chevron-down"
+                      size={16}
+                      color="#6C6C6C"
+                    />
+                  </View>
+                </View>
+              </View>
+
+              {/* Repeat on section */}
+              {customRecurrence.repeatUnit === repeatUnits[1] && (
+                <View style={styles.customRecurrenceSection}>
+                  <Text style={styles.customRecurrenceSectionTitle}>
+                    Repeat on
+                  </Text>
+                  <View style={styles.customDaysRow}>
+                    {dayAbbreviations.map((day, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.customDayButton,
+                          customRecurrence.repeatOn.includes(dayNames[index]) &&
+                          styles.customDayButtonSelected,
+                        ]}
+                        onPress={() => handleDayToggle(dayNames[index])}
+                      >
+                        <Text
+                          style={[
+                            styles.customDayButtonText,
+                            customRecurrence.repeatOn.includes(
+                              dayNames[index],
+                            ) && styles.customDayButtonTextSelected,
+                          ]}
+                        >
+                          {day}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+
+              {/* Ends section */}
+              <View style={styles.customRecurrenceSection}>
+                <Text style={styles.customRecurrenceSectionTitle}>Ends</Text>
+
+                <TouchableOpacity
+                  style={styles.customEndsOption}
+                  onPress={() =>
+                    setCustomRecurrence(prev => ({
+                      ...prev,
+                      endsType: endsOptions[0],
+                    }))
+                  }
+                >
+                  <View style={styles.customRadioButton}>
+                    {customRecurrence.endsType === endsOptions[0] && (
+                      <View style={styles.customRadioButtonSelected} />
+                    )}
+                  </View>
+                  <Text style={styles.customEndsOptionText}>
+                    {endsOptions[0]}
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customEndsOption}
+                  onPress={() =>
+                    setCustomRecurrence(prev => ({
+                      ...prev,
+                      endsType: endsOptions[1],
+                    }))
+                  }
+                >
+                  <View style={styles.customRadioButton}>
+                    {customRecurrence.endsType === endsOptions[1] && (
+                      <View style={styles.customRadioButtonSelected} />
+                    )}
+                  </View>
+                  <Text style={styles.customEndsOptionText}>
+                    {endsOptions[1]}
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.customEndsInput,
+                      customRecurrence.endsType !== endsOptions[1] &&
+                      styles.customEndsInputDisabled,
+                    ]}
+                    value={customRecurrence.endsDate}
+                    onChangeText={text =>
+                      setCustomRecurrence(prev => ({ ...prev, endsDate: text }))
+                    }
+                    placeholder="04/09/2025"
+                    placeholderTextColor="#9E9E9E"
+                    editable={customRecurrence.endsType === endsOptions[1]}
+                  />
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.customEndsOption}
+                  onPress={() =>
+                    setCustomRecurrence(prev => ({
+                      ...prev,
+                      endsType: endsOptions[2],
+                    }))
+                  }
+                >
+                  <View style={styles.customRadioButton}>
+                    {customRecurrence.endsType === endsOptions[2] && (
+                      <View style={styles.customRadioButtonSelected} />
+                    )}
+                  </View>
+                  <Text style={styles.customEndsOptionText}>
+                    {endsOptions[2]}
+                  </Text>
+                  <TextInput
+                    style={[
+                      styles.customEndsInput,
+                      customRecurrence.endsType !== endsOptions[2] &&
+                      styles.customEndsInputDisabled,
+                    ]}
+                    value={customRecurrence.endsAfter}
+                    onChangeText={text =>
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsAfter: text,
+                      }))
+                    }
+                    keyboardType="numeric"
+                    editable={customRecurrence.endsType === endsOptions[2]}
+                  />
+                  <Text style={styles.customEndsOccurrencesText}>
+                    occurrences
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* Action Buttons */}
+            <View style={styles.customModalActions}>
+              <TouchableOpacity
+                style={styles.customCancelButton}
+                onPress={() => setShowCustomRecurrenceModal(false)}
+              >
+                <Text style={styles.customCancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={styles.customDoneButton}
+                onPress={handleCustomRecurrenceDone}
+              >
+                <LinearGradient
+                  colors={['#18F06E', '#0B6DE0']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.customDoneButtonGradient}
+                >
+                  <Text style={styles.customDoneButtonText}>Done</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Location Suggestions Modal */}
+      <Modal
+        visible={showLocationModal}
+        animationType="slide"
+        transparent={true}
+        onRequestClose={() => setShowLocationModal(false)}
+        presentationStyle="overFullScreen"
+      >
+        <View style={styles.locationModalOverlay}>
+          {/* Keep the original TextInput visible at the top */}
+          <View style={styles.locationInputContainer}>
+            <View style={styles.locationInputRow}>
+              <FeatherIcon name="map-pin" size={20} color="#6C6C6C" />
+              <TextInput
+                style={styles.locationModalInput}
+                placeholder="Add location"
+                placeholderTextColor={colors.grey400}
+                value={location}
+                onChangeText={text => {
+                  setLocation(text);
+                  debouncedFetchSuggestions(text);
+                }}
+                autoCorrect={false}
+                autoCapitalize="none"
+                autoFocus={true}
+              />
+              <TouchableOpacity
+                onPress={() => setShowLocationModal(false)}
+                style={styles.locationCloseButton}
+              >
+                <FeatherIcon name="x" size={20} color={colors.blackText} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
+          {/* Suggestions list below the input */}
+          <View style={styles.locationSuggestionsContainer}>
+            {isLoadingLocations ? (
+              <View style={styles.loadingContainer}>
+                <Text style={styles.loadingText}>Searching locations...</Text>
+              </View>
+            ) : (
+              <FlatList
+                data={locationSuggestions}
+                keyExtractor={(item, index) => `${item.value}-${index}`}
+                renderItem={({ item }) => (
+                  <TouchableOpacity
+                    style={styles.locationItem}
+                    onPress={() => handleLocationSelect(item)}
+                  >
+                    <FeatherIcon
+                      name="map-pin"
+                      size={16}
+                      color={colors.grey400}
+                    />
+                    <Text style={styles.locationItemText}>{item.label}</Text>
+                  </TouchableOpacity>
+                )}
+                style={styles.locationList}
+                showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
+    </View>
+  );
+};
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.white,
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
+  },
+  recurrenceOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 1000,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingTop: scaleHeight(40),
+    paddingBottom: spacing.lg,
+    width: '100%',
+    position: 'relative',
+    paddingLeft: scaleWidth(10),
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    paddingHorizontal: spacing.sm,
+  },
+  headerTitle: {
+    fontSize: fontSize.textSize25,
+    color: colors.blackText,
+    fontWeight: '600',
+  },
+  eventTypeContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: scaleWidth(5),
+  },
+  eventTypeText: {
+    fontSize: fontSize.textSize25,
+    fontWeight: '600',
+    marginRight: scaleWidth(8),
+  },
+  eventTypeDropdown: {
+    position: 'absolute',
+    top: scaleHeight(100),
+    left: scaleWidth(166),
+    width: scaleWidth(138),
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F5F5F5',
+    shadowColor: '#0A0D12',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 1000,
+    paddingVertical: scaleHeight(8),
+  },
+  eventTypeItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    minHeight: scaleHeight(44),
+  },
+  eventTypeItemText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '400',
+    flex: 1,
+  },
+  eventTypeCheckmark: {
+    width: scaleWidth(16),
+    height: scaleHeight(16),
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButton: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  closeButtonText: {
+    fontSize: fontSize.textSize17,
+    color: colors.blackText,
+    fontWeight: 'bold',
+  },
+  arrowDropdown: {
+    width: 12,
+    height: 8,
+    marginTop: 4,
+    marginLeft: 1,
+  },
+  content: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+  },
+  inputSection: {
+    marginBottom: spacing.lg,
+  },
+  titleInput: {
+    fontSize: fontSize.textSize25,
+    color: colors.textPrimary,
+    paddingVertical: spacing.sm,
+    minHeight: scaleHeight(50),
+  },
+  inputUnderline: {
+    height: 1,
+    backgroundColor: colors.grey20,
+  },
+  detailsSection: {
+    marginBottom: spacing.lg,
+  },
+  selectorItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  selectorText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '400',
+    marginLeft: spacing.sm,
+    flex: 1,
+  },
+  dateTimeSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  dateTimeSelector: {
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  dateTimeDisplay: {
+    flex: 1,
+  },
+  dateTimeLabel: {
+    fontSize: fontSize.textSize14,
+    color: colors.grey400,
+    fontWeight: '500',
+    marginBottom: spacing.xs,
+  },
+  dateTimeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.md,
+  },
+  timeSlot: {
+    flex: 1,
+    backgroundColor: '#F6F7F9',
+    borderRadius: borderRadius.sm,
+    padding: spacing.sm,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    minHeight: scaleHeight(60),
+    justifyContent: 'center',
+  },
+  timeSlotLabel: {
+    fontSize: fontSize.textSize12,
+    color: colors.grey400,
+    fontWeight: '500',
+    marginBottom: spacing.xs,
+  },
+  timeSlotValue: {
+    fontSize: fontSize.textSize14,
+    color: colors.blackText,
+    fontWeight: '600',
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.grey20,
+    marginVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  addIconContainer: {
+    width: moderateScale(20),
+    height: moderateScale(20),
+    borderRadius: moderateScale(10),
+    backgroundColor: Colors.primaryGreen,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  addIconText: {
+    fontSize: fontSize.textSize14,
+    color: colors.white,
+    fontWeight: 'bold',
+  },
+  notificationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    width: '100%',
+  },
+  notificationInputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginLeft: 'auto',
+  },
+  notificationInput: {
+    width: scaleWidth(60),
+    height: scaleHeight(32),
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: borderRadius.sm,
+    textAlign: 'center',
+    fontSize: fontSize.textSize12,
+    color: colors.blackText,
+    marginRight: spacing.xs,
+    paddingHorizontal: 4,
+    paddingVertical: 0,
+  },
+  timeUnitDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    height: scaleHeight(32),
+  },
+  timeUnitText: {
+    fontSize: fontSize.textSize12,
+    color: colors.textPrimary,
+    fontWeight: '400',
+    marginRight: spacing.xs,
+  },
+  descriptionContainer: {
+    backgroundColor: '#F6F7F9',
+    borderRadius: 10,
+    padding: 16,
+    marginBottom: spacing.lg,
+  },
+  descriptionInput: {
+    fontSize: fontSize.textSize16,
+    color: colors.textPrimary,
+    padding: 0,
+    minHeight: scaleHeight(100),
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    textAlignVertical: 'top',
+    borderWidth: 0,
+    borderColor: 'transparent',
+  },
+  bottomActionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.xl,
+    marginHorizontal: scaleWidth(20),
+    paddingBottom: scaleHeight(50),
+  },
+  advanceOptionsButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+  },
+  advanceOptionsText: {
+    fontSize: fontSize.textSize18,
+    color: colors.dimGray,
+    fontWeight: '600',
+  },
+  saveButton: {
+    borderRadius: borderRadius.lg,
+    minWidth: scaleWidth(120),
+    alignItems: 'center',
+    ...shadows.sm,
+    overflow: 'hidden',
+  },
+  saveButtonDisabled: {
+    opacity: 0.6,
+  },
+  gradient: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.xl,
+    alignItems: 'center',
+    width: '100%',
+  },
+  saveButtonText: {
+    fontSize: fontSize.textSize16,
+    color: colors.white,
+    fontWeight: '600',
+  },
+  videoConferencingOptions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+    paddingHorizontal: spacing.sm,
+  },
+  videoConferencingButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xs,
+    marginHorizontal: spacing.xs,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    backgroundColor: colors.white,
+  },
+  videoConferencingButtonSelected: {
+    borderColor: Colors.primaryGreen,
+    backgroundColor: '#F0FFF4',
+  },
+  videoConferencingIconContainer: {
+    width: scaleWidth(24),
+    height: scaleHeight(24),
+    borderRadius: 12,
+    backgroundColor: '#F5F5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.xs,
+  },
+  videoConferencingButtonText: {
+    fontSize: fontSize.textSize14,
+    color: colors.blackText,
+    fontWeight: '500',
+  },
+  videoConferencingButtonTextSelected: {
+    color: Colors.primaryGreen,
+    fontWeight: '600',
+  },
+  // Modal Styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  guestModalContainer: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    minHeight: '60%',
+    paddingBottom: scaleHeight(40),
+  },
+  modalHandle: {
+    width: scaleWidth(40),
+    height: scaleHeight(4),
+    backgroundColor: '#D1D5DB',
+    borderRadius: 2,
+    alignSelf: 'center',
+    marginTop: scaleHeight(12),
+    marginBottom: scaleHeight(20),
+  },
+  modalHeader: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
+    fontSize: fontSize.textSize20,
+    fontWeight: '600',
+    color: colors.blackText,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F6F7F9',
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    marginLeft: spacing.sm,
+    padding: 0,
+  },
+  guestList: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+  },
+  guestItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  guestInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  guestAvatar: {
+    width: scaleWidth(40),
+    height: scaleHeight(40),
+    borderRadius: 20,
+    marginRight: spacing.md,
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+  },
+  avatarInitials: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: '#FF9500',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  avatarInitialsText: {
+    fontSize: fontSize.textSize14,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  guestDetails: {
+    flex: 1,
+  },
+  guestName: {
+    fontSize: fontSize.textSize16,
+    fontWeight: '500',
+    color: colors.blackText,
+    marginBottom: 2,
+  },
+  guestUsername: {
+    fontSize: fontSize.textSize14,
+    color: '#6B7280',
+  },
+  checkbox: {
+    width: scaleWidth(20),
+    height: scaleHeight(20),
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#D1D5DB',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  checkboxSelected: {
+    backgroundColor: Colors.primaryGreen,
+    borderColor: Colors.primaryGreen,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.lg,
+    gap: spacing.md,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 10,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    fontSize: fontSize.textSize16,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  addButton: {
+    flex: 2,
+    borderRadius: 10,
+    overflow: 'hidden',
+  },
+  addButtonGradient: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  addButtonText: {
+    fontSize: fontSize.textSize16,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  // Recurrence Dropdown Styles
+  recurrenceContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginLeft: spacing.sm,
+  },
+  recurrenceDropdown: {
+    position: 'absolute',
+    top: scaleHeight(180),
+    left: scaleWidth(20),
+    right: scaleWidth(20),
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: '#F5F5F5',
+    shadowColor: '#0A0D12',
+    shadowOffset: {
+      width: 0,
+      height: 4,
+    },
+    shadowOpacity: 0.03,
+    shadowRadius: 6,
+    elevation: 4,
+    zIndex: 1001,
+    paddingVertical: scaleHeight(8),
+    maxHeight: scaleHeight(400),
+  },
+  recurrenceDropdownScroll: {
+    maxHeight: scaleHeight(380),
+  },
+  recurrenceItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    minHeight: scaleHeight(44),
+  },
+  recurrenceItemSelected: {
+    backgroundColor: '#F0F8FF',
+  },
+  recurrenceItemText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '400',
+    flex: 1,
+  },
+  recurrenceItemTextSelected: {
+    color: Colors.primaryblue,
+    fontWeight: '500',
+  },
+  recurrenceCheckmark: {
+    width: scaleWidth(16),
+    height: scaleHeight(16),
+    borderRadius: 8,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  // Custom Recurrence Modal Styles
+  customRecurrenceModalContainer: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%',
+    minHeight: '60%',
+    paddingBottom: scaleHeight(40),
+  },
+  customRecurrenceContent: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+  },
+  // Custom Modal Styles
+  customModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  customModalHeader: {
+    marginBottom: spacing.xl,
+    alignItems: 'center',
+  },
+  customModalTitle: {
+    fontSize: fontSize.textSize20,
+    fontWeight: '600',
+    color: colors.blackText,
+  },
+  customRecurrenceSection: {
+    marginBottom: spacing.xl,
+  },
+  customRecurrenceSectionTitle: {
+    fontSize: fontSize.textSize16,
+    fontWeight: '600',
+    color: colors.blackText,
+    marginBottom: spacing.md,
+  },
+  customRepeatEveryRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  customRepeatEveryInput: {
+    width: scaleWidth(60),
+    height: scaleHeight(40),
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: borderRadius.sm,
+    textAlign: 'center',
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    paddingHorizontal: 4,
+  },
+  customRepeatUnitDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    height: scaleHeight(40),
+    minWidth: scaleWidth(80),
+  },
+  customRepeatUnitText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '400',
+    marginRight: spacing.xs,
+  },
+  customDaysRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: spacing.xs,
+  },
+  customDayButton: {
+    width: scaleWidth(40),
+    height: scaleHeight(40),
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customDayButtonSelected: {
+    backgroundColor: Colors.primaryblue,
+    borderColor: Colors.primaryblue,
+  },
+  customDayButtonText: {
+    fontSize: fontSize.textSize14,
+    fontWeight: '500',
+    color: colors.blackText,
+  },
+  customDayButtonTextSelected: {
+    color: colors.white,
+  },
+  customEndsOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    gap: spacing.sm,
+  },
+  customRadioButton: {
+    width: scaleWidth(20),
+    height: scaleHeight(20),
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#DCE0E5',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  customRadioButtonSelected: {
+    width: scaleWidth(10),
+    height: scaleHeight(10),
+    borderRadius: 5,
+    backgroundColor: Colors.primaryblue,
+  },
+  customEndsOptionText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '400',
+    minWidth: scaleWidth(40),
+  },
+  customEndsInput: {
+    width: scaleWidth(100),
+    height: scaleHeight(32),
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    fontSize: fontSize.textSize14,
+    color: colors.blackText,
+  },
+  customEndsInputDisabled: {
+    backgroundColor: '#F5F5F5',
+    color: '#9E9E9E',
+  },
+  customEndsOccurrencesText: {
+    fontSize: fontSize.textSize14,
+    color: colors.blackText,
+    marginLeft: spacing.xs,
+  },
+  customModalActions: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.md,
+  },
+  customCancelButton: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: borderRadius.md,
+    backgroundColor: '#F3F4F6',
+  },
+  customCancelButtonText: {
+    fontSize: fontSize.textSize16,
+    fontWeight: '500',
+    color: '#6B7280',
+  },
+  customDoneButton: {
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+  },
+  customDoneButtonGradient: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    alignItems: 'center',
+  },
+  customDoneButtonText: {
+    fontSize: fontSize.textSize16,
+    fontWeight: '600',
+    color: colors.white,
+  },
+  // Timezone Styles
+  timezoneTag: {
+    alignSelf: 'flex-start',
+    backgroundColor: colors.white,
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginTop: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  timezoneTagText: {
+    fontSize: fontSize.textSize14,
+    color: colors.blackText,
+    fontWeight: '400',
+  },
+  timezoneModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timezoneModal: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    width: scaleWidth(320),
+    maxHeight: scaleHeight(500),
+    padding: spacing.lg,
+  },
+  timezoneModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  timezoneModalTitle: {
+    fontSize: fontSize.textSize18,
+    fontWeight: '600',
+    color: colors.blackText,
+  },
+  timezoneModalCloseButton: {
+    width: moderateScale(24),
+    height: moderateScale(24),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  timezoneModalCloseText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: 'bold',
+  },
+  currentTimezoneContainer: {
+    marginBottom: spacing.md,
+  },
+  currentTimezoneInput: {
+    borderWidth: 1,
+    borderColor: '#E5E5E5',
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    backgroundColor: colors.white,
+  },
+  timezoneList: {
+    maxHeight: scaleHeight(250),
+    marginBottom: spacing.lg,
+  },
+  timezoneItem: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  timezoneItemSelected: {
+    backgroundColor: '#F0F8FF',
+  },
+  timezoneItemText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '400',
+  },
+  timezoneItemTextSelected: {
+    color: '#0B6DE0',
+    fontWeight: '500',
+  },
+  timezoneModalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    gap: spacing.sm,
+  },
+  timezoneModalButton: {
+    flex: 1,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderRadius: borderRadius.md,
+    alignItems: 'center',
+  },
+  timezoneModalButtonText: {
+    fontSize: fontSize.textSize14,
+    color: colors.blackText,
+    fontWeight: '400',
+  },
+  timezoneModalOkButton: {
+    flex: 1,
+    borderRadius: borderRadius.md,
+    overflow: 'hidden',
+  },
+  timezoneModalOkGradient: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    alignItems: 'center',
+  },
+  timezoneModalOkText: {
+    fontSize: fontSize.textSize14,
+    color: colors.white,
+    fontWeight: '600',
+  },
+  // Loading, Error, and Empty States
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+  },
+  loadingText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '500',
+  },
+  errorContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+  },
+  errorText: {
+    fontSize: fontSize.textSize16,
+    color: '#EF4444',
+    fontWeight: '500',
+    textAlign: 'center',
+    marginBottom: spacing.md,
+  },
+  retryButton: {
+    backgroundColor: Colors.primaryGreen,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+  },
+  retryButtonText: {
+    fontSize: fontSize.textSize14,
+    color: colors.white,
+    fontWeight: '600',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyText: {
+    fontSize: fontSize.textSize16,
+    color: colors.grey400,
+    fontWeight: '500',
+    textAlign: 'center',
+  },
+  // Location Modal Styles
+  locationModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'flex-end',
+  },
+  locationInputContainer: {
+    backgroundColor: colors.white,
+    paddingTop: scaleHeight(20),
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+  },
+  locationInputRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#F6F7F9',
+    borderRadius: 10,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  locationModalInput: {
+    flex: 1,
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    marginLeft: spacing.sm,
+    marginRight: spacing.sm,
+  },
+  locationCloseButton: {
+    padding: spacing.xs,
+  },
+  locationSuggestionsContainer: {
+    backgroundColor: colors.white,
+    maxHeight: scaleHeight(400),
+    minHeight: scaleHeight(200),
+  },
+  locationList: {
+    flex: 1,
+    paddingHorizontal: spacing.lg,
+  },
+  locationItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  locationItemText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    marginLeft: spacing.sm,
+    flex: 1,
+  },
+  allDayToggle: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  allDayText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '400',
+    marginLeft: spacing.sm,
+  },
+});
+
+export default CreateEventScreen;

@@ -1,0 +1,1574 @@
+[
+	{
+		"inputs": [],
+		"stateMutability": "nonpayable",
+		"type": "constructor"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "target",
+				"type": "address"
+			}
+		],
+		"name": "AddressEmptyCode",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "implementation",
+				"type": "address"
+			}
+		],
+		"name": "ERC1967InvalidImplementation",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "ERC1967NonPayable",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "FailedCall",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "InvalidInitialization",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "NotInitializing",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "owner",
+				"type": "address"
+			}
+		],
+		"name": "OwnableInvalidOwner",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "account",
+				"type": "address"
+			}
+		],
+		"name": "OwnableUnauthorizedAccount",
+		"type": "error"
+	},
+	{
+		"inputs": [],
+		"name": "UUPSUnauthorizedCallContext",
+		"type": "error"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bytes32",
+				"name": "slot",
+				"type": "bytes32"
+			}
+		],
+		"name": "UUPSUnsupportedProxiableUUID",
+		"type": "error"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "uint256",
+				"name": "emailId",
+				"type": "uint256"
+			},
+			{
+				"indexed": true,
+				"internalType": "string",
+				"name": "recipient",
+				"type": "string"
+			},
+			{
+				"indexed": true,
+				"internalType": "string",
+				"name": "senderName",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "string",
+				"name": "subject",
+				"type": "string"
+			},
+			{
+				"indexed": false,
+				"internalType": "uint256",
+				"name": "creationDate",
+				"type": "uint256"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "isCC",
+				"type": "bool"
+			},
+			{
+				"indexed": false,
+				"internalType": "bool",
+				"name": "isBCC",
+				"type": "bool"
+			}
+		],
+		"name": "EmailCreated",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": false,
+				"internalType": "uint64",
+				"name": "version",
+				"type": "uint64"
+			}
+		],
+		"name": "Initialized",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "previousOwner",
+				"type": "address"
+			},
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "OwnershipTransferred",
+		"type": "event"
+	},
+	{
+		"anonymous": false,
+		"inputs": [
+			{
+				"indexed": true,
+				"internalType": "address",
+				"name": "implementation",
+				"type": "address"
+			}
+		],
+		"name": "Upgraded",
+		"type": "event"
+	},
+	{
+		"inputs": [],
+		"name": "UPGRADE_INTERFACE_VERSION",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string[]",
+				"name": "_to",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_cc",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_bcc",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_toEncryptedData",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_ccEncryptedData",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_bccEncryptedData",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string",
+				"name": "_senderName",
+				"type": "string"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_emailDetails",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string",
+				"name": "_subject",
+				"type": "string"
+			},
+			{
+				"components": [
+					{
+						"internalType": "string",
+						"name": "key",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "value",
+						"type": "string"
+					}
+				],
+				"internalType": "struct Attribute[]",
+				"name": "_attributes",
+				"type": "tuple[]"
+			}
+		],
+		"name": "addEmails",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_user",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_date",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_filterType",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_filterValue",
+				"type": "string"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_emails",
+				"type": "string[]"
+			}
+		],
+		"name": "addFolder",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"components": [
+					{
+						"internalType": "bool",
+						"name": "status",
+						"type": "bool"
+					},
+					{
+						"internalType": "string[]",
+						"name": "recipient",
+						"type": "string[]"
+					},
+					{
+						"internalType": "string[]",
+						"name": "encryptedData",
+						"type": "string[]"
+					},
+					{
+						"internalType": "string[]",
+						"name": "emailDetails",
+						"type": "string[]"
+					},
+					{
+						"internalType": "string",
+						"name": "subject",
+						"type": "string"
+					},
+					{
+						"components": [
+							{
+								"internalType": "string",
+								"name": "key",
+								"type": "string"
+							},
+							{
+								"internalType": "string",
+								"name": "value",
+								"type": "string"
+							}
+						],
+						"internalType": "struct Attribute[]",
+						"name": "attributes",
+						"type": "tuple[]"
+					},
+					{
+						"internalType": "string",
+						"name": "senderName",
+						"type": "string"
+					}
+				],
+				"internalType": "struct EmailHostContract.bulkEmail[]",
+				"name": "emailLists",
+				"type": "tuple[]"
+			}
+		],
+		"name": "bulkEmailCreate",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "changeOwner",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "senderAddress",
+				"type": "string"
+			}
+		],
+		"name": "commonHelperAuthentication",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "constDomain",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "contractAddress",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_organizationId",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_role",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_userName",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_domain",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_publicKey",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_walletAddress",
+				"type": "string"
+			},
+			{
+				"internalType": "bool",
+				"name": "_status",
+				"type": "bool"
+			},
+			{
+				"components": [
+					{
+						"internalType": "string",
+						"name": "key",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "value",
+						"type": "string"
+					}
+				],
+				"internalType": "struct Attribute[]",
+				"name": "_attributes",
+				"type": "tuple[]"
+			}
+		],
+		"name": "createAccount",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "encrytedData",
+				"type": "string"
+			}
+		],
+		"name": "createAndUpdateAccountDetails",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "encrytedData",
+				"type": "string"
+			}
+		],
+		"name": "createAndUpdateSettings",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"components": [
+					{
+						"internalType": "string",
+						"name": "organizationId",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "role",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "username",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "domain",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "name",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "publicKey",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "walletAddress",
+						"type": "string"
+					},
+					{
+						"internalType": "bool",
+						"name": "status",
+						"type": "bool"
+					},
+					{
+						"components": [
+							{
+								"internalType": "string",
+								"name": "key",
+								"type": "string"
+							},
+							{
+								"internalType": "string",
+								"name": "value",
+								"type": "string"
+							}
+						],
+						"internalType": "struct Attribute[]",
+						"name": "attributes",
+						"type": "tuple[]"
+					}
+				],
+				"internalType": "struct User[]",
+				"name": "userBatch",
+				"type": "tuple[]"
+			}
+		],
+		"name": "createBulkAccounts",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "bool",
+				"name": "status",
+				"type": "bool"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_recipient",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_encryptedData",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_emailDetails",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string",
+				"name": "_subject",
+				"type": "string"
+			},
+			{
+				"components": [
+					{
+						"internalType": "string",
+						"name": "key",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "value",
+						"type": "string"
+					}
+				],
+				"internalType": "struct Attribute[]",
+				"name": "_attributes",
+				"type": "tuple[]"
+			},
+			{
+				"internalType": "string",
+				"name": "_senderName",
+				"type": "string"
+			},
+			{
+				"internalType": "bool",
+				"name": "_isCC",
+				"type": "bool"
+			},
+			{
+				"internalType": "bool",
+				"name": "_isBCC",
+				"type": "bool"
+			}
+		],
+		"name": "createEmail",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_username",
+				"type": "string"
+			}
+		],
+		"name": "deleteAllEmails",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_user",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_folderId",
+				"type": "uint256"
+			}
+		],
+		"name": "deleteFolder",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "recipient",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256[][]",
+				"name": "collection",
+				"type": "uint256[][]"
+			}
+		],
+		"name": "emptyTrash",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"name": "encryptedDataExists",
+		"outputs": [
+			{
+				"internalType": "bool",
+				"name": "",
+				"type": "bool"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			}
+		],
+		"name": "getAccountDetails",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			}
+		],
+		"name": "getAccountSettings",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			}
+		],
+		"name": "getAddressBookForUser",
+		"outputs": [
+			{
+				"internalType": "string[]",
+				"name": "",
+				"type": "string[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			}
+		],
+		"name": "getEmailCount",
+		"outputs": [
+			{
+				"internalType": "uint256",
+				"name": "",
+				"type": "uint256"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "offset",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "limit",
+				"type": "uint256"
+			}
+		],
+		"name": "getEmailList",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "status",
+						"type": "bool"
+					},
+					{
+						"internalType": "string",
+						"name": "subject",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "encryptedData",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "receivedDate",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "senderName",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "emailDetails",
+						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "creationDate",
+						"type": "uint256"
+					},
+					{
+						"components": [
+							{
+								"internalType": "string",
+								"name": "key",
+								"type": "string"
+							},
+							{
+								"internalType": "string",
+								"name": "value",
+								"type": "string"
+							}
+						],
+						"internalType": "struct Attribute[]",
+						"name": "attributes",
+						"type": "tuple[]"
+					}
+				],
+				"internalType": "struct EmailHostContract.Email[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			}
+		],
+		"name": "getPublicKeyOfUser",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "offset",
+				"type": "uint256"
+			},
+			{
+				"internalType": "uint256",
+				"name": "limit",
+				"type": "uint256"
+			}
+		],
+		"name": "getSentEmailList",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "status",
+						"type": "bool"
+					},
+					{
+						"internalType": "string",
+						"name": "subject",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "encryptedData",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "receivedDate",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "senderName",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "emailDetails",
+						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "creationDate",
+						"type": "uint256"
+					},
+					{
+						"components": [
+							{
+								"internalType": "string",
+								"name": "key",
+								"type": "string"
+							},
+							{
+								"internalType": "string",
+								"name": "value",
+								"type": "string"
+							}
+						],
+						"internalType": "struct Attribute[]",
+						"name": "attributes",
+						"type": "tuple[]"
+					}
+				],
+				"internalType": "struct EmailHostContract.Email[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			}
+		],
+		"name": "getUserByUsername",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "userId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "organizationId",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "role",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "userName",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "domain",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "name",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "publicKey",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "walletAddress",
+						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "creationDate",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "status",
+						"type": "bool"
+					},
+					{
+						"components": [
+							{
+								"internalType": "string",
+								"name": "key",
+								"type": "string"
+							},
+							{
+								"internalType": "string",
+								"name": "value",
+								"type": "string"
+							}
+						],
+						"internalType": "struct Attribute[]",
+						"name": "attributes",
+						"type": "tuple[]"
+					}
+				],
+				"internalType": "struct Users",
+				"name": "foundUser",
+				"type": "tuple"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_user",
+				"type": "string"
+			}
+		],
+		"name": "getUserDataByName",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "walletAddress",
+				"type": "string"
+			}
+		],
+		"name": "getUserDetailsForWallet",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "userId",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "organizationId",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "role",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "userName",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "domain",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "name",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "publicKey",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "walletAddress",
+						"type": "string"
+					},
+					{
+						"internalType": "uint256",
+						"name": "creationDate",
+						"type": "uint256"
+					},
+					{
+						"internalType": "bool",
+						"name": "status",
+						"type": "bool"
+					},
+					{
+						"components": [
+							{
+								"internalType": "string",
+								"name": "key",
+								"type": "string"
+							},
+							{
+								"internalType": "string",
+								"name": "value",
+								"type": "string"
+							}
+						],
+						"internalType": "struct Attribute[]",
+						"name": "attributes",
+						"type": "tuple[]"
+					}
+				],
+				"internalType": "struct Users[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_user",
+				"type": "string"
+			}
+		],
+		"name": "getUserFolders",
+		"outputs": [
+			{
+				"components": [
+					{
+						"internalType": "uint256",
+						"name": "id",
+						"type": "uint256"
+					},
+					{
+						"internalType": "string",
+						"name": "name",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "date",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "filterType",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "filterValue",
+						"type": "string"
+					},
+					{
+						"internalType": "string[]",
+						"name": "emails",
+						"type": "string[]"
+					}
+				],
+				"internalType": "struct Folder[]",
+				"name": "",
+				"type": "tuple[]"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "hostRegistryAddress",
+		"outputs": [
+			{
+				"internalType": "string",
+				"name": "",
+				"type": "string"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "initialize",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "owner",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "recipient",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "emailId",
+				"type": "uint256[]"
+			}
+		],
+		"name": "permanentlyDeleteEmail",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "proxiableUUID",
+		"outputs": [
+			{
+				"internalType": "bytes32",
+				"name": "",
+				"type": "bytes32"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "renounceOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "userName",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "ids",
+				"type": "uint256[]"
+			},
+			{
+				"internalType": "bool",
+				"name": "value",
+				"type": "bool"
+			}
+		],
+		"name": "saveTrashList",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "registryAddress",
+				"type": "string"
+			}
+		],
+		"name": "setAddress",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "contractAddressValue",
+				"type": "address"
+			}
+		],
+		"name": "setHelperContractAddress",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "userRegistryAddress",
+				"type": "address"
+			}
+		],
+		"name": "setUserAddress",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string[]",
+				"name": "_recipient",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_encryptedData",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_emailDetails",
+				"type": "string[]"
+			},
+			{
+				"internalType": "string",
+				"name": "_subject",
+				"type": "string"
+			},
+			{
+				"components": [
+					{
+						"internalType": "string",
+						"name": "key",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "value",
+						"type": "string"
+					}
+				],
+				"internalType": "struct Attribute[]",
+				"name": "_attributes",
+				"type": "tuple[]"
+			}
+		],
+		"name": "storeSendMail",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newOwner",
+				"type": "address"
+			}
+		],
+		"name": "transferOwnership",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "username",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256[]",
+				"name": "emailId",
+				"type": "uint256[]"
+			},
+			{
+				"components": [
+					{
+						"internalType": "string",
+						"name": "key",
+						"type": "string"
+					},
+					{
+						"internalType": "string",
+						"name": "value",
+						"type": "string"
+					}
+				],
+				"internalType": "struct Attribute[]",
+				"name": "_attributes",
+				"type": "tuple[]"
+			}
+		],
+		"name": "updateEmailAttributes",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "string",
+				"name": "_user",
+				"type": "string"
+			},
+			{
+				"internalType": "uint256",
+				"name": "_folderId",
+				"type": "uint256"
+			},
+			{
+				"internalType": "string",
+				"name": "_name",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_date",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_filterType",
+				"type": "string"
+			},
+			{
+				"internalType": "string",
+				"name": "_filterValue",
+				"type": "string"
+			},
+			{
+				"internalType": "string[]",
+				"name": "_emails",
+				"type": "string[]"
+			}
+		],
+		"name": "updateFolder",
+		"outputs": [],
+		"stateMutability": "nonpayable",
+		"type": "function"
+	},
+	{
+		"inputs": [
+			{
+				"internalType": "address",
+				"name": "newImplementation",
+				"type": "address"
+			},
+			{
+				"internalType": "bytes",
+				"name": "data",
+				"type": "bytes"
+			}
+		],
+		"name": "upgradeToAndCall",
+		"outputs": [],
+		"stateMutability": "payable",
+		"type": "function"
+	},
+	{
+		"inputs": [],
+		"name": "userRegistry",
+		"outputs": [
+			{
+				"internalType": "address",
+				"name": "",
+				"type": "address"
+			}
+		],
+		"stateMutability": "view",
+		"type": "function"
+	}
+]
