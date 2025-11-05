@@ -1037,14 +1037,42 @@ const AppointmentScheduleScreen: React.FC<AppointmentScheduleScreenProps> = () =
         return;
       }
 
-      // Prepare appointment data
+      // Generate proper appointment UID
+      const appointmentUID = formMode === 'edit' 
+        ? appointmentId 
+        : `appt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+
+      // Get current time in the same format as events (YYYYMMDDTHHMMSS)
+      const currentTime = new Date();
+      const fromTime = currentTime.toISOString().replace(/[-:]/g, '').split('.')[0]; // Format: "20251106T090000"
+      const toTime = new Date(currentTime.getTime() + 30 * 60000).toISOString().replace(/[-:]/g, '').split('.')[0]; // +30 minutes
+
+      // Create appointment data that is COMPATIBLE with event structure
       const newAppointmentDetails = {
+        // ✅ CORE EVENT FIELDS (required for retrieval with events)
+        uid: appointmentUID,
+        title: appointmentDetails.title,
+        description: appointmentDetails.description || '',
+        fromTime: fromTime, // ✅ MUST be in event format: "YYYYMMDDTHHMMSS"
+        toTime: toTime, // ✅ MUST be in event format: "YYYYMMDDTHHMMSS"
+        done: false,
+        list: [
+          { 
+            key: 'appointment', 
+            value: 'appointment',
+            color: Colors.primaryGreen 
+          }
+        ],
+
+        // ✅ APPOINTMENT-SPECIFIC FIELDS (for appointment functionality)
+        appointment_uid: appointmentUID,
         appointment_title: appointmentDetails.title,
-        appointment_description: appointmentDetails.description,
+        appointment_description: appointmentDetails.description || '',
         appointment_collaborate_users: JSON.stringify(availableGuest),
         appointment_settings: JSON.stringify({
           booking_form: bookingForm,
           locationType: locationType,
+          slotColor: appointmentDetails.slotColor,
           ...appointmentDetails,
         }),
         appointment_public_link: '',
@@ -1066,10 +1094,20 @@ const AppointmentScheduleScreen: React.FC<AppointmentScheduleScreenProps> = () =
             appointment_booking_settings: JSON.stringify({
               custom_time_slot: customTimeSlotValue,
               availability_type: appointmentDetails.availability_type,
+              slotColor: appointmentDetails.slotColor,
             }),
           },
         ],
       };
+
+      console.log('📝 [Appointment] Creating appointment with data:', {
+        uid: newAppointmentDetails.uid,
+        title: newAppointmentDetails.title,
+        fromTime: newAppointmentDetails.fromTime, // Should be like "20251106T090000"
+        toTime: newAppointmentDetails.toTime, // Should be like "20251106T093000"
+        hasList: !!newAppointmentDetails.list,
+        listContent: newAppointmentDetails.list
+      });
 
       if (formMode === 'edit') {
         // Update existing appointment
@@ -1080,43 +1118,23 @@ const AppointmentScheduleScreen: React.FC<AppointmentScheduleScreenProps> = () =
         };
         delete updatePayload.appointment_public_link;
 
-        // 1. 🎯 CRITICAL: EXECUTE BLOCKCHAIN SEQUENTIALLY
-        console.log('Calling blockchain updateAppointmentDetails...');
+        console.log('🔄 [Appointment] Updating appointment...');
         txHash = await blockchainService.updateAppointmentDetails(updatePayload, activeAccount, token);
 
         if (!txHash) {
           showErrorToast('Blockchain Error', 'Failed to confirm blockchain update.');
           setIsLoading(false);
-          return; // Stop if blockchain fails
+          return;
         }
-        console.log('Blockchain update successful:', txHash);
 
-        // 2. 🎯 CRITICAL: EXECUTE API SEQUENTIALLY (ONLY AFTER BLOCKCHAIN SUCCESS)
-        console.log('Calling API updateAppointmentDetails...');
-        // Match web endpoint: POST /updateAppointmentDetails with payload {appointmentDetails: {...}}
+        // API call for update
         const apiPayload = {
           appointmentDetails: updatePayload,
         };
         apiResponse = await api('POST', '/updateAppointmentDetails', apiPayload);
         
-        // Extract response data (web returns response.data directly)
         const result = apiResponse?.data;
         
-        // Show API response in Alert for debugging (without console)
-        Alert.alert(
-          'API Response (Update)',
-          JSON.stringify({
-            httpStatus: apiResponse?.status,
-            resultStatus: result?.status,
-            resultSuccess: result?.success,
-            resultMessage: result?.message,
-            hasError: !!result?.error,
-            fullResult: JSON.stringify(result),
-          }, null, 2),
-          [{ text: 'OK' }]
-        );
-
-        // Check for successful response - match web pattern: result?.status
         const isSuccess = result?.status === true || 
                          result?.status === 1 ||
                          result?.success === true || 
@@ -1125,77 +1143,74 @@ const AppointmentScheduleScreen: React.FC<AppointmentScheduleScreenProps> = () =
         if (isSuccess) {
           success('Success', result?.message || 'Appointment schedule updated successfully');
           
-          // Refresh events after successful update
+          // Force refresh events after successful update
           try {
-            console.log('🔄 Refreshing events after appointment update...');
-            const { getUserEvents } = useEventsStore.getState();
+            console.log('🔄 Force refreshing events after appointment update...');
+            const { getUserEvents, setUserEvents } = useEventsStore.getState();
+            
+            // Normalize appointment structure to match what the store expects
+            const normalizedAppointment = {
+              ...newAppointmentDetails,
+              // Ensure both uid fields are present
+              uid: newAppointmentDetails.uid || newAppointmentDetails.appointment_uid,
+              appointment_uid: newAppointmentDetails.appointment_uid || newAppointmentDetails.uid,
+              // Ensure both title fields are present
+              title: newAppointmentDetails.title || newAppointmentDetails.appointment_title,
+              appointment_title: newAppointmentDetails.appointment_title || newAppointmentDetails.title,
+              // Ensure both description fields are present
+              description: newAppointmentDetails.description || newAppointmentDetails.appointment_description,
+              appointment_description: newAppointmentDetails.appointment_description || newAppointmentDetails.description,
+              // Ensure list/tags are present
+              list: newAppointmentDetails.list || [],
+            };
+            
+            // Also manually add the appointment to the store to ensure it appears
+            const currentEvents = useEventsStore.getState().userEvents || [];
+            const updatedEvents = [
+              ...currentEvents.filter((e: any) => 
+                (e.uid || e.appointment_uid) !== appointmentUID
+              ), 
+              normalizedAppointment
+            ];
+            setUserEvents(updatedEvents);
+            
+            console.log('📅 Updated appointment in store. Total events:', updatedEvents.length);
+            
+            // Also trigger API refresh to sync with server
             await getUserEvents(activeAccount?.userName, api);
-            console.log('✅ Events refreshed successfully');
+            console.log('✅ Events refreshed from API');
+            
           } catch (refreshError) {
             console.error('⚠️ Error refreshing events:', refreshError);
-            // Don't fail the whole operation if refresh fails
           }
           
-          // Wait a bit for blockchain to process the transaction
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
+          await new Promise(resolve => setTimeout(resolve, 1000));
           navigation.goBack();
         } else {
-          const errorMessage = txHash
-            ? `Server sync failed after blockchain success. Response: ${JSON.stringify(result)}`
-            : result?.message || "Appointment update failed (Blockchain or API).";
-          showErrorToast('Error', errorMessage);
+          showErrorToast('Error', result?.message || "Appointment update failed.");
         }
       } else {
         // Create new appointment
-        // 1. 🎯 CRITICAL: EXECUTE BLOCKCHAIN SEQUENTIALLY
-        console.log('Calling blockchain storeAppointmentDetails...');
+        console.log('🔄 [Appointment] Creating new appointment...');
         const blockchainResult = await blockchainService.storeAppointmentDetails(newAppointmentDetails, activeAccount, token);
         
         if (!blockchainResult || !blockchainResult.txHash) {
           showErrorToast('Blockchain Error', 'Failed to confirm blockchain creation.');
           setIsLoading(false);
-          return; // Stop if blockchain fails
+          return;
         }
         
         txHash = blockchainResult.txHash;
-        const appointmentUID = blockchainResult.appointmentUID;
-        
-        console.log('Blockchain creation successful:', txHash);
-        
-        // Add the appointment UID to the payload
-        const createPayload = {
-          ...newAppointmentDetails,
-          appointment_uid: appointmentUID,
-        };
+        console.log('✅ [Appointment] Blockchain creation successful:', txHash);
 
-        // 2. 🎯 CRITICAL: EXECUTE API SEQUENTIALLY (ONLY AFTER BLOCKCHAIN SUCCESS)
-        console.log('Calling API storeAppointmentDetails...');
-        // Match web endpoint: POST /appointmentScheduleCreate with payload {appointmentDetails: {...}}
+        // API call for creation
         const apiPayload = {
-          appointmentDetails: createPayload,
+          appointmentDetails: newAppointmentDetails,
         };
         apiResponse = await api('POST', '/appointmentScheduleCreate', apiPayload);
         
-        // Extract response data (web returns response.data directly)
         const result = apiResponse?.data;
         
-        // Show API response in Alert for debugging (without console)
-        Alert.alert(
-          'API Response',
-          JSON.stringify({
-            httpStatus: apiResponse?.status,
-            resultStatus: result?.status,
-            resultSuccess: result?.success,
-            resultMessage: result?.message,
-            hasError: !!result?.error,
-            fullResult: JSON.stringify(result),
-          }, null, 2),
-          [{ text: 'OK' }]
-        );
-
-        // Check for successful response - match web pattern: result?.status
-        // Web checks: if(result?.status) { toast.success(result?.message); }
         const isSuccess = result?.status === true || 
                          result?.status === 1 ||
                          result?.success === true || 
@@ -1204,59 +1219,85 @@ const AppointmentScheduleScreen: React.FC<AppointmentScheduleScreenProps> = () =
         if (isSuccess) {
           success('Success', result?.message || 'Appointment schedule created successfully');
           
-          // Refresh events after successful creation (like events do)
+          // Force refresh events after successful creation
           try {
-            console.log('🔄 Refreshing events after appointment creation...');
-            const { getUserEvents } = useEventsStore.getState();
-            await getUserEvents(activeAccount?.userName, api);
-            console.log('✅ Events refreshed successfully');
+            console.log('🔄 Force refreshing events after appointment creation...');
+            const { getUserEvents, setUserEvents } = useEventsStore.getState();
+            
+            // Also manually add the appointment to the store to ensure it appears immediately
+            // Normalize appointment structure to match what the store expects
+            const normalizedAppointment = {
+              ...newAppointmentDetails,
+              // Ensure both uid fields are present
+              uid: newAppointmentDetails.uid || newAppointmentDetails.appointment_uid,
+              appointment_uid: newAppointmentDetails.appointment_uid || newAppointmentDetails.uid,
+              // Ensure both title fields are present
+              title: newAppointmentDetails.title || newAppointmentDetails.appointment_title,
+              appointment_title: newAppointmentDetails.appointment_title || newAppointmentDetails.title,
+              // Ensure both description fields are present
+              description: newAppointmentDetails.description || newAppointmentDetails.appointment_description,
+              appointment_description: newAppointmentDetails.appointment_description || newAppointmentDetails.description,
+              // Ensure list/tags are present
+              list: newAppointmentDetails.list || [],
+            };
+            
+            const currentEvents = useEventsStore.getState().userEvents || [];
+            // Remove any existing appointment with same UID to avoid duplicates
+            const filteredEvents = currentEvents.filter((e: any) => 
+              (e.uid || e.appointment_uid) !== appointmentUID
+            );
+            const updatedEvents = [...filteredEvents, normalizedAppointment];
+            setUserEvents(updatedEvents);
+            
+            console.log('📅 Manually added appointment to store. Total events:', updatedEvents.length);
+            console.log('📅 Appointment details:', {
+              uid: normalizedAppointment.uid,
+              title: normalizedAppointment.title,
+              fromTime: normalizedAppointment.fromTime,
+              toTime: normalizedAppointment.toTime,
+              hasList: !!normalizedAppointment.list,
+              listLength: normalizedAppointment.list?.length || 0
+            });
+            
+            // Wait a bit for blockchain to sync, then trigger API refresh
+            await new Promise(resolve => setTimeout(resolve, 3000));
+            
+            // Also trigger API refresh to sync with server (will update when blockchain syncs)
+            try {
+              await getUserEvents(activeAccount?.userName, api);
+              console.log('✅ Events refreshed from API');
+              
+              // After API refresh, ensure our appointment is still in the store
+              // (in case API doesn't have it yet due to blockchain delay)
+              const refreshedEvents = useEventsStore.getState().userEvents || [];
+              const hasAppointment = refreshedEvents.some((e: any) => 
+                (e.uid || e.appointment_uid) === appointmentUID
+              );
+              
+              if (!hasAppointment) {
+                console.log('📅 Appointment not in refreshed events, re-adding to store...');
+                const finalEvents = [...refreshedEvents, normalizedAppointment];
+                setUserEvents(finalEvents);
+                console.log('📅 Re-added appointment. Final count:', finalEvents.length);
+              }
+            } catch (refreshError) {
+              console.error('⚠️ Error refreshing events:', refreshError);
+              // Don't fail - appointment is already in store manually
+            }
+            
           } catch (refreshError) {
             console.error('⚠️ Error refreshing events:', refreshError);
-            // Don't fail the whole operation if refresh fails
           }
           
-          // Wait a bit for blockchain to process the transaction
-          await new Promise(resolve => setTimeout(resolve, 2000));
-          
+          await new Promise(resolve => setTimeout(resolve, 1000));
           navigation.goBack();
         } else {
-          const errorMessage = txHash
-            ? `Server sync failed after blockchain success. Response: ${JSON.stringify(result)}`
-            : result?.message || "Appointment creation failed (Blockchain or API).";
-          showErrorToast('Error', errorMessage);
+          showErrorToast('Error', result?.message || "Appointment creation failed.");
         }
       }
     } catch (err: any) {
       console.error('Error saving appointment:', err);
-      console.error('Error details:', {
-        message: err.message,
-        response: err.response?.data,
-        status: err.response?.status,
-        url: err.config?.url,
-      });
-      
-      // Handle API errors - check if it's a network/API error vs blockchain success
-      let errorMessage = '';
-      
-      if (txHash) {
-        // Blockchain succeeded but API failed
-        if (err.response?.status === 404) {
-          errorMessage = 'Server endpoint not found. Please check the API endpoint configuration.';
-        } else if (err.response?.status >= 500) {
-          errorMessage = 'Server error occurred. Please try again later.';
-        } else if (err.response?.data?.message) {
-          errorMessage = `Server sync failed: ${err.response.data.message}`;
-        } else {
-          errorMessage = `Server sync failed after blockchain success. Status: ${err.response?.status || 'Unknown'}`;
-        }
-      } else {
-        // Both blockchain and API failed
-        errorMessage = err.response?.data?.message 
-          || err.message 
-          || 'Failed to save appointment. Please check your network connection.';
-      }
-      
-      showErrorToast('Error', errorMessage);
+      showErrorToast('Error', err.response?.data?.message || err.message || 'Failed to save appointment.');
     } finally {
       setIsLoading(false);
     }

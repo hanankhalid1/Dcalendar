@@ -6,7 +6,6 @@ import { useEventsStore } from '../stores/useEventsStore';
 const ENCRYPTION_KEY = 'NcogDmailSecureConnection2024!';
 
 export function handleNcogResponse(url: string): boolean | void {
-  // Only process valid Ncog response URLs
   if (!url || typeof url !== 'string') {
     return;
   }
@@ -20,31 +19,26 @@ export function handleNcogResponse(url: string): boolean | void {
     if (params.success === 'true') {
       if (params?.data) {
         try {
-          let payload = JSON.parse(params.data); // first parse
+          let payload = JSON.parse(params.data);
           console.log('📦 [Ncog Handler] Initial payload:', payload);
-          console.log('📦 [Ncog Handler] Payload type:', typeof payload);
-          console.log('📦 [Ncog Handler] Is array:', Array.isArray(payload));
 
           // Handle different payload formats
           if (Array.isArray(payload)) {
-            // If payload is an array of stringified objects, parse again
             if (payload.length > 0 && typeof payload[0] === 'string') {
               console.log('📦 [Ncog Handler] Parsing stringified array items...');
               payload = payload.map(item => {
                 try {
-                  // Skip empty strings or invalid JSON
                   if (!item || typeof item !== 'string' || item.trim() === '') {
                     return null;
                   }
                   return JSON.parse(item);
                 } catch (parseError) {
                   console.warn('⚠️ Failed to parse item in payload array:', item, parseError);
-                  return null; // Return null for invalid items instead of crashing
+                  return null;
                 }
-              }).filter(item => item !== null); // Remove null entries
+              }).filter(item => item !== null);
             }
           } else if (payload && typeof payload === 'object') {
-            // Handle object format with messages property
             if (payload.messages && Array.isArray(payload.messages)) {
               console.log('📦 [Ncog Handler] Found messages property, using it');
               payload = payload.messages;
@@ -55,90 +49,140 @@ export function handleNcogResponse(url: string): boolean | void {
           }
 
           console.log('✅ [Ncog Handler] Final parsed payload:', payload);
-          console.log('✅ [Ncog Handler] Payload length:', Array.isArray(payload) ? payload.length : 'N/A');
           
-          // Log appointments in the payload
+          // Enhanced appointment detection and logging
           if (Array.isArray(payload)) {
             const appointmentsInPayload = payload.filter((item: any) => 
               item?.uid?.startsWith('appt_') || 
               item?.appointment_uid?.startsWith('appt_') ||
               item?.appointment_title ||
-              (item && typeof item === 'object' && JSON.stringify(item).includes('appointment'))
+              (item && typeof item === 'object' && 
+               (JSON.stringify(item).includes('appointment') ||
+                item.list?.some((listItem: any) => 
+                  listItem.key === 'appointment' || listItem.value?.includes('appointment')
+                )))
             );
+            
             console.log('📅 [Ncog Handler] Appointments found in payload:', appointmentsInPayload.length);
             if (appointmentsInPayload.length > 0) {
-              console.log('📅 [Ncog Handler] Appointment samples:', appointmentsInPayload.slice(0, 2).map(apt => ({
+              console.log('📅 [Ncog Handler] Appointment details:', appointmentsInPayload.map(apt => ({
                 uid: apt?.uid,
                 appointment_uid: apt?.appointment_uid,
-                title: apt?.title,
-                appointment_title: apt?.appointment_title,
-                keys: Object.keys(apt || {}),
+                title: apt?.title || apt?.appointment_title,
+                hasFromTime: !!apt?.fromTime,
+                hasToTime: !!apt?.toTime,
+                list: apt?.list,
               })));
             }
           }
 
           if (Array.isArray(payload) && payload.length > 0) {
-            // Get blockchain metadata to merge with decrypted data
-            const store = useEventsStore.getState();
-            const blockchainMetadata = store.blockchainEventsMetadata || [];
-            console.log('📋 [Ncog Handler] Blockchain metadata available:', blockchainMetadata.length);
-            
-            // Merge decrypted data with blockchain metadata (to preserve uid)
-            const mergedPayload = payload.map((decryptedItem: any, index: number) => {
-              // Try to match by index or UUID
-              const blockchainItem = blockchainMetadata[index];
-              
-              if (blockchainItem) {
-                // Merge blockchain metadata (uid, title from blockchain) with decrypted data
-                const merged = {
-                  ...decryptedItem,
-                  uid: blockchainItem.uid || decryptedItem.uid || decryptedItem.appointment_uid,
-                  uuid: blockchainItem.uuid || decryptedItem.uuid,
-                  title: blockchainItem.title || decryptedItem.title || decryptedItem.appointment_title,
-                  description: decryptedItem.description || decryptedItem.appointment_description || blockchainItem.description,
-                  fromTime: blockchainItem.fromTime || decryptedItem.fromTime || '',
-                  toTime: blockchainItem.toTime || decryptedItem.toTime || '',
-                  done: blockchainItem.done || decryptedItem.done || false,
-                  list: decryptedItem.list || blockchainItem.list || [],
-                };
-                
-                // Log if this is an appointment
-                if (merged.uid?.startsWith('appt_')) {
-                  console.log('📅 [Ncog Handler] Merged appointment:', {
-                    uid: merged.uid,
-                    title: merged.title,
-                    hasDecryptedData: !!decryptedItem.appointment_title,
-                  });
+            // Helper function to decode hex strings (like web code does)
+            const decodeHex = (hexString: string | null | undefined): string => {
+              if (!hexString || typeof hexString !== 'string') return '';
+              try {
+                // Check if it's a hex string (starts with 0x or all hex chars)
+                let hex = hexString;
+                if (hex.startsWith('0x')) {
+                  hex = hex.substring(2);
                 }
+                // Remove leading "22" if present (common prefix in hex-encoded strings)
+                if (hex.startsWith('22') && hex.length > 2) {
+                  hex = hex.substring(2);
+                }
+                // Convert hex to string
+                let result = '';
+                for (let i = 0; i < hex.length; i += 2) {
+                  const hexChar = hex.substr(i, 2);
+                  const charCode = parseInt(hexChar, 16);
+                  if (charCode > 0 && charCode < 128) { // Valid ASCII range
+                    result += String.fromCharCode(charCode);
+                  }
+                }
+                return result.trim() || hexString; // Return original if decode fails
+              } catch {
+                return hexString; // Return original if decode fails
+              }
+            };
+            
+            // Normalize appointment data structure to ensure consistency
+            const normalizedPayload = payload.map((item: any) => {
+              // Check if this is an appointment
+              const isAppointment = item?.uid?.startsWith('appt_') || 
+                                   item?.appointment_uid?.startsWith('appt_') ||
+                                   item?.list?.some((listItem: any) => 
+                                     listItem.key === 'appointment' || listItem.value?.includes('appointment')
+                                   );
+              
+              if (isAppointment) {
+                // Decode hex-encoded title and description
+                const decodedTitle = decodeHex(item.appointment_title) || decodeHex(item.title) || item.appointment_title || item.title || 'Untitled Appointment';
+                const decodedDescription = decodeHex(item.appointment_description) || decodeHex(item.description) || item.appointment_description || item.description || '';
                 
-                return merged;
+                console.log('📝 [Ncog Handler] Decoding appointment:', {
+                  uid: item.uid,
+                  raw_title: item.title,
+                  raw_appointment_title: item.appointment_title,
+                  decoded_title: decodedTitle
+                });
+                
+                // Normalize appointment structure
+                return {
+                  ...item,
+                  // Ensure both uid fields are present
+                  uid: item.uid || item.appointment_uid || `appt_${Date.now()}`,
+                  appointment_uid: item.appointment_uid || item.uid || `appt_${Date.now()}`,
+                  // Ensure both title fields are present with DECODED values
+                  title: decodedTitle, // ✅ Use decoded title
+                  appointment_title: decodedTitle, // ✅ Use decoded title
+                  // Ensure both description fields are present with DECODED values
+                  description: decodedDescription, // ✅ Use decoded description
+                  appointment_description: decodedDescription, // ✅ Use decoded description
+                  // Ensure fromTime/toTime are strings (can be empty for appointments)
+                  fromTime: item.fromTime || '',
+                  toTime: item.toTime || '',
+                  // Ensure list/tags are present
+                  list: item.list || item.tags || [
+                    { 
+                      key: 'appointment', 
+                      value: 'appointment',
+                      color: '#18F06E'
+                    }
+                  ],
+                };
               }
               
-              // If no blockchain metadata, return as-is
-              return decryptedItem;
+              // Return regular events as-is
+              return item;
             });
             
-            console.log('✅ [Ncog Handler] Merged payload length:', mergedPayload.length);
+            useEventsStore.getState().setUserEvents(normalizedPayload);
+            console.log('✅ [Ncog Handler] Events updated in store. Count:', normalizedPayload.length);
             
-            // Log appointments in merged payload
-            const appointmentsInMerged = mergedPayload.filter((item: any) => 
+            // Log final appointment count
+            const finalAppointments = normalizedPayload.filter((item: any) => 
               item?.uid?.startsWith('appt_') || 
               item?.appointment_uid?.startsWith('appt_')
             );
-            console.log('📅 [Ncog Handler] Appointments in merged payload:', appointmentsInMerged.length);
-            
-            useEventsStore.getState().setUserEvents(mergedPayload);
-            console.log('✅ [Ncog Handler] Events updated in store. Count:', mergedPayload.length);
+            console.log('📅 [Ncog Handler] Final appointment count in store:', finalAppointments.length);
+            if (finalAppointments.length > 0) {
+              console.log('📅 [Ncog Handler] Normalized appointments:', finalAppointments.map(apt => ({
+                uid: apt.uid,
+                title: apt.title,
+                hasFromTime: !!apt.fromTime,
+                listLength: apt.list?.length || 0
+              })));
+            }
           } else {
             console.warn('⚠️ [Ncog Handler] No valid events in payload');
           }
         } catch (parseError) {
           console.error('❌ Failed to parse payload data:', params.data, parseError);
-          // Don't crash if JSON parsing fails, just log the error
         }
       } else {
         console.warn('⚠️ [Ncog Handler] No data in response params');
       }
+      
       const walletData = {
         walletAddress: decryptData(params.encryptedWalletAddress),
         publicKey: params.dilithiumPublicKey,
@@ -147,7 +191,6 @@ export function handleNcogResponse(url: string): boolean | void {
       };
 
       console.log('✅ Connected to Ncog!', walletData);
-      // TODO: Store or use walletData in your app (e.g., Redux, context, etc.)
     } else {
       console.log('❌ Connection failed:', params.error);
     }

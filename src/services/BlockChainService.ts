@@ -1102,7 +1102,7 @@ export class BlockchainService {
   }
   async getAllEvents(username: string) {
     try {
-      console.log('🔍 Fetching all events for user:', username);
+      console.log('🔍 [BLOCKCHAIN] Getting ALL events (including appointments) for:', username);
       console.log('📋 Contract address:', CONTRACT_ADDRESSES.CALENDAR);
       console.log('🌐 RPC URL:', RPC_URL);
 
@@ -1132,14 +1132,13 @@ export class BlockchainService {
         };
       }
 
-      // Fetch all events from contract safely
+      // Fetch all events from contract safely (this includes appointments since they use addEvent)
       const rawEvents = await this.safeCall(
         async () =>
           await this.calendarContract.methods
             .getEvent(username, 0, eventCount)
             .call(),
       );
-
 
       console.log("[RETRIEVE] Raw events from contract:", JSON.stringify(rawEvents, null, 2));
       if (!rawEvents || !Array.isArray(rawEvents)) {
@@ -1151,7 +1150,6 @@ export class BlockchainService {
       }
 
       console.log('📅 Raw events from contract:', rawEvents);
-
 
       // Transform nested list tuples into JS objects
       const formattedEvents = rawEvents.map((event: any) => ({
@@ -1168,18 +1166,42 @@ export class BlockchainService {
             value: item.value,
           }))
           : [],
-      })
+      }));
+
+      console.log('✅ [BLOCKCHAIN] Formatted events:', formattedEvents.length);
+      
+      // Log breakdown of events vs appointments
+      const appointments = formattedEvents.filter((event: any) => 
+        event.uid?.startsWith('appt_') || 
+        event.list?.some((item: any) => item?.key === 'appointment')
       );
-      console.log('UID to UUID Map:', this.uidToUuidMap);
-      console.log("[RETRIEVE] Formatted events:", JSON.stringify(formattedEvents, null, 2));
+      
+      const regularEvents = formattedEvents.filter((event: any) => 
+        !event.uid?.startsWith('appt_') && 
+        !event.list?.some((item: any) => item?.key === 'appointment')
+      );
+
+      console.log('📊 [BLOCKCHAIN] Data breakdown:', {
+        total: formattedEvents.length,
+        appointments: appointments.length,
+        regularEvents: regularEvents.length
+      });
+
+      if (appointments.length > 0) {
+        console.log('📅 [BLOCKCHAIN] Appointments found:', appointments.map((apt: any) => ({
+          uid: apt.uid,
+          title: apt.title,
+          fromTime: apt.fromTime,
+          hasList: !!apt.list
+        })));
+      }
+
       // Extract UUIDs
       const eventUUIDs = formattedEvents.map((event: any) => {
-        console.log('event ====>', event);
         return event.uuid;
       });
 
-      console.log('✅ Formatted events:', formattedEvents);
-      console.log('🆔 Event UUIDs:', eventUUIDs);
+      console.log('🆔 Event UUIDs:', eventUUIDs.length);
 
       return {
         events: formattedEvents,
@@ -1580,12 +1602,36 @@ export class BlockchainService {
   // Appointment blockchain methods
   async storeAppointmentDetails(appointmentData: any, activeAccount: any, token: string) {
     try {
-      console.log('Storing appointment details on blockchain...');
-      console.log('Appointment data:', appointmentData);
+      console.log('🔍 [BLOCKCHAIN] Storing appointment as event...');
+      console.log('📝 [BLOCKCHAIN] Appointment data:', {
+        uid: appointmentData.uid,
+        title: appointmentData.title,
+        fromTime: appointmentData.fromTime,
+        toTime: appointmentData.toTime,
+        hasList: !!appointmentData.list
+      });
       
-      // Generate a unique ID for the appointment FIRST (needed for encryption)
-      const appointmentUID = `appt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log('Generated appointment UID:', appointmentUID);
+      // Use the appointment UID from the data if provided, otherwise generate one
+      const appointmentUID = appointmentData.uid || appointmentData.appointment_uid || `appt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('📝 [BLOCKCHAIN] Using appointment UID:', appointmentUID);
+      
+      // Ensure fromTime and toTime are in proper format (same as events)
+      // If empty, use current time and +30 minutes
+      let fromTime = appointmentData.fromTime || '';
+      let toTime = appointmentData.toTime || '';
+      
+      if (!fromTime || fromTime.trim() === '') {
+        const currentTime = new Date();
+        fromTime = currentTime.toISOString().replace(/[-:]/g, '').split('.')[0]; // Format: YYYYMMDDTHHMMSS
+        console.log('📝 [BLOCKCHAIN] Generated fromTime:', fromTime);
+      }
+      
+      if (!toTime || toTime.trim() === '') {
+        const currentTime = new Date();
+        const futureTime = new Date(currentTime.getTime() + 30 * 60000); // +30 minutes
+        toTime = futureTime.toISOString().replace(/[-:]/g, '').split('.')[0]; // Format: YYYYMMDDTHHMMSS
+        console.log('📝 [BLOCKCHAIN] Generated toTime:', toTime);
+      }
       
       // Get public key for encryption
       const publicKey = await this.hostContract.methods
@@ -1600,8 +1646,6 @@ export class BlockchainService {
         [appointmentUID], // Pass uid array as required by encryptWithNECJS
       );
       
-      // For now, we'll use the calendar contract similar to events
-      // TODO: Replace with actual appointment contract method when available
       const calendarContract = new Contract(
         CONTRACT_ADDRESSES.CALENDAR,
         CALENDAR_CONTRACT_ABI,
@@ -1610,13 +1654,13 @@ export class BlockchainService {
       
       const walletAddress = await this.getWalletAddress(Config.NECJSPK);
       
-      // Prepare appointment params (similar to event structure)
+      // Prepare appointment params using the SAME structure as events
       const appointmentParamsValue = {
         uuid: encryptedData,
         uid: appointmentUID,
-        title: appointmentData.appointment_title || 'Appointment',
-        fromTime: '',
-        toTime: '',
+        title: appointmentData.title || appointmentData.appointment_title || 'Appointment',
+        fromTime: fromTime, // ✅ Use proper time format (same as events)
+        toTime: toTime, // ✅ Use proper time format (same as events)
       };
       
       const paramsValue = [
@@ -1625,7 +1669,13 @@ export class BlockchainService {
         { contact: [] },
       ];
       
-      console.log('📋 Appointment params:', JSON.stringify(paramsValue, null, 2));
+      console.log('📋 [BLOCKCHAIN] Appointment params for storage:', {
+        uid: appointmentParamsValue.uid,
+        title: appointmentParamsValue.title,
+        fromTime: appointmentParamsValue.fromTime,
+        toTime: appointmentParamsValue.toTime,
+        type: 'APPOINTMENT'
+      });
       
       // Estimate gas
       console.log('⛽ Estimating gas for appointment...');
@@ -1706,7 +1756,6 @@ export class BlockchainService {
         console.log('⏳ Waiting for blockchain confirmation...');
         
         // Wait a bit for transaction to be mined (blockchain needs time)
-        // Note: necjs Provider doesn't support getTransactionReceipt, so we wait
         await new Promise(resolve => setTimeout(resolve, 3000));
         
         console.log('✅ Appointment stored on blockchain successfully');
@@ -1717,7 +1766,7 @@ export class BlockchainService {
       
       return { txHash, appointmentUID };
     } catch (error) {
-      console.error('Error storing appointment on blockchain:', error);
+      console.error('❌ [BLOCKCHAIN] Error storing appointment:', error);
       throw error;
     }
   }
@@ -1728,11 +1777,28 @@ export class BlockchainService {
       console.log('Appointment data:', appointmentData);
       
       // Extract the existing appointment UID (needed for encryption)
-      const appointmentUID = appointmentData.appointment_uid || appointmentData.appointment_schedule_id;
+      const appointmentUID = appointmentData.uid || appointmentData.appointment_uid || appointmentData.appointment_schedule_id;
       if (!appointmentUID) {
         throw new Error('Appointment UID is required for update');
       }
-      console.log('Using existing appointment UID:', appointmentUID);
+      console.log('📝 [BLOCKCHAIN] Using existing appointment UID:', appointmentUID);
+      
+      // Ensure fromTime and toTime are in proper format (same as events)
+      let fromTime = appointmentData.fromTime || '';
+      let toTime = appointmentData.toTime || '';
+      
+      if (!fromTime || fromTime.trim() === '') {
+        const currentTime = new Date();
+        fromTime = currentTime.toISOString().replace(/[-:]/g, '').split('.')[0]; // Format: YYYYMMDDTHHMMSS
+        console.log('📝 [BLOCKCHAIN] Generated fromTime for update:', fromTime);
+      }
+      
+      if (!toTime || toTime.trim() === '') {
+        const currentTime = new Date();
+        const futureTime = new Date(currentTime.getTime() + 30 * 60000); // +30 minutes
+        toTime = futureTime.toISOString().replace(/[-:]/g, '').split('.')[0]; // Format: YYYYMMDDTHHMMSS
+        console.log('📝 [BLOCKCHAIN] Generated toTime for update:', toTime);
+      }
       
       // Get public key for encryption
       const publicKey = await this.hostContract.methods
@@ -1757,13 +1823,13 @@ export class BlockchainService {
       
       const walletAddress = await this.getWalletAddress(Config.NECJSPK);
       
-      // Prepare appointment params for update
+      // Prepare appointment params for update using the SAME structure as events
       const appointmentParamsValue = {
         uuid: encryptedData,
         uid: appointmentUID,
-        title: appointmentData.appointment_title || 'Appointment',
-        fromTime: '',
-        toTime: '',
+        title: appointmentData.title || appointmentData.appointment_title || 'Appointment',
+        fromTime: fromTime, // ✅ Use proper time format (same as events)
+        toTime: toTime, // ✅ Use proper time format (same as events)
       };
       
       const paramsValue = [
@@ -1772,7 +1838,13 @@ export class BlockchainService {
         activeAccount?.userName,
       ];
       
-      console.log('Appointment update params:', paramsValue);
+      console.log('📋 [BLOCKCHAIN] Appointment update params:', {
+        uid: appointmentParamsValue.uid,
+        title: appointmentParamsValue.title,
+        fromTime: appointmentParamsValue.fromTime,
+        toTime: appointmentParamsValue.toTime,
+        type: 'APPOINTMENT_UPDATE'
+      });
       
       // Estimate gas
       const gasEstimate = await calendarContract.methods

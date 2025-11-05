@@ -45,6 +45,7 @@ import { parseTimeToPST } from '../utils';
 import { useSettingsStore } from '../stores/useSetting';
 import { convertToSelectedTimezone } from '../utils/timezone';
 import { s } from 'react-native-size-matters';
+import { Colors } from '../constants/Colors';
 
 
 const HomeScreen = () => {
@@ -100,149 +101,267 @@ const HomeScreen = () => {
     const transformEventsToCalendar = (allEvents: any[], selectedTimeZone: string) => {
         const groupedEvents: Record<string, any[]> = {};
         
-        console.log('🔄 [HomeScreen] transformEventsToCalendar - Total events:', allEvents?.length || 0);
-        console.log('🔄 [HomeScreen] First few events:', allEvents?.slice(0, 3));
+        console.log('🔄 [HomeScreen] transformEventsToCalendar - Processing events:', allEvents?.length || 0);
+        console.log('🔄 [HomeScreen] All events sample:', allEvents?.slice(0, 3));
+
+        if (!allEvents || allEvents.length === 0) {
+            console.log('🔄 [HomeScreen] No events to process');
+            return [];
+        }
 
         allEvents.forEach((event, index) => {
-            // Debug logging for appointments - check multiple ways
-            const hasApptUid = event.uid?.startsWith('appt_');
-            const hasApptTitle = event.title?.toLowerCase().includes('appointment');
-            const hasApptInList = event.list?.some((item: any) => 
-                item.key === 'appointment' || item.value?.includes('appointment')
-            );
-            
-            if (hasApptUid || hasApptTitle || hasApptInList) {
-                console.log(`📅 [HomeScreen] Found potential appointment at index ${index}:`, {
-                    uid: event.uid,
-                    title: event.title,
-                    hasFromTime: !!event.fromTime,
-                    hasToTime: !!event.toTime,
-                    list: event.list,
-                    fullEvent: JSON.stringify(event, null, 2)
-                });
+            if (!event) {
+                console.warn('🔄 [HomeScreen] Skipping null/undefined event at index:', index);
+                return;
             }
-            
-            // Check if this is an appointment (UID starts with 'appt_')
-            // Also check if it's an appointment from decrypted data structure
-            const isAppointment = event.uid?.startsWith('appt_') || 
-                                 event.appointment_uid?.startsWith('appt_') ||
-                                 (event.list && event.list.some((item: any) => item.key === 'appointment'));
-            
-            // For appointments, handle them differently since they don't have fromTime/toTime
+
+            // Enhanced appointment detection - check multiple indicators
+            const isAppointment = 
+                event.uid?.startsWith('appt_') || 
+                event.appointment_uid?.startsWith('appt_') ||
+                event.title?.toLowerCase().includes('appointment') ||
+                event.appointment_title?.toLowerCase().includes('appointment') ||
+                event.list?.some((item: any) => 
+                    item?.key === 'appointment' || 
+                    item?.value?.includes('appointment')
+                ) ||
+                event.tags?.some((item: any) => 
+                    item?.key === 'appointment' || 
+                    item?.value?.includes('appointment')
+                );
+
+            console.log(`🔄 [HomeScreen] Event ${index}:`, {
+                uid: event.uid,
+                title: event.title,
+                isAppointment: isAppointment,
+                hasFromTime: !!event.fromTime,
+                list: event.list
+            });
+
             if (isAppointment) {
-                // Use today's date for appointments (since they're schedules, not specific events)
-                const today = new Date();
-                const eventDateKey = today.toDateString();
+                console.log(`📅 [HomeScreen] Processing APPOINTMENT at index ${index}:`, {
+                    uid: event.uid,
+                    title: event.title || event.appointment_title,
+                    hasFromTime: !!event.fromTime,
+                    fromTime: event.fromTime,
+                    list: event.list
+                });
+
+                // Handle appointment time display
+                let startTimeDate: Date | null = null;
+                let endTimeDate: Date | null = null;
+                let eventDateKey: string;
+                let eventTime: string;
+                
+                // For appointments, if no specific time is set, use today's date with "Available Schedule"
+                if (event.fromTime && event.fromTime.trim() !== '' && event.fromTime !== 'null') {
+                    try {
+                        const fromTimeOnly = event.fromTime.split('T')[1];
+                        const toTimeOnly = event.toTime?.split('T')[1];
+                        
+                        const isAllDay = fromTimeOnly?.startsWith('000000') && toTimeOnly?.startsWith('000000');
+                        
+                        const parseAllDayDate = (dateStr: string) => {
+                            const year = parseInt(dateStr.substring(0, 4), 10);
+                            const month = parseInt(dateStr.substring(4, 6), 10) - 1;
+                            const day = parseInt(dateStr.substring(6, 8), 10);
+                            return new Date(year, month, day);
+                        };
+                        
+                        startTimeDate = isAllDay
+                            ? parseAllDayDate(event.fromTime)
+                            : convertToSelectedTimezone(event.fromTime, selectedTimeZone);
+                        
+                        endTimeDate = isAllDay
+                            ? parseAllDayDate(event.toTime)
+                            : event.toTime && event.toTime !== 'null'
+                                ? convertToSelectedTimezone(event.toTime, selectedTimeZone)
+                                : null;
+                        
+                        if (startTimeDate instanceof Date && !isNaN(startTimeDate.getTime())) {
+                            eventDateKey = startTimeDate.toDateString();
+                            const startTime = startTimeDate.toLocaleTimeString('en-US', { 
+                                hour: '2-digit', 
+                                minute: '2-digit', 
+                                hour12: true 
+                            });
+                            const endTime = endTimeDate instanceof Date && !isNaN(endTimeDate.getTime())
+                                ? endTimeDate.toLocaleTimeString('en-US', { 
+                                    hour: '2-digit', 
+                                    minute: '2-digit', 
+                                    hour12: true 
+                                })
+                                : '';
+                            eventTime = isAllDay ? 'All Day' : endTime ? `${startTime} - ${endTime}` : startTime;
+                        } else {
+                            throw new Error('Invalid start time date');
+                        }
+                    } catch (error) {
+                        console.warn('⚠️ Error processing appointment time, using default:', error);
+                        // Fallback: use today's date
+                        const today = new Date();
+                        eventDateKey = today.toDateString();
+                        eventTime = 'Available Schedule';
+                    }
+                } else {
+                    // No specific time - use today's date with "Available Schedule"
+                    const today = new Date();
+                    eventDateKey = today.toDateString();
+                    eventTime = 'Available Schedule';
+                }
                 
                 if (!groupedEvents[eventDateKey]) {
                     groupedEvents[eventDateKey] = [];
                 }
                 
-                // Handle both title formats (title from blockchain or appointment_title from decrypted data)
-                const appointmentTitle = event.title || event.appointment_title || 'Untitled Appointment';
+                // Decode hex-encoded title if needed
+                const decodeHexTitle = (titleStr: string | null | undefined): string => {
+                    if (!titleStr || typeof titleStr !== 'string') return '';
+                    // Check if it looks like hex (all hex chars and not a normal string)
+                    if (/^[0-9a-fA-F]+$/.test(titleStr) && titleStr.length > 10) {
+                        try {
+                            let hex = titleStr;
+                            // Remove leading "22" if present
+                            if (hex.startsWith('22') && hex.length > 2) {
+                                hex = hex.substring(2);
+                            }
+                            // Convert hex to string
+                            let result = '';
+                            for (let i = 0; i < hex.length; i += 2) {
+                                const hexChar = hex.substr(i, 2);
+                                const charCode = parseInt(hexChar, 16);
+                                if (charCode > 0 && charCode < 128) {
+                                    result += String.fromCharCode(charCode);
+                                }
+                            }
+                            const decoded = result.trim();
+                            if (decoded && decoded.length > 0) {
+                                return decoded;
+                            }
+                        } catch (e) {
+                            console.warn('⚠️ Failed to decode hex title:', e);
+                        }
+                    }
+                    return titleStr;
+                };
+                
+                const rawTitle = event.title || event.appointment_title || '';
+                const appointmentTitle = decodeHexTitle(rawTitle) || rawTitle || 'Untitled Appointment';
+                
+                console.log('📝 [HomeScreen] Appointment title decoding:', {
+                    raw_title: rawTitle,
+                    decoded_title: appointmentTitle,
+                    uid: event.uid
+                });
                 
                 const appointmentEvent = {
                     id: event.uid || event.appointment_uid || `appt_${Date.now()}`,
                     title: appointmentTitle,
-                    time: 'Appointment Schedule',
+                    time: eventTime,
                     description: event.description || event.appointment_description || '',
                     date: eventDateKey,
-                    color: colors.figmaOrange, // Use orange color for appointments
+                    color: Colors.primaryGreen, // GREEN color for appointments
                     tags: event.list || [],
                     isExpandable: true,
                     hasActions: true,
                     originalRawEventData: event,
+                    isAppointment: true,
                 };
                 
-                console.log('✅ [HomeScreen] Adding appointment to groupedEvents:', appointmentEvent);
+                console.log('✅ [HomeScreen] Adding APPOINTMENT to calendar:', {
+                    date: eventDateKey,
+                    title: appointmentTitle,
+                    time: eventTime,
+                    color: Colors.primaryGreen
+                });
+                
                 groupedEvents[eventDateKey].push(appointmentEvent);
-                return; // Skip the rest of the processing for appointments
+                return; // Skip regular event processing for appointments
             }
             
-            // For regular events/tasks, require fromTime
-            if (!event.fromTime) {
-                console.warn('Missing fromTime:', event);
+            // Regular event processing (only if it has fromTime)
+            if (!event.fromTime || event.fromTime.trim() === '' || event.fromTime === 'null') {
+                console.warn('🔄 [HomeScreen] Skipping event without fromTime:', event);
                 return;
             }
 
-            console.log("event title in home", event.title);
-            console.log("selected timezone", { selectedTimeZone })
+            try {
+                const fromTimeOnly = event.fromTime.split('T')[1];
+                const toTimeOnly = event.toTime?.split('T')[1];
 
-            const fromTimeOnly = event.fromTime.split('T')[1];
-            const toTimeOnly = event.toTime?.split('T')[1];
+                const isAllDay =
+                    fromTimeOnly?.startsWith('000000') &&
+                    toTimeOnly?.startsWith('000000');
 
-            const isAllDay =
-                fromTimeOnly?.startsWith('000000') &&
-                toTimeOnly?.startsWith('000000');
+                const parseAllDayDate = (dateStr: string) => {
+                    const year = parseInt(dateStr.substring(0, 4), 10);
+                    const month = parseInt(dateStr.substring(4, 6), 10) - 1;
+                    const day = parseInt(dateStr.substring(6, 8), 10);
+                    return new Date(year, month, day);
+                };
 
-            console.log("Detected all-day:", isAllDay);
-            // Convert times with proper parsing and timezone application
-            // ✅ Skip timezone conversion if all-day
-            const parseAllDayDate = (dateStr: string) => {
-                const year = parseInt(dateStr.substring(0, 4), 10);
-                const month = parseInt(dateStr.substring(4, 6), 10) - 1; // month index fix
-                const day = parseInt(dateStr.substring(6, 8), 10);
+                const startTimeDate = isAllDay
+                    ? parseAllDayDate(event.fromTime)
+                    : convertToSelectedTimezone(event.fromTime, selectedTimeZone);
 
-                return new Date(year, month, day);
-            };
+                const endTimeDate = isAllDay
+                    ? parseAllDayDate(event.toTime)
+                    : event.toTime && event.toTime !== 'null'
+                        ? convertToSelectedTimezone(event.toTime, selectedTimeZone)
+                        : null;
 
-            const startTimeDate = isAllDay
-                ? parseAllDayDate(event.fromTime)
-                : convertToSelectedTimezone(event.fromTime, selectedTimeZone);
+                if (!(startTimeDate instanceof Date) || isNaN(startTimeDate.getTime())) {
+                    console.warn('🔄 [HomeScreen] Invalid fromTime after conversion:', event);
+                    return;
+                }
 
-            const endTimeDate = isAllDay
-                ? parseAllDayDate(event.toTime)
-                : event.toTime
-                    ? convertToSelectedTimezone(event.toTime, selectedTimeZone)
-                    : null;
+                const eventDateKey = startTimeDate.toDateString();
+                const isTask = (event.list || []).some((item: any) => item.key === 'task');
+                const eventColor = isTask ? colors.figmaPurple : colors.figmaOrange;
 
+                const startTime = startTimeDate.toLocaleTimeString('en-US', { 
+                    hour: '2-digit', 
+                    minute: '2-digit', 
+                    hour12: true 
+                });
+                const endTime = endTimeDate instanceof Date && !isNaN(endTimeDate.getTime())
+                    ? endTimeDate.toLocaleTimeString('en-US', { 
+                        hour: '2-digit', 
+                        minute: '2-digit', 
+                        hour12: true 
+                    })
+                    : '';
 
-            console.log("Converted Start Time:", startTimeDate);
-            console.log("Converted End Time:", endTimeDate);
-            if (!(startTimeDate instanceof Date) || isNaN(startTimeDate.getTime())) {
-                console.warn('Invalid fromTime after conversion:', event);
-                return;
+                const eventTime = isAllDay
+                    ? 'All Day'
+                    : isTask
+                        ? startTime
+                        : endTime ? `${startTime} - ${endTime}` : startTime;
+
+                if (!groupedEvents[eventDateKey]) {
+                    groupedEvents[eventDateKey] = [];
+                }
+
+                groupedEvents[eventDateKey].push({
+                    id: event.uid,
+                    title: event.title || 'Untitled Event',
+                    time: eventTime,
+                    description: event.description || '',
+                    date: eventDateKey,
+                    color: eventColor,
+                    tags: event.list || [],
+                    isExpandable: true,
+                    hasActions: true,
+                    originalRawEventData: event,
+                    isAppointment: false,
+                });
+
+            } catch (error) {
+                console.error('🔄 [HomeScreen] Error processing regular event:', error, event);
             }
-            if (endTimeDate !== null && (!(endTimeDate instanceof Date) || isNaN(endTimeDate.getTime()))) {
-                console.warn('Invalid toTime after conversion:', event);
-                // Decide whether to skip or ignore endTime here; ignoring for now
-            }
-
-            const eventDateKey = startTimeDate.toDateString();
-            const isTask = (event.list || []).some((item: any) => item.key === 'task');
-            const eventColor = isTask ? colors.figmaPurple : colors.figmaOrange;
-
-            const startTime = startTimeDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            const endTime = endTimeDate instanceof Date
-                ? endTimeDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-                : '';
-
-            const eventTime = isAllDay
-                ? 'All Day'
-                : isTask
-                    ? startTime
-                    : `${startTime} - ${endTime}`;
-
-            if (!groupedEvents[eventDateKey]) {
-                groupedEvents[eventDateKey] = [];
-            }
-
-            console.log('Event time', eventTime)
-            groupedEvents[eventDateKey].push({
-                id: event.uid,
-                title: event.title || 'Untitled Event',
-                time: eventTime,
-                description: event.description || '',
-                date: eventDateKey,
-                color: eventColor,
-                tags: event.list || [],
-                isExpandable: true,
-                hasActions: true,
-                originalRawEventData: event,
-            });
         });
 
-        return Object.keys(groupedEvents).map(dateKey => {
+        const result = Object.keys(groupedEvents).map(dateKey => {
             const dateObj = new Date(dateKey);
 
             return {
@@ -252,6 +371,14 @@ const HomeScreen = () => {
                 events: groupedEvents[dateKey],
             };
         });
+
+        console.log('🔄 [HomeScreen] Final transformed events:', {
+            totalDays: result.length,
+            totalEvents: result.reduce((acc, day) => acc + day.events.length, 0),
+            appointments: result.reduce((acc, day) => acc + day.events.filter((e: any) => e.isAppointment).length, 0)
+        });
+
+        return result;
     };
     // useEffect(() => {
     //         console.log('Selected Timezone in HomeScreen:', selectedTimeZone);
@@ -296,20 +423,61 @@ const HomeScreen = () => {
     useFocusEffect(
         useCallback(() => {
             console.log('🔄 [HomeScreen] useFocusEffect triggered');
-            console.log('📊 [HomeScreen] userEvents count:', userEvents?.length || 0);
-            console.log('📊 [HomeScreen] userEvents:', userEvents);
-            let transformedData = transformEventsToCalendar(userEvents, selectedTimeZone);
-            console.log('📊 [HomeScreen] Transformed data count:', transformedData?.length || 0);
+            
+            // Transform current events
+            console.log('🔄 [HomeScreen] Transforming current events:', userEvents?.length || 0);
+            let transformedData = transformEventsToCalendar(userEvents || [], selectedTimeZone);
+            console.log('🔄 [HomeScreen] After transformation:', transformedData?.length || 0);
 
-            // --- APPLY TASK/EVENT FILTER FIRST ---
             transformedData = filterEventsByTaskType(transformedData, filterType);
-            // -------------------------------------
-
             const filteredData = filterEventsByView(transformedData, currentView);
-            console.log('📊 [HomeScreen] Final filtered data count:', filteredData?.length || 0);
+            
+            console.log('🔄 [HomeScreen] Final events to display:', filteredData?.length || 0);
             setEvents(filteredData);
-        }, [userEvents, currentView, selectedTimeZone, filterType]) // Dependency on filterType
+            
+        }, [userEvents, currentView, selectedTimeZone, filterType])
     );
+
+    // Add this useEffect to debug the events flow and update display when userEvents changes
+    useEffect(() => {
+        console.log('🔍 [HomeScreen DEBUG] Current state:', {
+            userEventsCount: userEvents?.length || 0,
+            eventsCount: events?.length || 0,
+            userEventsSample: userEvents?.slice(0, 3),
+            filteredEventsSample: events?.slice(0, 3)
+        });
+
+        // Check for appointments in userEvents
+        if (userEvents && userEvents.length > 0) {
+            const appointments = userEvents.filter((event: any) => 
+                event?.uid?.startsWith('appt_') || 
+                event?.appointment_uid?.startsWith('appt_') ||
+                event?.list?.some((item: any) => item?.key === 'appointment')
+            );
+            console.log('🔍 [HomeScreen DEBUG] Appointments found in userEvents:', {
+                total: appointments.length,
+                appointments: appointments.map((apt: any) => ({
+                    uid: apt.uid,
+                    appointment_uid: apt.appointment_uid,
+                    title: apt.title,
+                    appointment_title: apt.appointment_title,
+                    hasFromTime: !!apt.fromTime,
+                    hasList: !!apt.list,
+                    listLength: apt.list?.length || 0
+                }))
+            });
+        }
+        
+        // Transform events whenever userEvents changes (but not when events change to avoid loop)
+        if (userEvents !== undefined) {
+            console.log('🔄 [HomeScreen] userEvents changed, transforming events...');
+            let transformedData = transformEventsToCalendar(userEvents || [], selectedTimeZone);
+            transformedData = filterEventsByTaskType(transformedData, filterType);
+            const filteredData = filterEventsByView(transformedData, currentView);
+            setEvents(filteredData);
+            console.log('🔄 [HomeScreen] Events updated from userEvents change');
+        }
+    }, [userEvents, selectedTimeZone, filterType, currentView]);
 
     // console.log('All Events',allEvents);
     useEffect(() => {
@@ -401,44 +569,53 @@ const HomeScreen = () => {
     const filterEventsByView = (
         allEvents: any[],
         view: 'Day' | 'Week' | 'Month',
-    ) => {
-        const today = new Date();
-
-        if (view === 'Day') {
-            // Show only today's events
-            return allEvents.filter(dayGroup => {
-                const dayDate = new Date(dayGroup.events[0]?.date);
-                return dayDate.toDateString() === today.toDateString();
-            });
-        }
-
-        if (view === 'Week') {
-            // Get start and end of current week
+      ) => {
+        console.log('🔍 [FILTER] Filtering events by view:', view);
+        
+        // For appointments: ALWAYS show them regardless of date
+        // For regular events: apply date filtering
+        const filtered = allEvents.filter(dayGroup => {
+          const hasAppointments = dayGroup.events.some((event: any) => event.isAppointment);
+          
+          if (hasAppointments) {
+            console.log('✅ [FILTER] Keeping day with appointments:', dayGroup.date);
+            return true; // Always keep days with appointments
+          }
+          
+          // For days without appointments, apply normal date filtering
+          const dayDate = new Date(dayGroup.events[0]?.date);
+          const today = new Date();
+          
+          if (view === 'Day') {
+            const isToday = dayDate.toDateString() === today.toDateString();
+            console.log('🔍 [FILTER DAY] Regular event:', dayDate.toDateString(), 'isToday:', isToday);
+            return isToday;
+          }
+      
+          if (view === 'Week') {
             const startOfWeek = new Date(today);
-            startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
-
+            startOfWeek.setDate(today.getDate() - today.getDay());
             const endOfWeek = new Date(today);
-            endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
-
-            return allEvents.filter(dayGroup => {
-                const dayDate = new Date(dayGroup.events[0]?.date);
-                return dayDate >= startOfWeek && dayDate <= endOfWeek;
-            });
-        }
-
-        if (view === 'Month') {
-            // Show events for current month
-            return allEvents.filter(dayGroup => {
-                const dayDate = new Date(dayGroup.events[0]?.date);
-                return (
-                    dayDate.getMonth() === today.getMonth() &&
-                    dayDate.getFullYear() === today.getFullYear()
-                );
-            });
-        }
-
-        return allEvents; // fallback - show all events
-    };
+            endOfWeek.setDate(startOfWeek.getDate() + 6);
+            const isInWeek = dayDate >= startOfWeek && dayDate <= endOfWeek;
+            console.log('🔍 [FILTER WEEK] Regular event:', dayDate.toDateString(), 'inWeek:', isInWeek);
+            return isInWeek;
+          }
+      
+          if (view === 'Month') {
+            const isCurrentMonth = 
+              dayDate.getMonth() === today.getMonth() && 
+              dayDate.getFullYear() === today.getFullYear();
+            console.log('🔍 [FILTER MONTH] Regular event:', dayDate.toDateString(), 'inMonth:', isCurrentMonth);
+            return isCurrentMonth;
+          }
+      
+          return true;
+        });
+      
+        console.log('✅ [FILTER] Final filtered days:', filtered.length);
+        return filtered;
+      };
 
 
     return (
