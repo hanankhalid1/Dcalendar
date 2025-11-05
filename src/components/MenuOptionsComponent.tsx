@@ -57,6 +57,13 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
       iconType: 'MaterialIcons',
       gradient: ['#18F06E', '#0B6DE0'],
     },
+    {
+      id: 'appointment',
+      label: 'Appointment',
+      icon: 'calendar',
+      iconType: 'Feather',
+      gradient: ['#18F06E', '#0B6DE0'],
+    },
   ];
 
   React.useEffect(() => {

@@ -88,6 +88,8 @@ const CreateOutOfOfficeScreen: React.FC = () => {
       navigation.navigate('CreateEventScreen');
     } else if (eventType === 'Task') {
       navigation.navigate('CreateTaskScreen');
+    } else if (eventType === 'Appointment') {
+      navigation.navigate('AppointmentScheduleScreen');
     } else if (eventType === 'Out of office') {
       // Stay on current screen
       return;

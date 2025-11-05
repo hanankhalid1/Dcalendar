@@ -1,13 +1,32 @@
-import React from 'react';
-import { StatusBar, StyleSheet } from 'react-native';
+import React, { useEffect } from 'react';
+import { StatusBar, StyleSheet, Linking } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import AppNavigation from './src/navigations/AppNavigation';
 import ToastProvider from './src/hooks/useToast';
 import { SafeAreaProvider, SafeAreaView } from 'react-native-safe-area-context';
+import { handleNcogResponse } from './src/utils/ncogHandler';
 
 const App = () => {
-  // Google Sign-In configuration removed - using web-based OAuth instead
+  // Global deep link listener for Ncog wallet responses
+  useEffect(() => {
+    const subscription = Linking.addEventListener('url', ({ url }) => {
+      console.log('🔗 [App] Received deep link:', url);
+      handleNcogResponse(url);
+    });
+
+    // Handle initial URL if app was opened via deep link
+    Linking.getInitialURL().then(initialUrl => {
+      if (initialUrl) {
+        console.log('🔗 [App] Initial URL:', initialUrl);
+        handleNcogResponse(initialUrl);
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>

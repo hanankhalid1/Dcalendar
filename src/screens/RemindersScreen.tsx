@@ -152,6 +152,9 @@ const RemindersScreen = () => {
                 case 'event':
                   navigation.navigate(Screen.CreateEventScreen);
                   break;
+                case 'appointment':
+                  navigation.navigate(Screen.AppointmentScheduleScreen);
+                  break;
                 default:
                   break;
               }

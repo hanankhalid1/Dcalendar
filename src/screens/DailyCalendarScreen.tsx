@@ -323,6 +323,9 @@ const DailyCalendarScreen = () => {
             case 'event':
               navigation.navigate(Screen.CreateEventScreen as never);
               break;
+            case 'appointment':
+              navigation.navigate(Screen.AppointmentScheduleScreen as never);
+              break;
             default:
               break;
           }

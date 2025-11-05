@@ -1577,5 +1577,263 @@ export class BlockchainService {
     }
   }
 
-  // Add more safe read/write wrappers here...
+  // Appointment blockchain methods
+  async storeAppointmentDetails(appointmentData: any, activeAccount: any, token: string) {
+    try {
+      console.log('Storing appointment details on blockchain...');
+      console.log('Appointment data:', appointmentData);
+      
+      // Generate a unique ID for the appointment FIRST (needed for encryption)
+      const appointmentUID = `appt_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      console.log('Generated appointment UID:', appointmentUID);
+      
+      // Get public key for encryption
+      const publicKey = await this.hostContract.methods
+        .getPublicKeyOfUser(activeAccount?.userName)
+        .call();
+      
+      // Encrypt appointment data - MUST include uid as 4th parameter
+      const encryptedData = await encryptWithNECJS(
+        JSON.stringify(appointmentData),
+        publicKey,
+        token,
+        [appointmentUID], // Pass uid array as required by encryptWithNECJS
+      );
+      
+      // For now, we'll use the calendar contract similar to events
+      // TODO: Replace with actual appointment contract method when available
+      const calendarContract = new Contract(
+        CONTRACT_ADDRESSES.CALENDAR,
+        CALENDAR_CONTRACT_ABI,
+        this.provider,
+      );
+      
+      const walletAddress = await this.getWalletAddress(Config.NECJSPK);
+      
+      // Prepare appointment params (similar to event structure)
+      const appointmentParamsValue = {
+        uuid: encryptedData,
+        uid: appointmentUID,
+        title: appointmentData.appointment_title || 'Appointment',
+        fromTime: '',
+        toTime: '',
+      };
+      
+      const paramsValue = [
+        [appointmentParamsValue],
+        activeAccount?.userName,
+        { contact: [] },
+      ];
+      
+      console.log('📋 Appointment params:', JSON.stringify(paramsValue, null, 2));
+      
+      // Estimate gas
+      console.log('⛽ Estimating gas for appointment...');
+      let gasEstimate;
+      try {
+        gasEstimate = await calendarContract.methods
+          .addEvent(...paramsValue)
+          .estimateGas({
+            from: walletAddress,
+          });
+        console.log('✅ Estimated Gas for appointment:', gasEstimate.toString());
+      } catch (gasError: any) {
+        console.error('❌ Gas estimation failed:', gasError);
+        throw new Error(`Gas estimation failed: ${gasError.message || 'Unknown error'}`);
+      }
+      
+      const sender = await WalletModule.privateKeyToWalletAddressMobile(
+        Config.NECJSPK,
+      );
+      const nonce = await this.provider.getTransactionCount(sender);
+      const gasPrice = await this.provider.getGasPrice();
+      
+      console.log('📝 Transaction details:', {
+        walletAddress,
+        sender,
+        nonce: nonce.toString(),
+        gasPrice: gasPrice.toString(),
+        gasEstimate: gasEstimate.toString(),
+      });
+      
+      // Create transaction
+      console.log('📤 Creating transaction...');
+      let transactionHash;
+      try {
+        transactionHash = await calendarContract.methods
+          .addEvent(...paramsValue)
+          .nativeSend({
+            from: walletAddress,
+            gas: gasEstimate,
+            gasPrice: gasPrice,
+            nonce: nonce,
+            value: '0x0',
+          });
+        console.log('✅ Transaction hash created:', transactionHash);
+      } catch (txError: any) {
+        console.error('❌ Transaction creation failed:', txError);
+        throw new Error(`Transaction creation failed: ${txError.message || 'Unknown error'}`);
+      }
+      
+      // Sign transaction
+      console.log('✍️ Signing transaction...');
+      let signedResult;
+      try {
+        signedResult = await WalletModule.signTransactionMobile(
+          transactionHash,
+          Config.NECJSPK,
+        );
+        console.log('✅ Transaction signed successfully');
+      } catch (signError: any) {
+        console.error('❌ Transaction signing failed:', signError);
+        throw new Error(`Transaction signing failed: ${signError.message || 'Unknown error'}`);
+      }
+      
+      // Send transaction
+      console.log('📡 Sending transaction to blockchain...');
+      let txHash;
+      try {
+        txHash = await this.provider.sendRawTransaction(
+          signedResult.rawTransaction,
+        );
+        
+        if (!txHash || txHash === '0x' || txHash.length < 10) {
+          throw new Error('Invalid transaction hash received');
+        }
+        
+        console.log('✅ Appointment blockchain transaction hash:', txHash);
+        console.log('✅ Appointment UID:', appointmentUID);
+        console.log('⏳ Waiting for blockchain confirmation...');
+        
+        // Wait a bit for transaction to be mined (blockchain needs time)
+        // Note: necjs Provider doesn't support getTransactionReceipt, so we wait
+        await new Promise(resolve => setTimeout(resolve, 3000));
+        
+        console.log('✅ Appointment stored on blockchain successfully');
+      } catch (sendError: any) {
+        console.error('❌ Transaction send failed:', sendError);
+        throw new Error(`Transaction send failed: ${sendError.message || 'Unknown error'}`);
+      }
+      
+      return { txHash, appointmentUID };
+    } catch (error) {
+      console.error('Error storing appointment on blockchain:', error);
+      throw error;
+    }
+  }
+
+  async updateAppointmentDetails(appointmentData: any, activeAccount: any, token: string) {
+    try {
+      console.log('Updating appointment details on blockchain...');
+      console.log('Appointment data:', appointmentData);
+      
+      // Extract the existing appointment UID (needed for encryption)
+      const appointmentUID = appointmentData.appointment_uid || appointmentData.appointment_schedule_id;
+      if (!appointmentUID) {
+        throw new Error('Appointment UID is required for update');
+      }
+      console.log('Using existing appointment UID:', appointmentUID);
+      
+      // Get public key for encryption
+      const publicKey = await this.hostContract.methods
+        .getPublicKeyOfUser(activeAccount?.userName)
+        .call();
+      
+      // Encrypt appointment data - MUST include uid as 4th parameter
+      const encryptedData = await encryptWithNECJS(
+        JSON.stringify(appointmentData),
+        publicKey,
+        token,
+        [appointmentUID], // Pass uid array as required by encryptWithNECJS
+      );
+      
+      // For now, we'll use the calendar contract similar to events
+      // TODO: Replace with actual appointment contract method when available
+      const calendarContract = new Contract(
+        CONTRACT_ADDRESSES.CALENDAR,
+        CALENDAR_CONTRACT_ABI,
+        this.provider,
+      );
+      
+      const walletAddress = await this.getWalletAddress(Config.NECJSPK);
+      
+      // Prepare appointment params for update
+      const appointmentParamsValue = {
+        uuid: encryptedData,
+        uid: appointmentUID,
+        title: appointmentData.appointment_title || 'Appointment',
+        fromTime: '',
+        toTime: '',
+      };
+      
+      const paramsValue = [
+        [appointmentParamsValue.uid],
+        appointmentParamsValue,
+        activeAccount?.userName,
+      ];
+      
+      console.log('Appointment update params:', paramsValue);
+      
+      // Estimate gas
+      const gasEstimate = await calendarContract.methods
+        .editEvent(...paramsValue)
+        .estimateGas({
+          from: walletAddress,
+        });
+      
+      console.log('Estimated Gas for appointment update:', gasEstimate);
+      
+      const sender = await WalletModule.privateKeyToWalletAddressMobile(
+        Config.NECJSPK,
+      );
+      const nonce = await this.provider.getTransactionCount(sender);
+      const gasPrice = await this.provider.getGasPrice();
+      
+      // Create transaction
+      const transactionHash = await calendarContract.methods
+        .editEvent(...paramsValue)
+        .nativeSend({
+          from: walletAddress,
+          gas: gasEstimate,
+          gasPrice: gasPrice,
+          nonce: nonce,
+          value: '0x0',
+        });
+      
+      // Sign transaction
+      const signedResult = await WalletModule.signTransactionMobile(
+        transactionHash,
+        Config.NECJSPK,
+      );
+      
+      // Send transaction
+      const txHash = await this.provider.sendRawTransaction(
+        signedResult.rawTransaction,
+      );
+      
+      console.log('Appointment blockchain update transaction hash:', txHash);
+      return txHash;
+    } catch (error) {
+      console.error('Error updating appointment on blockchain:', error);
+      throw error;
+    }
+  }
+
+  async storeCollaborateUsers(collaborateData: any, activeAccount: any, token: string) {
+    try {
+      console.log('Storing collaborate users on blockchain...');
+      console.log('Collaborate data:', collaborateData);
+      
+      // For collaborate users, we might store this differently
+      // For now, return a placeholder txHash
+      // TODO: Implement actual blockchain method for collaborate users
+      const placeholderTxHash = `collab_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      
+      console.log('Collaborate users blockchain transaction hash:', placeholderTxHash);
+      return placeholderTxHash;
+    } catch (error) {
+      console.error('Error storing collaborate users on blockchain:', error);
+      throw error;
+    }
+  }
 }

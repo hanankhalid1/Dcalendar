@@ -199,6 +199,8 @@ const CreateTaskScreen = () => {
       navigation.replace('CreateEventScreen');
     } else if (eventType === 'Out of office') {
       navigation.replace('CreateOutOfOfficeScreen');
+    } else if (eventType === 'Appointment') {
+      navigation.replace('AppointmentScheduleScreen');
     } else if (eventType === 'Task') {
       // Stay on current screen
       return;

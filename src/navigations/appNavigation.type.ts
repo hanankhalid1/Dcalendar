@@ -12,6 +12,7 @@ export enum Screen {
   CreateTaskScreen = 'CreateTaskScreen',
   CreateEventScreen = 'CreateEventScreen',
   CreateOutOfOfficeScreen = 'CreateOutOfOfficeScreen',
+  AppointmentScheduleScreen = 'AppointmentScheduleScreen',
   SettingsScreen = 'SettingsScreen',
   DeletedEventsScreen = 'DeletedEventsScreen',
   IntegrationScreen = 'IntegrationScreen',
@@ -27,6 +28,7 @@ export type RootStackParamList = {
   [Screen.CreateTaskScreen]: undefined;
   [Screen.CreateEventScreen]: undefined;
   [Screen.CreateOutOfOfficeScreen]: undefined;
+  [Screen.AppointmentScheduleScreen]: undefined;
   [Screen.SettingsScreen]: undefined;
   [Screen.DeletedEventsScreen]: undefined;
   [Screen.IntegrationScreen]: undefined;

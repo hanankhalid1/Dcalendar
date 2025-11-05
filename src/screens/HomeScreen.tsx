@@ -99,8 +99,67 @@ const HomeScreen = () => {
 
     const transformEventsToCalendar = (allEvents: any[], selectedTimeZone: string) => {
         const groupedEvents: Record<string, any[]> = {};
+        
+        console.log('🔄 [HomeScreen] transformEventsToCalendar - Total events:', allEvents?.length || 0);
+        console.log('🔄 [HomeScreen] First few events:', allEvents?.slice(0, 3));
 
-        allEvents.forEach(event => {
+        allEvents.forEach((event, index) => {
+            // Debug logging for appointments - check multiple ways
+            const hasApptUid = event.uid?.startsWith('appt_');
+            const hasApptTitle = event.title?.toLowerCase().includes('appointment');
+            const hasApptInList = event.list?.some((item: any) => 
+                item.key === 'appointment' || item.value?.includes('appointment')
+            );
+            
+            if (hasApptUid || hasApptTitle || hasApptInList) {
+                console.log(`📅 [HomeScreen] Found potential appointment at index ${index}:`, {
+                    uid: event.uid,
+                    title: event.title,
+                    hasFromTime: !!event.fromTime,
+                    hasToTime: !!event.toTime,
+                    list: event.list,
+                    fullEvent: JSON.stringify(event, null, 2)
+                });
+            }
+            
+            // Check if this is an appointment (UID starts with 'appt_')
+            // Also check if it's an appointment from decrypted data structure
+            const isAppointment = event.uid?.startsWith('appt_') || 
+                                 event.appointment_uid?.startsWith('appt_') ||
+                                 (event.list && event.list.some((item: any) => item.key === 'appointment'));
+            
+            // For appointments, handle them differently since they don't have fromTime/toTime
+            if (isAppointment) {
+                // Use today's date for appointments (since they're schedules, not specific events)
+                const today = new Date();
+                const eventDateKey = today.toDateString();
+                
+                if (!groupedEvents[eventDateKey]) {
+                    groupedEvents[eventDateKey] = [];
+                }
+                
+                // Handle both title formats (title from blockchain or appointment_title from decrypted data)
+                const appointmentTitle = event.title || event.appointment_title || 'Untitled Appointment';
+                
+                const appointmentEvent = {
+                    id: event.uid || event.appointment_uid || `appt_${Date.now()}`,
+                    title: appointmentTitle,
+                    time: 'Appointment Schedule',
+                    description: event.description || event.appointment_description || '',
+                    date: eventDateKey,
+                    color: colors.figmaOrange, // Use orange color for appointments
+                    tags: event.list || [],
+                    isExpandable: true,
+                    hasActions: true,
+                    originalRawEventData: event,
+                };
+                
+                console.log('✅ [HomeScreen] Adding appointment to groupedEvents:', appointmentEvent);
+                groupedEvents[eventDateKey].push(appointmentEvent);
+                return; // Skip the rest of the processing for appointments
+            }
+            
+            // For regular events/tasks, require fromTime
             if (!event.fromTime) {
                 console.warn('Missing fromTime:', event);
                 return;
@@ -236,14 +295,18 @@ const HomeScreen = () => {
 
     useFocusEffect(
         useCallback(() => {
-            console.log('User Events in HomeScreen:', userEvents);
+            console.log('🔄 [HomeScreen] useFocusEffect triggered');
+            console.log('📊 [HomeScreen] userEvents count:', userEvents?.length || 0);
+            console.log('📊 [HomeScreen] userEvents:', userEvents);
             let transformedData = transformEventsToCalendar(userEvents, selectedTimeZone);
+            console.log('📊 [HomeScreen] Transformed data count:', transformedData?.length || 0);
 
             // --- APPLY TASK/EVENT FILTER FIRST ---
             transformedData = filterEventsByTaskType(transformedData, filterType);
             // -------------------------------------
 
             const filteredData = filterEventsByView(transformedData, currentView);
+            console.log('📊 [HomeScreen] Final filtered data count:', filteredData?.length || 0);
             setEvents(filteredData);
         }, [userEvents, currentView, selectedTimeZone, filterType]) // Dependency on filterType
     );
@@ -253,9 +316,16 @@ const HomeScreen = () => {
         const fetchEvents = async () => {
             try {
                 setLoading(true);
-                console.log('Fetching events for user:', account[3]);
+                const username = account?.userName || account?.username || account?.[3] || userName;
+                console.log('Fetching events for user:', username);
+                
+                if (!username) {
+                    console.warn('No username available to fetch events');
+                    setLoading(false);
+                    return;
+                }
 
-                const events = await getUserEvents(account[3], api);
+                const events = await getUserEvents(username, api);
                 console.log("events fetched in 179", events);
             } catch (error) {
                 console.error('Error fetching events:', error);
@@ -263,8 +333,10 @@ const HomeScreen = () => {
                 setLoading(false);
             }
         };
-        fetchEvents();
-    }, [userName]);
+        if (account && userName) {
+            fetchEvents();
+        }
+    }, [userName, account]);
 
     const handleMenuPress = () => {
         setIsDrawerOpen(true);
@@ -434,6 +506,9 @@ const HomeScreen = () => {
                             break;
                         case 'event':
                             navigation.navigate(Screen.CreateEventScreen);
+                            break;
+                        case 'appointment':
+                            navigation.navigate(Screen.AppointmentScheduleScreen);
                             break;
                         default:
                             break;

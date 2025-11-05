@@ -726,7 +726,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             >
               <Text style={styles.createMenuTextOnly}>Task</Text>
             </TouchableOpacity>
-            {/* <TouchableOpacity
+            <TouchableOpacity
               style={[styles.createMenuItem, { borderBottomWidth: 0 }]}
               onPress={() => {
                 console.log('>>>>>>>>> Appointment');
@@ -735,7 +735,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 onClose();
               }}
             >
-            </TouchableOpacity> */}
+              <Text style={styles.createMenuTextOnly}>Appointment</Text>
+            </TouchableOpacity>
           </View>
         )}
       </Animated.View>

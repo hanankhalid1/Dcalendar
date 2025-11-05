@@ -66,6 +66,7 @@ export const eventTypes = [
   { id: '3', name: 'Out of office', icon: '' },
   { id: '4', name: 'Birthday', icon: '' },
   { id: '5', name: 'Working Location', icon: '' },
+  { id: '6', name: 'Appointment', icon: '' },
 ];
 
 export const recurrenceOptions = [

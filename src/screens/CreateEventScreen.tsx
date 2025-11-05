@@ -604,6 +604,8 @@ const CreateEventScreen = () => {
       navigation.navigate(Screen.CreateTaskScreen);
     } else if (eventType === 'Out of office') {
       navigation.navigate(Screen.CreateOutOfOfficeScreen);
+    } else if (eventType === 'Appointment') {
+      navigation.navigate(Screen.AppointmentScheduleScreen);
     } else if (eventType === 'Event') {
       // Stay on current screen
       return;
