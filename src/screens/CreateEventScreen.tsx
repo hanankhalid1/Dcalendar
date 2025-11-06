@@ -1,4 +1,4 @@
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -15,6 +15,7 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import FeatherIcon from 'react-native-vector-icons/Feather';
+import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {
   borderRadius,
   colors,
@@ -48,6 +49,7 @@ import GuestSelector from '../components/createEvent/GuestSelector';
 import { BlockchainService } from '../services/BlockChainService';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useToken } from '../stores/useTokenStore';
+import { useAuthStore } from '../stores/useAuthStore';
 
 const CreateEventScreen = () => {
   const navigation: any = useNavigation<AppNavigationProp>();
@@ -56,6 +58,7 @@ const CreateEventScreen = () => {
   const route = useRoute<any>();
   const { mode, eventData: editEventData } = route.params || {};
   const { getUserEvents } = useEventsStore();
+  const { googleIntegration } = useAuthStore();
 
   // Initialize blockchain service and get contract instance
   // Form state
@@ -86,6 +89,7 @@ const CreateEventScreen = () => {
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
   const [selectedRecurrence, setSelectedRecurrence] = useState('Does not repeat');
   const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
+  const [showIntegrationModal, setShowIntegrationModal] = useState(false);
   const [customRecurrence, setCustomRecurrence] = useState(() => {
     const weekday =
       selectedStartDate
@@ -396,7 +400,7 @@ const CreateEventScreen = () => {
       setLocation(parsedData.location || '');
 
       if (parsedData.locationType) {
-        setSelectedVideoConferencing(parsedData.locationType);
+        setSelectedVideoConferencing(parsedData.locationType === 'google' ? 'google' : parsedData.locationType);
         setShowVideoConferencingOptions(true);
       }
 
@@ -491,6 +495,26 @@ const CreateEventScreen = () => {
 
     }
   }, [editEventData, mode]);
+
+  // Auto-select Google Meet when returning from IntegrationScreen after connecting
+  useFocusEffect(
+    React.useCallback(() => {
+      // Check if we're returning from IntegrationScreen after Google connection
+      // If Google is connected, show video conferencing options and auto-select Google Meet
+      if (googleIntegration.isConnected) {
+        // Show video conferencing options if not already shown
+        if (!showVideoConferencingOptions) {
+          setShowVideoConferencingOptions(true);
+        }
+        // Auto-select Google Meet if nothing is selected yet or if it's not already selected
+        if (selectedVideoConferencing !== 'google') {
+          setTimeout(() => {
+            setSelectedVideoConferencing('google');
+          }, 300);
+        }
+      }
+    }, [googleIntegration.isConnected, showVideoConferencingOptions, selectedVideoConferencing])
+  );
 
   useEffect(() => {
     if (selectedStartDate) {
@@ -685,6 +709,17 @@ const CreateEventScreen = () => {
 
       return newSelection;
     });
+  };
+
+  // Handle Google Meet button click
+  const handleGoogleMeetClick = () => {
+    if (!googleIntegration.isConnected) {
+      // Show modal first, then navigate on Continue
+      setShowIntegrationModal(true);
+    } else {
+      // Google is connected, allow selecting Google Meet
+      setSelectedVideoConferencing('google');
+    }
   };
 
 
@@ -1100,10 +1135,10 @@ const CreateEventScreen = () => {
           '',
         guests: selectedGuests,
         location: location.trim() || videoConferencing.trim(),
-        locationType: (videoConferencing.trim() ? 'inperson' : 'inperson') as
+        locationType: (selectedVideoConferencing === 'google' ? 'google' : selectedVideoConferencing === 'in-person' ? 'inperson' : 'inperson') as
           | 'inperson'
           | 'zoom'
-          | 'google', // Default to inperson for now
+          | 'google',
         busy: 'Busy',
         visibility: 'Default Visibility',
         notification: 'Email',
@@ -1485,7 +1520,7 @@ const CreateEventScreen = () => {
             <TouchableOpacity
               style={[
                 styles.videoConferencingButton,
-                selectedVideoConferencing === 'inperson' &&
+                selectedVideoConferencing === 'in-person' &&
                 styles.videoConferencingButtonSelected,
               ]}
               onPress={() => setSelectedVideoConferencing('in-person')}
@@ -1496,7 +1531,7 @@ const CreateEventScreen = () => {
               <Text
                 style={[
                   styles.videoConferencingButtonText,
-                  selectedVideoConferencing === 'inperson' &&
+                  selectedVideoConferencing === 'in-person' &&
                   styles.videoConferencingButtonTextSelected,
                 ]}
               >
@@ -1529,10 +1564,10 @@ const CreateEventScreen = () => {
             <TouchableOpacity
               style={[
                 styles.videoConferencingButton,
-                selectedVideoConferencing === 'google-meet' &&
+                selectedVideoConferencing === 'google' &&
                 styles.videoConferencingButtonSelected,
               ]}
-              onPress={() => setSelectedVideoConferencing('google-meet')}
+              onPress={handleGoogleMeetClick}
             >
               <View style={styles.videoConferencingIconContainer}>
                 <FeatherIcon name="video" size={16} color="#34A853" />
@@ -1540,13 +1575,13 @@ const CreateEventScreen = () => {
               <Text
                 style={[
                   styles.videoConferencingButtonText,
-                  selectedVideoConferencing === 'google-meet' &&
+                  selectedVideoConferencing === 'google' &&
                   styles.videoConferencingButtonTextSelected,
                 ]}
               >
                 Google Meet
               </Text>
-            </TouchableOpacity> */
+            </TouchableOpacity>
           </View>
         )}
 
@@ -2050,6 +2085,57 @@ const CreateEventScreen = () => {
                 keyboardShouldPersistTaps="handled"
               />
             )}
+          </View>
+        </View>
+      </Modal>
+
+      {/* Integration Info Modal */}
+      <Modal
+        visible={showIntegrationModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowIntegrationModal(false)}
+      >
+        <View style={styles.integrationModalOverlay}>
+          <View style={styles.integrationModalContainer}>
+            <View style={styles.integrationModalHeader}>
+              <Icon name="link-variant" size={32} color="#18F06E" />
+              <Text style={styles.integrationModalTitle}>Integration Required</Text>
+            </View>
+            
+            <View style={styles.integrationModalContent}>
+              <Text style={styles.integrationModalDescription}>
+                To use Google Meet, you need to integrate Google
+              </Text>
+            </View>
+
+            <View style={styles.integrationModalButtons}>
+              <TouchableOpacity
+                style={styles.integrationModalCancelButton}
+                onPress={() => setShowIntegrationModal(false)}
+              >
+                <Text style={styles.integrationModalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+              
+              <TouchableOpacity
+                style={styles.integrationModalContinueButton}
+                onPress={() => {
+                  setShowIntegrationModal(false);
+                  navigation.navigate(Screen.IntegrationScreen, {
+                    returnToScreen: Screen.CreateEventScreen,
+                  });
+                }}
+              >
+                <LinearGradient
+                  colors={['#18F06E', '#0B6DE0']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.integrationModalGradient}
+                >
+                  <Text style={styles.integrationModalContinueText}>Continue</Text>
+                </LinearGradient>
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
       </Modal>
@@ -3016,6 +3102,79 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     fontWeight: '400',
     marginLeft: spacing.sm,
+  },
+  // Integration Modal Styles
+  integrationModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  integrationModalContainer: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.xl,
+    width: scaleWidth(320),
+    padding: spacing.xl,
+    ...shadows.lg,
+  },
+  integrationModalHeader: {
+    alignItems: 'center',
+    marginBottom: spacing.lg,
+  },
+  integrationModalTitle: {
+    fontSize: fontSize.textSize20,
+    fontWeight: '700',
+    color: colors.blackText,
+    marginTop: spacing.sm,
+    textAlign: 'center',
+  },
+  integrationModalContent: {
+    marginBottom: spacing.xl,
+  },
+  integrationModalDescription: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    textAlign: 'center',
+    marginBottom: spacing.md,
+    lineHeight: 22,
+  },
+  integrationModalSubDescription: {
+    fontSize: fontSize.textSize14,
+    color: colors.grey400,
+    textAlign: 'center',
+    lineHeight: 20,
+  },
+  integrationModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+  },
+  integrationModalCancelButton: {
+    flex: 1,
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.grey20,
+    marginRight: spacing.sm,
+  },
+  integrationModalCancelText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '600',
+  },
+  integrationModalContinueButton: {
+    flex: 1,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+  },
+  integrationModalGradient: {
+    paddingVertical: spacing.md,
+    alignItems: 'center',
+  },
+  integrationModalContinueText: {
+    fontSize: fontSize.textSize16,
+    color: colors.white,
+    fontWeight: '600',
   },
 });
 

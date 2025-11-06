@@ -29,7 +29,7 @@ export type RootStackParamList = {
   [Screen.CreateOutOfOfficeScreen]: undefined;
   [Screen.SettingsScreen]: undefined;
   [Screen.DeletedEventsScreen]: undefined;
-  [Screen.IntegrationScreen]: undefined;
+  [Screen.IntegrationScreen]: { returnToScreen?: Screen } | undefined;
 };
 
 export type AppNavigationProp = NativeStackNavigationProp<RootStackParamList>;

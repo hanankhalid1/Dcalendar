@@ -12,16 +12,22 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import FeatherIcon from 'react-native-vector-icons/Feather';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useApiClient } from '../hooks/useApi';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import GoogleOAuthWebView from '../components/GoogleOAuthWebView';
 import { colors, fontSize, spacing, borderRadius, shadows } from '../utils/LightTheme';
-import { scaleWidth } from '../utils/dimensions';
+import { scaleWidth, scaleHeight, moderateScale } from '../utils/dimensions';
+import NcogIntegration from '../services/SimpleNcogIntegration';
+import { Screen } from '../navigations/appNavigation.type';
+import PlainHeader from '../components/PlainHeader';
+import CustomDrawer from '../components/CustomDrawer';
 
 const IntegrationScreen = () => {
   const navigation = useNavigation();
+  const route = useRoute<any>();
+  const { returnToScreen } = route.params || {};
   const { 
     googleIntegration, 
     connectGoogle, 
@@ -37,6 +43,16 @@ const IntegrationScreen = () => {
   const [showWebView, setShowWebView] = useState(false);
   const [authUrl, setAuthUrl] = useState('');
   const [oauthType, setOauthType] = useState<'google' | 'zoom'>('google');
+  const ncogIntegration = React.useRef(new NcogIntegration('DCalendar', 'dcalendar'));
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const handleMenuPress = () => {
+    setIsDrawerOpen(true);
+  };
+
+  const handleDrawerClose = () => {
+    setIsDrawerOpen(false);
+  };
 
   // Helper to safely stringify objects with BigInt (for blockchain data)
   const safeStringify = (obj: any): string => {
@@ -282,7 +298,26 @@ const IntegrationScreen = () => {
             fullName: data.name,
             photo: data.photo,
           });
-          Alert.alert('✅ Connected', 'Google account connected successfully!');
+          
+          // After Google connection succeeds, immediately trigger NCOG wallet connection
+          try {
+            console.log('Google connected successfully - triggering NCOG wallet connection...');
+            await ncogIntegration.current.connectToNcog();
+          } catch (ncogError) {
+            console.error('Failed to open NCOG wallet:', ncogError);
+            // Don't show error - user can connect wallet later
+          }
+          
+          // If we came from CreateEventScreen, navigate back first, then show alert
+          if (returnToScreen) {
+            navigation.navigate(returnToScreen as any);
+            // Show success alert after navigation
+            setTimeout(() => {
+              Alert.alert('✅ Connected', 'Google account connected successfully!');
+            }, 500);
+          } else {
+            Alert.alert('✅ Connected', 'Google account connected successfully!');
+          }
         }
         return;
       }
@@ -320,7 +355,26 @@ const IntegrationScreen = () => {
               email: integrations.googleEmail,
               fullName: integrations.googleName,
             });
-            Alert.alert('✅ Connected', 'Google account connected successfully!');
+            
+            // After Google connection succeeds, immediately trigger NCOG wallet connection
+            try {
+              console.log('Google connected successfully - triggering NCOG wallet connection...');
+              await ncogIntegration.current.connectToNcog();
+            } catch (ncogError) {
+              console.error('Failed to open NCOG wallet:', ncogError);
+              // Don't show error - user can connect wallet later
+            }
+            
+            // If we came from CreateEventScreen, navigate back first, then show alert
+            if (returnToScreen) {
+              navigation.navigate(returnToScreen as any);
+              // Show success alert after navigation
+              setTimeout(() => {
+                Alert.alert('✅ Connected', 'Google account connected successfully!');
+              }, 500);
+            } else {
+              Alert.alert('✅ Connected', 'Google account connected successfully!');
+            }
           } else {
             Alert.alert(
               'Backend Error',
@@ -357,6 +411,7 @@ const IntegrationScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
+      <PlainHeader onMenuPress={handleMenuPress} title="Integration" />
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.mainCard}>
           <Text style={styles.title}>Connect Your Apps</Text>
@@ -445,7 +500,7 @@ const IntegrationScreen = () => {
                     ? [colors.grey400, colors.grey400]
                     : zoomIntegration.isConnected
                     ? ['#FF6B6B', '#EE5A52']
-                    : ['#2D8CFF', '#1E6BD8']
+                    : ['#18F06E', '#0B6DE0']
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -473,29 +528,109 @@ const IntegrationScreen = () => {
           onCancel={handleOAuthCancel}
         />
       )}
+
+      {/* Custom Drawer */}
+      <CustomDrawer
+        isOpen={isDrawerOpen}
+        onClose={handleDrawerClose}
+      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.white },
-  content: { flex: 1, paddingHorizontal: spacing.lg },
-  mainCard: { backgroundColor: colors.white, borderRadius: borderRadius.xl, padding: spacing.xl, ...shadows.sm },
-  title: { fontSize: fontSize.textSize24, fontWeight: 'bold', textAlign: 'center', marginBottom: spacing.md },
-  description: { fontSize: fontSize.textSize14, textAlign: 'center', marginBottom: spacing.xl },
-  integrationCard: { backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.grey20 },
-  integrationHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
-  integrationLogoContainer: { width: scaleWidth(48), height: scaleWidth(48), borderRadius: borderRadius.md, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.grey20 },
-  integrationInfo: { flex: 1 },
-  integrationName: { fontSize: fontSize.textSize18, fontWeight: '600' },
-  connectedEmail: { fontSize: fontSize.textSize12, color: colors.figmaAccent, marginTop: spacing.xs },
-  connectedName: { fontSize: fontSize.textSize12, color: colors.mediumgray, marginTop: 2 },
-  connectButton: { borderRadius: borderRadius.lg, overflow: 'hidden', ...shadows.sm },
+  container: { 
+    flex: 1, 
+    backgroundColor: colors.white 
+  },
+  content: { 
+    flex: 1, 
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.md,
+  },
+  mainCard: { 
+    backgroundColor: colors.white, 
+    borderRadius: borderRadius.xl, 
+    padding: spacing.xl, 
+    marginTop: spacing.md,
+    ...shadows.sm 
+  },
+  title: { 
+    fontSize: fontSize.textSize24, 
+    fontWeight: 'bold', 
+    textAlign: 'center', 
+    marginBottom: spacing.md,
+    color: colors.blackText,
+  },
+  description: { 
+    fontSize: fontSize.textSize14, 
+    textAlign: 'center', 
+    marginBottom: spacing.xl,
+    color: colors.grey400,
+    lineHeight: 20,
+  },
+  integrationCard: { 
+    backgroundColor: colors.white, 
+    borderRadius: borderRadius.lg, 
+    padding: spacing.lg, 
+    borderWidth: 1, 
+    borderColor: colors.grey20,
+    marginBottom: spacing.md,
+  },
+  integrationHeader: { 
+    flexDirection: 'row', 
+    alignItems: 'center', 
+    marginBottom: spacing.md 
+  },
+  integrationLogoContainer: { 
+    width: scaleWidth(48), 
+    height: scaleWidth(48), 
+    borderRadius: borderRadius.md, 
+    backgroundColor: '#F8F9FA', 
+    justifyContent: 'center', 
+    alignItems: 'center', 
+    borderWidth: 1, 
+    borderColor: colors.grey20,
+    marginRight: spacing.md,
+  },
+  integrationInfo: { 
+    flex: 1 
+  },
+  integrationName: { 
+    fontSize: fontSize.textSize18, 
+    fontWeight: '600',
+    color: colors.blackText,
+  },
+  connectedEmail: { 
+    fontSize: fontSize.textSize12, 
+    color: colors.figmaAccent, 
+    marginTop: spacing.xs 
+  },
+  connectedName: { 
+    fontSize: fontSize.textSize12, 
+    color: colors.mediumgray, 
+    marginTop: 2 
+  },
+  connectButton: { 
+    borderRadius: borderRadius.lg, 
+    overflow: 'hidden', 
+    ...shadows.sm,
+    marginTop: spacing.sm,
+  },
   connectButtonActive: {},
   disconnectButton: {},
-  buttonDisabled: { opacity: 0.6 },
-  gradient: { paddingVertical: spacing.md, alignItems: 'center' },
-  connectButtonText: { fontSize: fontSize.textSize16, color: colors.white, fontWeight: '600' },
+  buttonDisabled: { 
+    opacity: 0.6 
+  },
+  gradient: { 
+    paddingVertical: spacing.md, 
+    alignItems: 'center' 
+  },
+  connectButtonText: { 
+    fontSize: fontSize.textSize16, 
+    color: colors.white, 
+    fontWeight: '600' 
+  },
 });
 
 export default IntegrationScreen;

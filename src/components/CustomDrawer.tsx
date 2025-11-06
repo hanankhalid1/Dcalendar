@@ -19,7 +19,7 @@ import {
   screenHeight,
 } from '../utils/dimensions';
 
-import { colors, fontSize, spacing, shadows } from '../utils/LightTheme';
+import { colors, fontSize, spacing, shadows, borderRadius } from '../utils/LightTheme';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlockchainService } from '../services/BlockChainService';
@@ -660,9 +660,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 onClose();
               }}
             >
-              <Image
-                source={require('../assets/images/Primaryfolder-open.png')}
-              />
+              <Icon name="link-variant" size={24} color="#FFFFFF" />
               <Text style={styles.navText}>Integration</Text>
             </TouchableOpacity>
 
@@ -975,8 +973,7 @@ const styles = StyleSheet.create({
   },
   accountDropdownItemLoading: {
     opacity: 0.6,
-  }
-
+  },
 });
 
 export default CustomDrawer;

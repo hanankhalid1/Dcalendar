@@ -11,6 +11,7 @@ import {
 } from 'react-native';
 import InAppBrowser from 'react-native-inappbrowser-reborn';
 import { useNavigation } from '@react-navigation/native';
+import NcogIntegration from '../services/SimpleNcogIntegration';
 
 interface GoogleOAuthWebViewProps {
   authUrl: string;
@@ -28,6 +29,7 @@ const GoogleOAuthWebView: React.FC<GoogleOAuthWebViewProps> = ({
   const navigation = useNavigation();
   const [loading, setLoading] = useState(true);
   const browserClosedRef = useRef(false);
+  const ncogIntegration = useRef(new NcogIntegration('DCalendar', 'dcalendar'));
 
   useEffect(() => {
     openBrowser();
@@ -54,7 +56,7 @@ const GoogleOAuthWebView: React.FC<GoogleOAuthWebViewProps> = ({
     }
   };
 
-  const handleCallbackUrl = (url: string) => {
+  const handleCallbackUrl = async (url: string) => {
     try {
       const urlObj = new URL(url);
       const params = new URLSearchParams(urlObj.search);
@@ -70,25 +72,42 @@ const GoogleOAuthWebView: React.FC<GoogleOAuthWebViewProps> = ({
         return;
       }
       
-      if (accessToken) {
+      // If OAuth succeeded (we have token or code), trigger NCOG wallet connection immediately
+      if (accessToken || code) {
+        // Close browser first
+        InAppBrowser.close();
+        
+        // Call success callback first
         onSuccess?.({
-          accessToken,
+          accessToken: accessToken || undefined,
           refreshToken: refreshToken || undefined,
         });
-        navigation.goBack();
+        
+        // Immediately trigger NCOG wallet connection
+        try {
+          console.log('Google OAuth succeeded - triggering NCOG wallet connection...');
+          await ncogIntegration.current.connectToNcog();
+          navigation.goBack();
+        } catch (ncogError) {
+          console.error('Failed to open NCOG wallet:', ncogError);
+          // Still navigate back - wallet connection can be done later
+          navigation.goBack();
+        }
         return;
       }
       
-      if (code) {
-        // Backend handles code exchange
-        onSuccess?.({});
-        navigation.goBack();
-        return;
-      }
-      
-      // If URL indicates success
+      // If URL indicates success (but no token/code), still trigger NCOG connection
       if (url.includes('success') || url.includes('connected')) {
+        InAppBrowser.close();
         onSuccess?.({});
+        
+        // Trigger NCOG wallet connection
+        try {
+          console.log('OAuth completed - triggering NCOG wallet connection...');
+          await ncogIntegration.current.connectToNcog();
+        } catch (ncogError) {
+          console.error('Failed to open NCOG wallet:', ncogError);
+        }
         navigation.goBack();
       }
     } catch (err) {
@@ -125,18 +144,31 @@ const GoogleOAuthWebView: React.FC<GoogleOAuthWebViewProps> = ({
             onError?.(errorMsg);
             navigation.goBack();
           } 
-          // If backend redirected to dcalendar.ncog.earth or wallet page, treat as success
+          // If backend redirected to dcalendar.ncog.earth, it means OAuth succeeded
+          // Immediately trigger NCOG wallet connection without showing the wallet page
           else if (result.url.includes('dcalendar.ncog.earth') || result.url.includes('oauth-callback')) {
-            // Backend redirected to success page - OAuth completed successfully
-            // The deep link should have been triggered automatically, but if not, handle it manually
             if (result.url.includes('oauth-callback')) {
               handleCallbackUrl(result.url);
             } else {
-              // Backend redirected to webpage instead of deep link
-              // This means OAuth succeeded but backend didn't redirect to app
-              // Automatically treat as success
-              console.log('OAuth completed - backend redirected to:', result.url);
+              // Backend redirected to dcalendar.ncog.earth - OAuth succeeded
+              // Close browser and immediately trigger NCOG wallet connection
+              console.log('OAuth completed - redirecting to NCOG wallet:', result.url);
+              InAppBrowser.close();
+              
+              // Call success callback
               onSuccess?.({});
+              
+              // Immediately trigger NCOG wallet connection
+              try {
+                await ncogIntegration.current.connectToNcog();
+              } catch (error) {
+                console.error('Failed to open NCOG wallet:', error);
+                Alert.alert(
+                  'NCOG Wallet',
+                  'Please install the NCOG wallet app to complete the connection.',
+                  [{ text: 'OK' }]
+                );
+              }
               navigation.goBack();
             }
           } else {
