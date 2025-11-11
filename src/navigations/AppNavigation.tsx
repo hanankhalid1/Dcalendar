@@ -16,6 +16,7 @@ import AccountSelection from '../screens/wallet/AccountSelection';
 import HelpScreen from '../screens/HelpScreen';
 import DeletedEventsScreen from '../screens/DeletedEventsScreen';
 import IntegrationScreen from '../screens/IntegrationScreen';
+import SendFeedbackScreen from '../screens/SendFeedbackScreen';
 // import GoogleLoginWebView from '../screens/GoogleLoginWebView';
 
 const Stack = createNativeStackNavigator();
@@ -37,6 +38,11 @@ const StackNavigator = () => {
       <Stack.Screen
         name="HelpScreen"
         component={HelpScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="SendFeedbackScreen"
+        component={SendFeedbackScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

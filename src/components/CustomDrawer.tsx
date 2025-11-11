@@ -651,6 +651,26 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               <Icon name="link-variant" size={24} color="#FFFFFF" />
               <Text style={styles.navText}>Integration</Text>
             </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => {
+                doNavigate('SendFeedbackScreen');
+                onClose();
+              }}
+            >
+              <Image source={require('../assets/images/Orangefolder.png')} />
+              <Text style={styles.navText}>Send Feedback</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => {
+                doNavigate('HelpScreen');
+                onClose();
+              }}
+            >
+              <Image source={require('../assets/images/Blackfolder.png')} />
+              <Text style={styles.navText}>Help</Text>
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={styles.navItem}
@@ -663,17 +683,6 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
               <Text style={styles.navText}>Log Out</Text>
             </TouchableOpacity>
-            {/* <TouchableOpacity style={styles.navItem}>
-              <Image source={require('../assets/images/Orangefolder.png')} />
-              <Text style={styles.navText}>Send Feedback</Text>
-            </TouchableOpacity> */}
-            {/* <TouchableOpacity style={styles.navItem} onPress={() => {
-              doNavigate('HelpScreen');
-              onClose();
-            }}>
-              <Image source={require('../assets/images/Blackfolder.png')} />
-              <Text style={styles.navText}>Help</Text>
-            </TouchableOpacity> */}
           </View>
         </ScrollView>
         {showCreateMenu && (

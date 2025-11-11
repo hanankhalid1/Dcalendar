@@ -5,6 +5,7 @@ import type { NativeStackNavigationProp } from '@react-navigation/native-stack';
 export enum Screen {
   HomeScreen = 'HomeScreen',
   HelpScreen = 'HelpScreen',
+  SendFeedbackScreen = 'SendFeedbackScreen',
   WeekScreen = 'WeekScreen',
   DailyCalendarScreen = 'DailyCalendarScreen',
   MonthlyCalenderScreen = 'MonthlyCalenderScreen',
@@ -21,6 +22,7 @@ export type RootStackParamList = {
   [Screen.HomeScreen]: undefined;
   [Screen.WeekScreen]: undefined;
   [Screen.HelpScreen]: undefined;
+  [Screen.SendFeedbackScreen]: undefined;
   [Screen.DailyCalendarScreen]: undefined;
   [Screen.MonthlyCalenderScreen]: undefined;
   [Screen.RemindersScreen]: undefined;
