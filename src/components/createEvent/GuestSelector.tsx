@@ -59,16 +59,20 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
 
     try {
       const result = await getAllContacts(account?.userName);
-      if (result.success) {
+      console.log("Contact result:", result);
+      
+      if (result.success && Array.isArray(result.data)) {
         setGuests(result.data);
         console.log("Loaded contacts:", result.data.length);
       } else {
         setError(result.error || 'Failed to load contacts');
+        setGuests([]);
         console.error("Failed to load contacts:", result.error);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
+      setGuests([]);
       console.error("Error loading contacts:", err);
     } finally {
       setIsLoading(false);
@@ -77,8 +81,14 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
 
   // Load contacts when modal opens
   useEffect(() => {
-    loadContacts();
-  }, [loadContacts]);
+    if (showGuestModal) {
+      loadContacts();
+    } else {
+      // Reset when modal closes
+      setGuests([]);
+      onSearchQueryChange('');
+    }
+  }, [showGuestModal, loadContacts, onSearchQueryChange]);
 
   // Filter guests based on search query
   const filteredGuests = guests.filter(
@@ -126,7 +136,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               <FeatherIcon name="search" size={20} color="#6C6C6C" />
               <TextInput
                 style={styles.searchInput}
-                placeholder="Add"
+                placeholder="Search contacts..."
                 placeholderTextColor="#9E9E9E"
                 value={searchQuery}
                 onChangeText={onSearchQueryChange}
@@ -147,6 +157,10 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                 >
                   <Text style={styles.retryButtonText}>Retry</Text>
                 </TouchableOpacity>
+              </View>
+            ) : filteredGuests.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>No contacts found</Text>
               </View>
             ) : (
               <FlatList
@@ -444,6 +458,24 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize16,
     fontWeight: '600',
     color: colors.white,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: spacing.xl,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '500',
+    marginBottom: spacing.sm,
+  },
+  emptySubtext: {
+    fontSize: fontSize.textSize14,
+    color: '#6B7280',
+    textAlign: 'center',
   },
 });
 

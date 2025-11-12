@@ -17,7 +17,7 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import { useAuthStore } from '../stores/useAuthStore';
 import { useApiClient } from '../hooks/useApi';
 import { useActiveAccount } from '../stores/useActiveAccount';
-import GoogleOAuthWebView from '../components/GoogleOAuthWebFlow';
+import GoogleOAuthWebView from '../components/GoogleOAuthWebView';
 import { colors, fontSize, spacing, borderRadius, shadows } from '../utils/LightTheme';
 import { scaleWidth } from '../utils/dimensions';
 import { useRoute, RouteProp } from '@react-navigation/native';
