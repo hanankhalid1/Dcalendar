@@ -16,8 +16,6 @@ import AccountSelection from '../screens/wallet/AccountSelection';
 import HelpScreen from '../screens/HelpScreen';
 import DeletedEventsScreen from '../screens/DeletedEventsScreen';
 import IntegrationScreen from '../screens/IntegrationScreen';
-import SendFeedbackScreen from '../screens/SendFeedbackScreen';
-// import GoogleLoginWebView from '../screens/GoogleLoginWebView';
 
 const Stack = createNativeStackNavigator();
 
@@ -32,17 +30,12 @@ const StackNavigator = () => {
       />
       <Stack.Screen
         name="HomeScreen"
-        component={HomeScreen}
-        options={{ headerShown: false }}
+        component={MonthlyCalenderScreen}
+        options={{ headerShown: false, gestureEnabled: false }}
       />
       <Stack.Screen
         name="HelpScreen"
         component={HelpScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="SendFeedbackScreen"
-        component={SendFeedbackScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
@@ -61,6 +54,16 @@ const StackNavigator = () => {
         options={{ headerShown: false }}
       />
       <Stack.Screen
+        name="ScheduleScreen"
+        component={HomeScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
+        name="IntegrationScreen"
+        component={IntegrationScreen}
+        options={{ headerShown: false }}
+      />
+      <Stack.Screen
         name="RemindersScreen"
         component={RemindersScreen}
         options={{ headerShown: false }}
@@ -75,11 +78,6 @@ const StackNavigator = () => {
         component={CreateEventScreen}
         options={{ headerShown: false }}
       />
-      {/* <Stack.Screen
-        name="GoogleLoginWebView"
-        component={GoogleLoginWebView}
-        options={{ headerShown: false }}
-      /> */}
       <Stack.Screen
         name="CreateOutOfOfficeScreen"
         component={CreateOutOfOfficeScreen}
@@ -93,11 +91,6 @@ const StackNavigator = () => {
       <Stack.Screen
         name="SettingsScreen"
         component={SettingsScreen}
-        options={{ headerShown: false }}
-      />
-       <Stack.Screen
-        name="IntegrationScreen"
-        component={IntegrationScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen
