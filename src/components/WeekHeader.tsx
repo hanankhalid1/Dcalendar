@@ -366,12 +366,12 @@ const styles = StyleSheet.create({
   },
   monthSliderWrapper: {
     width: '100%',
-    backgroundColor: '#FFF',
+    backgroundColor: 'transparent',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     minHeight: 50,
     zIndex: 1003,
-    elevation: 13,
+    elevation: 0,
   },
   rightSection: {
     flexDirection: 'row',
@@ -440,11 +440,12 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
   },
   monthScrollItem: {
-    backgroundColor: '#F9F9F9', // App's light gray for unselected
+    backgroundColor: colors.lightGrayishBlue,
     borderRadius: 20,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     marginHorizontal: 4,
+    borderWidth: 0,
   },
   monthScrollItemSelected: {
     backgroundColor: '#00AEEF' // App's primary green for selected

@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, Text, Alert, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
+import { View, StyleSheet, Text, Alert, TouchableOpacity, ScrollView, ActivityIndicator, Image } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../navigations/appNavigation.type';
@@ -21,6 +21,7 @@ import ClockIcon from '../assets/svgs/clock.svg';
 import CalendarIcon from '../assets/svgs/calendar.svg';
 import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
+import LinearGradient from 'react-native-linear-gradient';
 
 interface MonthlyCalendarProps {
   onDateSelect?: (date: string) => void;
@@ -50,6 +51,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const [isDeleting, setIsDeleting] = useState(false);
   const [exitModal, setExitModal] = useState(false);
   const [navigationAction, setNavigationAction] = useState(null);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
   // Format date to YYYY-MM-DD for react-native-calendars
   const formatDate = (date: Date): string => {
@@ -411,6 +413,67 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     return repeatType;
   };
 
+  // Extract guests from event - returns array of { email, avatar } objects
+  const getEventGuests = (event: any): Array<{ email: string; avatar?: string }> => {
+    if (!event) return [];
+    
+    const guests: Array<{ email: string; avatar?: string }> = [];
+    
+    // First try direct guests array
+    if (event.guests && Array.isArray(event.guests)) {
+      event.guests.forEach((g: any) => {
+        if (typeof g === 'string') {
+          guests.push({ email: g });
+        } else if (g && typeof g === 'object' && g.email) {
+          guests.push({ email: g.email, avatar: g.avatar || g.picture || g.profilePicture });
+        }
+      });
+    }
+    
+    // Try to extract from list metadata
+    if (event.list && Array.isArray(event.list)) {
+      const guestItems = event.list.filter((item: any) => item && item.key === 'guest');
+      guestItems.forEach((item: any) => {
+        if (typeof item.value === 'string') {
+          guests.push({ email: item.value });
+        } else if (item.value && typeof item.value === 'object') {
+          guests.push({ 
+            email: item.value.email || item.value, 
+            avatar: item.value.avatar || item.value.picture || item.value.profilePicture 
+          });
+        }
+      });
+    }
+    
+    return guests.filter((g: any) => g && g.email);
+  };
+
+  // Generate initials from email
+  const getGuestInitials = (email: string): string => {
+    if (!email) return '?';
+    const parts = email.split('@')[0].split(/[._-]/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return email.charAt(0).toUpperCase();
+  };
+
+  // Generate background color based on email
+  const getGuestBackgroundColor = (email: string): string[] => {
+    const colorOptions = [
+      ['#FF6B6B', '#FF8E8E'],
+      ['#4ECDC4', '#6EDDD6'],
+      ['#45B7D1', '#6BC5D8'],
+      ['#FFA07A', '#FFB89A'],
+      ['#98D8C8', '#B0E4D4'],
+      ['#F7DC6F', '#F9E68A'],
+      ['#BB8FCE', '#C9A5D9'],
+      ['#85C1E2', '#9DCFE8'],
+    ];
+    const index = email.charCodeAt(0) % colorOptions.length;
+    return colorOptions[index];
+  };
+
 
   const selectedDateEvents = eventsByDate[selectedDateString] || [];
 
@@ -437,111 +500,224 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         selectedDate={selectedDate}
       />
 
-      <View style={styles.calendarWrapper}>
-        <Calendar
-          key={selectedDateString}
-          current={selectedDateString}
-          markedDates={markedDates}
-          markingType="multi-period"
-          onDayPress={handleDayPress}
-          firstDay={1}
-          theme={{
-            backgroundColor: '#ffffff',
-            calendarBackground: '#ffffff',
-            textSectionTitleColor: '#b6c1cd',
-            selectedDayBackgroundColor: '#000',
-            selectedDayTextColor: '#ffffff',
-            todayTextColor: colors.figmaLightBlue || '#2196F3',
-            dayTextColor: '#2d4150',
-            textDisabledColor: '#d9e1e8',
-            dotColor: '#337E89',
-            selectedDotColor: '#ffffff',
-            arrowColor: colors.figmaLightBlue || '#2196F3',
-            monthTextColor: '#2d4150',
-            textDayFontFamily: 'DM Sans',
-            textMonthFontFamily: 'DM Sans',
-            textDayHeaderFontFamily: 'DM Sans',
-            textDayFontSize: 14,
-            textMonthFontSize: 16,
-            textDayHeaderFontSize: 12,
-          }}
-          renderHeader={() => null}
-          hideArrows={true}
-        />
-      </View>
+      <ScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+      >
+        <View style={styles.calendarWrapper}>
+          <Calendar
+            key={selectedDateString}
+            current={selectedDateString}
+            markedDates={markedDates}
+            markingType="multi-period"
+            onDayPress={handleDayPress}
+            firstDay={1}
+            theme={{
+              backgroundColor: '#ffffff',
+              calendarBackground: '#ffffff',
+              textSectionTitleColor: '#b6c1cd',
+              selectedDayBackgroundColor: '#000',
+              selectedDayTextColor: '#ffffff',
+              todayTextColor: colors.figmaLightBlue || '#2196F3',
+              dayTextColor: '#2d4150',
+              textDisabledColor: '#d9e1e8',
+              dotColor: '#337E89',
+              selectedDotColor: '#ffffff',
+              arrowColor: colors.figmaLightBlue || '#2196F3',
+              monthTextColor: '#2d4150',
+              textDayFontFamily: 'DM Sans',
+              textMonthFontFamily: 'DM Sans',
+              textDayHeaderFontFamily: 'DM Sans',
+              textDayFontSize: 14,
+              textMonthFontSize: 16,
+              textDayHeaderFontSize: 12,
+            }}
+            renderHeader={() => null}
+            hideArrows={true}
+          />
+        </View>
 
-      <View style={styles.eventsContainer}>
-        <Text style={styles.eventsTitle}>Timeline</Text>
+        <View style={styles.eventsContainer}>
+          <Text style={styles.eventsTitle}>Timeline</Text>
 
-        <ScrollView style={styles.eventsList}>
-          {selectedDateEvents.length > 0 ? (
-            selectedDateEvents.map((event, index) => (
-              <View key={`${event.uid}-${index}`}
-                style={{ display: 'flex', flexDirection: 'column', marginBottom: 10 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
-                  <Text style={[styles.eventTime]}>
-                    {event.instanceStartTime?.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                  </Text>
-
-                  {/* Line */}
-                  <View style={{ flex: 1, height: 1, backgroundColor: '#D5D7DA', marginLeft: 14 }} />
-                </View>
-
-                <TouchableOpacity
-                  style={styles.eventItem}
-                  onPress={() => handleEventPress(event)}
-                >
-                  <View style={styles.eventContent}>
-                    <Text style={styles.eventTitle} numberOfLines={1}>
-                      {event.title}
+          <View style={styles.eventsList}>
+            {selectedDateEvents.length > 0 ? (
+              selectedDateEvents.map((event, index) => (
+                <View key={`${event.uid}-${index}`}
+                  style={{ display: 'flex', flexDirection: 'column', marginBottom: 10 }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+                    <Text style={[styles.eventTime]}>
+                      {event.instanceStartTime?.toLocaleTimeString('en-US', {
+                        hour: 'numeric',
+                        minute: '2-digit',
+                      })}
                     </Text>
 
-                    <View style={styles.eventBadges}>
-                      <View style={styles.badge}>
-                        <ClockIcon height={14} width={14} />
-                        <Text style={styles.eventTime}>
-                          {parseTimeToPST(event.fromTime)?.toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                          {' - '}
-                          {parseTimeToPST(event.toTime)?.toLocaleTimeString('en-US', {
-                            hour: 'numeric',
-                            minute: '2-digit',
-                          })}
-                        </Text>
-                      </View>
+                    {/* Line */}
+                    <View style={{ flex: 1, height: 1, backgroundColor: '#D5D7DA', marginLeft: 14 }} />
+                  </View>
 
-                      {event.isRecurring && (
+                  <TouchableOpacity
+                    style={styles.eventItem}
+                    onPress={() => handleEventPress(event)}
+                  >
+                    <View style={styles.eventContent}>
+                      <Text style={styles.eventTitle} numberOfLines={1}>
+                        {event.title}
+                      </Text>
+
+                      <View style={styles.eventBadges}>
                         <View style={styles.badge}>
-                          <CalendarIcon height={14} width={14} />
-                          <Text style={styles.badgeText}>
-                            {getRecurrenceDayText(event)}
+                          <ClockIcon height={14} width={14} />
+                          <Text style={styles.eventTime}>
+                            {parseTimeToPST(event.fromTime)?.toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}
+                            {' - '}
+                            {parseTimeToPST(event.toTime)?.toLocaleTimeString('en-US', {
+                              hour: 'numeric',
+                              minute: '2-digit',
+                            })}
                           </Text>
                         </View>
-                      )}
 
-                      <View style={[styles.badge, {
-                        borderColor: event.isTask ? '#8DC63F' : '#00AEEF',
-                      }]}>
-                        {event.isTask? <TaskIcon height={14} width={14}/> : <EventIcon height={14} width={14}/>}
-                        <Text style={styles.badgeText}>
-                          {event.isTask ? 'Task' : 'Event'}
-                        </Text>
+                        {event.isRecurring && (
+                          <View style={styles.badge}>
+                            <CalendarIcon height={14} width={14} />
+                            <Text style={styles.badgeText}>
+                              {getRecurrenceDayText(event)}
+                            </Text>
+                          </View>
+                        )}
+
+                        <View style={[styles.badge, {
+                          borderColor: event.isTask ? '#8DC63F' : '#00AEEF',
+                        }]}>
+                          {event.isTask? <TaskIcon height={14} width={14}/> : <EventIcon height={14} width={14}/>}
+                          <Text style={styles.badgeText}>
+                            {event.isTask ? 'Task' : 'Event'}
+                          </Text>
+                        </View>
                       </View>
+
+                      {/* Guest Thumbnails */}
+                      {(() => {
+                        const eventGuests = getEventGuests(event);
+                        if (!eventGuests || eventGuests.length === 0) return null;
+
+                        const maxVisible = 5;
+                        const size = 36;
+                        const visibleGuests = eventGuests.slice(0, maxVisible);
+                        const remainingCount = eventGuests.length - maxVisible;
+                        const isSingleGuest = eventGuests.length === 1;
+
+                        return (
+                          <View style={styles.guestsContainer}>
+                            {visibleGuests.map((guest, index) => {
+                              const initials = getGuestInitials(guest.email);
+                              const gradientColors = getGuestBackgroundColor(guest.email);
+                              const hasAvatar = guest.avatar && typeof guest.avatar === 'string' && guest.avatar.trim() !== '';
+                              const imageFailed = failedImages.has(guest.email);
+                              // For single guest, no negative margin. For multiple, overlap them more
+                              const marginLeft = isSingleGuest ? 0 : (index > 0 ? -12 : 0);
+
+                              return (
+                                <View
+                                  key={`${guest.email}-${index}`}
+                                  style={[
+                                    {
+                                      width: size,
+                                      height: size,
+                                      borderRadius: size / 2,
+                                      marginLeft: marginLeft,
+                                      zIndex: maxVisible - index,
+                                      borderWidth: 2,
+                                      borderColor: colors.white,
+                                      overflow: 'hidden',
+                                      backgroundColor: 'transparent',
+                                    },
+                                  ]}
+                                >
+                                  {hasAvatar && !imageFailed ? (
+                                    <Image
+                                      source={{ uri: guest.avatar }}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        resizeMode: 'cover',
+                                      }}
+                                      onError={() => {
+                                        setFailedImages(prev => new Set(prev).add(guest.email));
+                                      }}
+                                    />
+                                  ) : (
+                                    <LinearGradient
+                                      colors={gradientColors}
+                                      start={{ x: 0, y: 0 }}
+                                      end={{ x: 1, y: 1 }}
+                                      style={{
+                                        width: '100%',
+                                        height: '100%',
+                                        justifyContent: 'center',
+                                        alignItems: 'center',
+                                      }}
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.guestInitialsText,
+                                          {
+                                            fontSize: size * 0.4,
+                                          },
+                                        ]}
+                                      >
+                                        {initials}
+                                      </Text>
+                                    </LinearGradient>
+                                  )}
+                                </View>
+                              );
+                            })}
+
+                            {remainingCount > 0 && (
+                              <View
+                                style={[
+                                  styles.guestRemainingCount,
+                                  {
+                                    width: size,
+                                    height: size,
+                                    borderRadius: size / 2,
+                                    marginLeft: -12,
+                                    zIndex: 0,
+                                  },
+                                ]}
+                              >
+                                <Text
+                                  style={[
+                                    styles.guestCountText,
+                                    {
+                                      fontSize: size * 0.35,
+                                    },
+                                  ]}
+                                >
+                                  +{remainingCount}
+                                </Text>
+                              </View>
+                            )}
+                          </View>
+                        );
+                      })()}
                     </View>
-                  </View>
-                </TouchableOpacity>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noEventsText}>No events for this date</Text>
-          )}
-        </ScrollView>
-      </View>
+                  </TouchableOpacity>
+                </View>
+              ))
+            ) : (
+              <Text style={styles.noEventsText}>No events for this date</Text>
+            )}
+          </View>
+        </View>
+      </ScrollView>
 
       {(userEventsLoading || isDeleting) && (
         <View style={[styles.loadingContainer, { pointerEvents: 'box-none' }]}>
@@ -593,6 +769,12 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5',
   },
+  scrollContainer: {
+    flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xl,
+  },
   calendarWrapper: {
     marginHorizontal: spacing.md,
     marginVertical: spacing.lg,
@@ -602,7 +784,6 @@ const styles = StyleSheet.create({
   eventsContainer: {
     marginHorizontal: spacing.md,
     paddingHorizontal: 4,
-    flex: 1,
   },
   eventsTitle: {
     fontSize: 16,
@@ -612,7 +793,7 @@ const styles = StyleSheet.create({
     color: '#2d4150',
   },
   eventsList: {
-    flex: 1,
+    flexGrow: 1,
   },
   eventItem: {
     backgroundColor: '#ffffff',
@@ -690,6 +871,44 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: '#333333',
     fontWeight: '500',
+  },
+  guestsContainer: {
+    marginTop: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  guestAvatarWrapper: {
+    borderWidth: 2,
+    borderColor: colors.white,
+    overflow: 'hidden',
+  },
+  guestAvatar: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    width: '100%',
+    height: '100%',
+  },
+  guestAvatarImage: {
+    resizeMode: 'cover',
+    width: '100%',
+    height: '100%',
+  },
+  guestInitialsText: {
+    color: colors.white,
+    fontWeight: '600',
+    fontFamily: 'DM Sans',
+  },
+  guestRemainingCount: {
+    backgroundColor: '#FFB6C1',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: colors.white,
+  },
+  guestCountText: {
+    color: colors.white,
+    fontWeight: '600',
+    fontFamily: 'DM Sans',
   },
 });
 

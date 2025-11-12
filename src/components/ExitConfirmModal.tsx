@@ -3,7 +3,6 @@ import { Modal, View, Text, TouchableOpacity, StyleSheet, BackHandler } from "re
 import { Colors } from "../constants/Colors";
 import { Fonts } from "../constants/Fonts";
 import LinearGradient from "react-native-linear-gradient";
-import ExitApp from "react-native-exit-app";
 
 interface ExitConfirmModalProps {
   visible: boolean;
@@ -14,9 +13,9 @@ const ExitConfirmModal: React.FC<ExitConfirmModalProps> = ({
   visible,
   onCancel,
 }) => {
-  // 2. Use the new ExitApp.exitApp() function
+  // Use React Native's built-in BackHandler to exit the app
   const exitApp = () => {
-    ExitApp.exitApp();
+    BackHandler.exitApp();
   };
   return (
     <Modal transparent visible={visible} animationType="fade">
