@@ -19,7 +19,7 @@ import {
 import CalendarComponent from './CalendarComponent';
 // import MenuIcon from '../assets/svgs/menu.svg';
 import { ScrollView } from 'react-native';
-
+import MenuIcon from '../assets/svgs/menu.svg';
 interface WeekHeaderProps {
   onMenuPress: () => void;
   currentMonth: string;
@@ -88,25 +88,6 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
     onDateSelect?.(date);
   };
 
-  const handleMonthSelect = (monthIndex: number) => {
-    if (currentDate) {
-      // Create date with fixed time to avoid timezone issues
-      const newDate = new Date(
-        currentDate.getFullYear(),
-        monthIndex,
-        1,
-        12,
-        0,
-        0,
-        0,
-      );
-      console.log('WeekHeader - Month selected:', newDate);
-      console.log('WeekHeader - Day of week:', newDate.getDay());
-      onDateSelect?.(newDate);
-      onMonthSelect?.(monthIndex);
-    }
-    setIsMonthDropdownVisible(false);
-  };
 
   const handleYearSelect = (year: number) => {
     if (currentDate) {
@@ -125,56 +106,36 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
   };
 
   // Auto-scroll to current month when dropdown opens
+  // Auto-scroll to center the current month when dropdown opens
   useEffect(() => {
     if (isMonthDropdownVisible && currentDate && scrollViewRef.current) {
-      const currentMonthIndex = currentDate.getMonth();
-      const currentYear = currentDate.getFullYear();
-      const previousYear = currentYear - 1;
-      
-      // Calculate scroll position
-      // We show 12 months before current month
-      // Count items: previous year label + months from Nov 2024 to Oct 2025 (12 months)
-      // Then current year label + months from Jan to current month
-      let itemCount = 0;
-      
-      // Previous year items (from same month to Dec)
-      const monthsFromPrevYear = 12 - currentMonthIndex; // e.g., Nov to Dec = 2 months
-      if (monthsFromPrevYear > 0) {
-        itemCount += 1; // Year label
-        itemCount += monthsFromPrevYear;
-      }
-      
-      // Current year items (from Jan to current month)
-      itemCount += 1; // Year label
-      itemCount += currentMonthIndex + 1; // Months including current
-      
-      // Each item is approximately 60-70px wide (including margins)
+      const currentMonthIndex = 13; // always center index (since you have 25 items total: -12..+12)
       const itemWidth = 70;
-      const scrollPosition = itemCount * itemWidth;
-      
-      // Scroll with a slight delay to ensure layout is complete
+      const scrollPosition = currentMonthIndex * itemWidth - Dimensions.get('window').width / 2 + itemWidth / 2;
+
       setTimeout(() => {
         scrollViewRef.current?.scrollTo({
-          x: Math.max(0, scrollPosition - 100), // Offset slightly to center better
+          x: Math.max(0, scrollPosition),
           animated: true,
         });
-      }, 150);
+      }, 200);
     }
   }, [isMonthDropdownVisible, currentDate]);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      <View style={styles.header}>
+      <View style={[
+        styles.header,
+        isMonthDropdownVisible && styles.headerNoBorder // Remove shadow when dropdown is open
+      ]}>
         {/* Left Section - Menu Icon and Month Component */}
         <View style={styles.leftSection}>
           {/* Hamburger Menu */}
           <TouchableOpacity style={styles.menuButton} onPress={onMenuPress}>
             {/* <MenuIcon width={24} height={24} /> */}
-            <Image
-              source={require('../assets/images/HeaderImages/HeaderDrawer.png')}
-              style={styles.menuIcon}
-            />
+            <MenuIcon width={24} height={24} />
           </TouchableOpacity>
 
           {/* Month Selector */}
@@ -213,34 +174,34 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
         // Generate dynamic months centered around current month
         // From same month in previous year to same month in next year
         const dynamicItems: Array<{ type: 'month'; monthIndex: number; year: number } | { type: 'year'; year: number }> = [];
-        
+
         if (currentDate) {
           const currentMonthIndex = currentDate.getMonth();
           const currentYear = currentDate.getFullYear();
           const previousYear = currentYear - 1;
           const nextYear = currentYear + 1;
-          
+
           // Start from the same month in previous year (e.g., Nov 2024)
           // Go through to the same month in next year (e.g., Nov 2026)
-          
+
           let lastYearAdded: number | null = null;
-          
+
           // Generate 25 months: 12 months before + current month + 12 months after
           for (let i = -12; i <= 12; i++) {
             const totalMonths = currentMonthIndex + i;
             const monthIndex = ((totalMonths % 12) + 12) % 12; // Handle negative modulo
             const year = currentYear + Math.floor(totalMonths / 12);
-            
+
             // Add year label when year changes
             if (lastYearAdded !== year) {
               dynamicItems.push({ type: 'year', year });
               lastYearAdded = year;
             }
-            
+
             dynamicItems.push({ type: 'month', monthIndex, year });
           }
         }
-        
+
         return (
           <View style={styles.monthSliderWrapper}>
             <ScrollView
@@ -255,10 +216,10 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
             >
               {dynamicItems.map((item, index) => {
                 if (item.type === 'month') {
-                  const isSelected = 
-                    currentDate?.getMonth() === item.monthIndex && 
+                  const isSelected =
+                    currentDate?.getMonth() === item.monthIndex &&
                     currentDate?.getFullYear() === item.year;
-                  
+
                   return (
                     <TouchableOpacity
                       key={`month-${item.monthIndex}-${item.year}-${index}`}
@@ -358,6 +319,12 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingTop: spacing.sm,
+    backgroundColor: colors.white, // ← ADD THIS LINE
+    zIndex: 1004, // ensure header stays above backdrop if needed
+  },
+  headerNoBorder: {
+    shadowOpacity: 0,
+    elevation: 0,
   },
   leftSection: {
     flexDirection: 'row',
@@ -399,7 +366,7 @@ const styles = StyleSheet.create({
   },
   monthSliderWrapper: {
     width: '100%',
-    backgroundColor: 'transparent',
+    backgroundColor: '#FFF',
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.md,
     minHeight: 50,
@@ -424,8 +391,7 @@ const styles = StyleSheet.create({
     left: 0,          // Change from -Dimensions.get('window').width
     right: 0,         // Add
     bottom: 0,        // Add
-    // width/height removed as top/bottom/left/right covers the screen
-    backgroundColor: 'rgba(0, 0, 0, 0.1)',
+
     zIndex: 999, // Backdrop Z-Index
   },
   monthDropdown: {
@@ -436,18 +402,15 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingVertical: spacing.xs,
     minWidth: 150,
-    ...shadows.sm,
     zIndex: 1001,
-    elevation: 11,
-    borderWidth: 1,
-    borderColor: colors.lightGrayishBlue,
+
   },
   monthDropdownItem: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
   },
   monthDropdownItemSelected: {
-    backgroundColor: colors.lightGrayishBlue,
+    backgroundColor: '#00AEEF',
   },
   monthDropdownText: {
     fontSize: fontSize.textSize16,
@@ -477,14 +440,14 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
   },
   monthScrollItem: {
-    backgroundColor: colors.lightGrayishBlue, // App's light gray for unselected
+    backgroundColor: '#F9F9F9', // App's light gray for unselected
     borderRadius: 20,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     marginHorizontal: 4,
   },
   monthScrollItemSelected: {
-    backgroundColor: colors.primary2, // App's primary green for selected
+    backgroundColor: '#00AEEF' // App's primary green for selected
   },
   monthScrollText: {
     fontSize: fontSize.textSize14,
@@ -514,7 +477,7 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: moderateScale(30), // Adjust this value to be just below the 'November' text
     left: 0,
-    right:0,
+    right: 0,
     zIndex: 1002, // Higher than backdrop (999) and calendar (1000)
     elevation: 12,
   },

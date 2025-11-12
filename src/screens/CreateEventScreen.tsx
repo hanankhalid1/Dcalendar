@@ -1,4 +1,4 @@
-import { useNavigation, useRoute, useFocusEffect } from '@react-navigation/native';
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
 import React, { useEffect, useState } from 'react';
 import {
   Alert,
@@ -15,7 +15,6 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import FeatherIcon from 'react-native-vector-icons/Feather';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import {
   borderRadius,
   colors,
@@ -39,7 +38,6 @@ import {
   dayNames,
   eventTypes,
   guestData,
-  recurrenceOptions,
   timezones,
 } from '../constants/dummyData';
 import { AppNavigationProp, Screen } from '../navigations/appNavigation.type';
@@ -49,6 +47,9 @@ import GuestSelector from '../components/createEvent/GuestSelector';
 import { BlockchainService } from '../services/BlockChainService';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useToken } from '../stores/useTokenStore';
+import { convertionISOToTime, convertSecondsToUnit } from '../utils/notifications';
+import dayjs from "dayjs";
+import Icon from 'react-native-vector-icons/Feather';
 import { useAuthStore } from '../stores/useAuthStore';
 
 const CreateEventScreen = () => {
@@ -68,6 +69,9 @@ const CreateEventScreen = () => {
   const [videoConferencing, setVideoConferencing] = useState(editEventData?.videoConferencing ?? '');
   const [notificationMinutes, setNotificationMinutes] = useState('0');
   const [selectedTimeUnit, setSelectedTimeUnit] = useState('Minutes');
+  const [selectedNotificationType, setSelectedNotificationType] = useState('Notification');
+  const [selectedStatus, setSelectedStatus] = useState('Busy');
+  const [selectedVisibility, setSelectedVisibility] = useState('Default Visibility');
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(editEventData?.selectedStartDate ? new Date(editEventData.selectedStartDate) : null);
   const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(editEventData?.selectedEndDate ? new Date(editEventData.selectedEndDate) : null);
@@ -89,7 +93,6 @@ const CreateEventScreen = () => {
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
   const [selectedRecurrence, setSelectedRecurrence] = useState('Does not repeat');
   const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
-  const [showIntegrationModal, setShowIntegrationModal] = useState(false);
   const [customRecurrence, setCustomRecurrence] = useState(() => {
     const weekday =
       selectedStartDate
@@ -114,8 +117,9 @@ const CreateEventScreen = () => {
   const [isLoadingLocations, setIsLoadingLocations] = React.useState(false);
   const { api } = useApiClient();
   const [isAllDayEvent, setIsAllDayEvent] = useState(false);
-
+  const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const endsOptions = ['Never', 'On', 'After'];
+  const [showIntegrationModal, setShowIntegrationModal] = useState(false);
 
   const isAllDayEventCheck = (fromTime: string, toTime: string): boolean => {
     if (!fromTime || !toTime) {
@@ -388,6 +392,8 @@ const CreateEventScreen = () => {
       return { date: null, time: '' };
     }
   };
+
+
   useEffect(() => {
     console.log('Edit Event Data:', JSON.stringify(editEventData));
 
@@ -400,7 +406,7 @@ const CreateEventScreen = () => {
       setLocation(parsedData.location || '');
 
       if (parsedData.locationType) {
-        setSelectedVideoConferencing(parsedData.locationType === 'google' ? 'google' : parsedData.locationType);
+        setSelectedVideoConferencing(parsedData.locationType);
         setShowVideoConferencingOptions(true);
       }
 
@@ -478,9 +484,27 @@ const CreateEventScreen = () => {
         setSelectedPermission(parsedData.guest_permission);
       }
 
+      if (parsedData.notification) {
+        setSelectedNotificationType(parsedData.notification);
+      }
+
+      if (parsedData.busy) {
+        setSelectedStatus(parsedData.busy);
+      }
+
+      if (parsedData.visibility) {
+        setSelectedVisibility(parsedData.visibility);
+      }
+
       if (parsedData.seconds) {
-        const minutes = Math.floor(parseInt(parsedData.seconds) / 60);
-        setNotificationMinutes(minutes.toString());
+        const secondsValue = parseInt(parsedData.seconds, 10);
+        const unitLabel = parsedData.trigger
+          ? convertionISOToTime(parsedData.trigger)?.Label || 'Minutes'
+          : 'Minutes';
+
+        const convertedValue = convertSecondsToUnit(secondsValue, unitLabel);
+        setNotificationMinutes(convertedValue.toString());
+        setSelectedTimeUnit(unitLabel); // Display unit like Minutes/Hours
         setShowAdvanced(true);
       }
 
@@ -496,7 +520,6 @@ const CreateEventScreen = () => {
     }
   }, [editEventData, mode]);
 
-  // Auto-select Google Meet when returning from IntegrationScreen after connecting
   useFocusEffect(
     React.useCallback(() => {
       // Check if we're returning from IntegrationScreen after Google connection
@@ -515,6 +538,16 @@ const CreateEventScreen = () => {
       }
     }, [googleIntegration.isConnected, showVideoConferencingOptions, selectedVideoConferencing])
   );
+
+  const handleGoogleMeetClick = () => {
+    if (!googleIntegration.isConnected) {
+      // Show modal first, then navigate on Continue
+      setShowIntegrationModal(true);
+    } else {
+      // Google is connected, allow selecting Google Meet
+      setSelectedVideoConferencing('google');
+    }
+  };
 
   useEffect(() => {
     if (selectedStartDate) {
@@ -587,6 +620,43 @@ const CreateEventScreen = () => {
     [],
   );
 
+  const getRecurrenceOptions = (selectedStartDate: Date) => {
+    const d = dayjs(selectedStartDate);
+    const weekday = d.format("dddd");
+    const dayNumber = d.date();
+    const monthName = d.format("MMMM");
+
+    // Determine week position (first, second, last, etc.)
+    const weekOfMonth = Math.ceil(dayNumber / 7);
+    const weekNames = ["first", "second", "third", "fourth"];
+
+    // Check if the next week falls into the next month to label the current one as "last"
+    const isLastWeekday = d.add(7, "day").month() !== d.month();
+
+    // Use 'last' if the date is in the last occurrence of that weekday for the month
+    const weekText = isLastWeekday ? "last" : weekNames[weekOfMonth - 1];
+
+    return [
+      "Does not repeat",
+      "Daily",
+      // The day of the selected start date is used (Weekly on Thursday)
+      `Weekly on ${weekday}`,
+
+      // This is the option for the specific week number of that weekday (Monthly on the first Thursday)
+      `Monthly on the ${weekText} ${weekday}`,
+
+      // This calculates if the next week's same day falls in a new month (Monthly on the last Thursday)
+      `Monthly on the last ${weekday}`,
+
+      // Annually option matches the format in the image (Annually on October 2)
+      `Annually on ${monthName} ${dayNumber}`,
+
+      "Every Weekday (Monday to Friday)",
+      "Custom...",
+    ];
+  };
+  const recurrenceOptions = getRecurrenceOptions(selectedStartDate);
+
   // Handle location selection
   const handleLocationSelect = (selectedLocation: any) => {
     setLocation(selectedLocation.label);
@@ -599,6 +669,11 @@ const CreateEventScreen = () => {
     if (location && location.length >= 2) {
       debouncedFetchSuggestions(location);
     }
+  };
+
+  const handleUnitSelect = (unit) => {
+    setCustomRecurrence(prev => ({ ...prev, repeatUnit: unit }));
+    setShowUnitDropdown(false);
   };
 
   const repeatUnits = ['Day', 'Week', 'Month', 'Year'];
@@ -625,9 +700,9 @@ const CreateEventScreen = () => {
 
     // Navigate to corresponding screen
     if (eventType === 'Task') {
-      navigation.navigate(Screen.CreateTaskScreen);
+      navigation.replace(Screen.CreateTaskScreen);
     } else if (eventType === 'Out of office') {
-      navigation.navigate(Screen.CreateOutOfOfficeScreen);
+      navigation.replace(Screen.CreateOutOfOfficeScreen);
     } else if (eventType === 'Event') {
       // Stay on current screen
       return;
@@ -711,17 +786,6 @@ const CreateEventScreen = () => {
     });
   };
 
-  // Handle Google Meet button click
-  const handleGoogleMeetClick = () => {
-    if (!googleIntegration.isConnected) {
-      // Show modal first, then navigate on Continue
-      setShowIntegrationModal(true);
-    } else {
-      // Google is connected, allow selecting Google Meet
-      setSelectedVideoConferencing('google');
-    }
-  };
-
 
   // Filter guests based on search query
   const filteredGuests = guestData.filter(
@@ -745,6 +809,7 @@ const CreateEventScreen = () => {
     if (calendarMode === 'from') {
       setSelectedStartDate(date);
       setSelectedStartTime(time);
+      setSelectedRecurrence("Does not repeat");
 
       // If no end date is set, set it to the same date
       if (!selectedEndDate) {
@@ -1112,6 +1177,42 @@ const CreateEventScreen = () => {
       };
 
       console.log('CreateEventScreen: Event data ==>', editEventData);
+
+      // Helper function to convert a value to seconds based on unit
+      function convertToSeconds(value: number, unit: string) {
+        switch (unit) {
+          case 'Minutes':
+            return value * 60;
+          case 'Hours':
+            return value * 3600;
+          case 'Days':
+            return value * 86400;
+          case 'Weeks':
+            return value * 604800;
+          default:
+            return value; // fallback, assume already in seconds
+        }
+      }
+
+      // Creating your event object
+      const numericValue = parseInt(notificationMinutes || '0', 10);
+
+      const secondsValue = convertToSeconds(numericValue, selectedTimeUnit);
+
+      const triggerISO = (() => {
+        switch (selectedTimeUnit) {
+          case 'Minutes':
+            return `PT${numericValue}M`;
+          case 'Hours':
+            return `PT${numericValue}H`;
+          case 'Days':
+            return `P${numericValue}D`;
+          case 'Weeks':
+            return `P${numericValue}W`;
+          default:
+            return `PT${numericValue}S`; // fallback to seconds
+        }
+      })();
       // Prepare event data in the new format
       const eventData = {
         uuid: editEventData?.uuid || '', // Keep uuid if editing
@@ -1134,17 +1235,14 @@ const CreateEventScreen = () => {
           activeAccount?.address ||
           '',
         guests: selectedGuests,
-        location: location.trim() || videoConferencing.trim(),
-        locationType: (selectedVideoConferencing === 'google' ? 'google' : selectedVideoConferencing === 'in-person' ? 'inperson' : 'inperson') as
-          | 'inperson'
-          | 'zoom'
-          | 'google',
-        busy: 'Busy',
-        visibility: 'Default Visibility',
-        notification: 'Email',
+        location: location.trim(),
+        locationType: selectedVideoConferencing,
+        busy: selectedStatus || 'Busy',
+        visibility: selectedVisibility || 'Default Visibility',
+        notification: selectedNotificationType,
+        seconds: secondsValue,
+        trigger: triggerISO,
         guest_permission: selectedPermission || 'Modify event',
-        seconds: parseInt(notificationMinutes || '0', 10) * 60, // Convert minutes to seconds
-        trigger: `PT${notificationMinutes || '0'}M`, // ISO 8601 duration
         timezone: selectedTimezone || 'UTC',
         repeatEvent:
           selectedRecurrence !== 'Does not repeat'
@@ -1153,6 +1251,59 @@ const CreateEventScreen = () => {
         customRepeatEvent: undefined,
         list: [],
       };
+
+      // If Google Meet is selected
+      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
+        console.log('Creating Google Meet meeting...');
+
+        // Use Google Calendar API directly
+        const googleEvent = {
+          summary: eventData.title,
+          description: eventData.description,
+          start: {
+            dateTime: new Date(selectedStartDate).toISOString(),
+            timeZone: eventData.timezone || 'UTC',
+          },
+          end: {
+            dateTime: new Date(selectedEndDate).toISOString(),
+            timeZone: eventData.timezone || 'UTC',
+          },
+          attendees: eventData.guests?.map((email) => ({ email })),
+          conferenceData: {
+            createRequest: {
+              requestId: `meet_${Date.now()}`,
+              conferenceSolutionKey: { type: 'hangoutsMeet' },
+            },
+          },
+        };
+
+        try {
+          const response = await fetch(
+            'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
+            {
+              method: 'POST',
+              headers: {
+                Authorization: `Bearer ${googleIntegration.accessToken}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify(googleEvent),
+            }
+          );
+
+          const data = await response.json();
+          if (response.ok) {
+            console.log('✅ Google Meet created:', data.hangoutLink);
+
+            // Save the meeting link in your event data
+          } else {
+            console.error('❌ Failed to create Google Meet:', data);
+            Alert.alert('Error', data.error?.message || 'Failed to create Google Meet');
+          }
+        } catch (err) {
+          console.error('❌ Google Meet creation error:', err);
+        }
+      }
+
 
       console.log('>>>>>>>> START DATE/TIME <<<<<<<<', {
         startDate: selectedStartDate?.toISOString(),
@@ -1483,33 +1634,23 @@ const CreateEventScreen = () => {
 
         <View style={styles.divider} />
 
-        {/* Add video conferencing */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginTop: spacing.md,
-          }}
-        >
-          <FeatherIcon name="video" size={20} color="#6C6C6C" />
-          <View>
-            <TouchableOpacity
-              onPress={() =>
-                setShowVideoConferencingOptions(!showVideoConferencingOptions)
-              }
-            >
-              <Text style={styles.selectorText}>Add video conferencing</Text>
-            </TouchableOpacity>
-          </View>
-
-          <Image
-            style={{
-              marginLeft: scaleWidth(5),
-              height: scaleHeight(12.87),
-              width: scaleWidth(12.87),
-            }}
-            source={require('../assets/images/addIcon.png')}
-          />
+        <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
+          <TouchableOpacity
+            style={{ flexDirection: 'row', alignItems: 'center' }}
+            onPress={() =>
+              setShowVideoConferencingOptions(!showVideoConferencingOptions)
+            }
+          >
+            <Text style={styles.selectorText}>Add video conferencing</Text>
+            <Image
+              style={{
+                marginLeft: scaleWidth(5),
+                height: scaleHeight(12.87),
+                width: scaleWidth(12.87),
+              }}
+              source={require('../assets/images/addIcon.png')}
+            />
+          </TouchableOpacity>
         </View>
 
         <View style={styles.divider} />
@@ -1520,10 +1661,14 @@ const CreateEventScreen = () => {
             <TouchableOpacity
               style={[
                 styles.videoConferencingButton,
-                selectedVideoConferencing === 'in-person' &&
+                selectedVideoConferencing === 'inPerson' &&
                 styles.videoConferencingButtonSelected,
               ]}
-              onPress={() => setSelectedVideoConferencing('in-person')}
+              onPress={() =>
+                setSelectedVideoConferencing(
+                  selectedVideoConferencing === 'inPerson' ? null : 'inPerson'
+                )
+              }
             >
               <View style={styles.videoConferencingIconContainer}>
                 <FeatherIcon name="map-pin" size={16} color="#6C6C6C" />
@@ -1531,15 +1676,15 @@ const CreateEventScreen = () => {
               <Text
                 style={[
                   styles.videoConferencingButtonText,
-                  selectedVideoConferencing === 'in-person' &&
+                  selectedVideoConferencing === 'inPerson' &&
                   styles.videoConferencingButtonTextSelected,
                 ]}
               >
                 In-person
               </Text>
             </TouchableOpacity>
-
-             {/* <TouchableOpacity
+{/* 
+            <TouchableOpacity
               style={[
                 styles.videoConferencingButton,
                 selectedVideoConferencing === 'zoom' &&
@@ -1590,11 +1735,11 @@ const CreateEventScreen = () => {
           style={{
             flexDirection: 'row',
             alignItems: 'center',
-            marginTop: spacing.md,
-            marginBottom: spacing.md,
+            marginBottom: spacing.lg,
           }}
         >
           <FeatherIcon name="map-pin" size={20} color="#6C6C6C" />
+
           <TextInput
             style={[
               styles.selectorText,
@@ -1603,19 +1748,23 @@ const CreateEventScreen = () => {
             placeholder="Add location"
             placeholderTextColor={colors.grey400}
             value={location}
-            onChangeText={text => {
-              setLocation(text);
-              debouncedFetchSuggestions(text);
-            }}
-            onFocus={handleLocationFocus}
-            autoCorrect={false}
-            autoCapitalize="none"
+            onFocus={() => setShowLocationModal(true)} // 👈 open modal on focus
+            editable={true}
           />
-          <Image
-            style={{ marginLeft: scaleWidth(10) }}
-            source={require('../assets/images/addIcon.png')}
-          />
+
+          <TouchableOpacity onPress={() => setShowLocationModal(true)}>  {/* 👈 also open on + icon click */}
+            <Image
+              style={{
+                marginLeft: scaleWidth(10),
+                height: scaleHeight(12.87),
+                width: scaleWidth(12.87),
+              }}
+              source={require('../assets/images/addIcon.png')}
+            />
+          </TouchableOpacity>
         </View>
+
+
 
         {/* Add Notification time */}
         {/* <View style={styles.notificationRow}>
@@ -1654,6 +1803,8 @@ const CreateEventScreen = () => {
             }
             selectedTimeUnit={selectedTimeUnit}
             onTimeUnitChange={setSelectedTimeUnit}
+            selectedNotificationType={selectedNotificationType}
+            onNotificationTypeChange={setSelectedNotificationType}
             onAddNotification={() => {
               // Handle add notification
               console.log('Add notification pressed');
@@ -1663,8 +1814,10 @@ const CreateEventScreen = () => {
               // Handle organizer selection
               console.log('Organizer pressed');
             }}
-            status="Busy"
-            visibility="Default visibility"
+            selectedStatus={selectedStatus}
+            onStatusChange={setSelectedStatus}
+            selectedVisibility={selectedVisibility}
+            onVisibilityChange={setSelectedVisibility}
             onStatusPress={() => {
               // Handle status selection
               console.log('Status pressed');
@@ -1853,18 +2006,24 @@ const CreateEventScreen = () => {
                     keyboardType="numeric"
                     maxLength={2}
                   />
-                  <View style={styles.customRepeatUnitDropdown}>
+                  <TouchableOpacity
+                    style={styles.customRepeatUnitDropdown}
+                    onPress={() => setShowUnitDropdown(prev => !prev)}
+                  >
                     <Text style={styles.customRepeatUnitText}>
                       {customRecurrence.repeatUnit}
                     </Text>
                     <FeatherIcon
                       name="chevron-down"
-                      size={16}
+                      size={14}
                       color="#6C6C6C"
+                      style={{ paddingTop: 3 }}
                     />
-                  </View>
+                  </TouchableOpacity>
                 </View>
               </View>
+
+
 
               {/* Repeat on section */}
               {customRecurrence.repeatUnit === repeatUnits[1] && (
@@ -1994,7 +2153,21 @@ const CreateEventScreen = () => {
                 </TouchableOpacity>
               </View>
             </View>
-
+            {showUnitDropdown && (
+              <View style={styles.dropdownOverlay}>
+                <View style={styles.dropdownContainer}>
+                  {repeatUnits.map(unit => (
+                    <TouchableOpacity
+                      key={unit}
+                      style={styles.dropdownItem}
+                      onPress={() => handleUnitSelect(unit)}
+                    >
+                      <Text style={styles.dropdownItemText}>{unit}</Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+            )}
             {/* Action Buttons */}
             <View style={styles.customModalActions}>
               <TouchableOpacity
@@ -2019,7 +2192,9 @@ const CreateEventScreen = () => {
               </TouchableOpacity>
             </View>
           </View>
+
         </View>
+
       </Modal>
 
       {/* Location Suggestions Modal */}
@@ -2088,7 +2263,6 @@ const CreateEventScreen = () => {
           </View>
         </View>
       </Modal>
-
       {/* Integration Info Modal */}
       <Modal
         visible={showIntegrationModal}
@@ -2102,7 +2276,7 @@ const CreateEventScreen = () => {
               <Icon name="link-variant" size={32} color="#18F06E" />
               <Text style={styles.integrationModalTitle}>Integration Required</Text>
             </View>
-            
+
             <View style={styles.integrationModalContent}>
               <Text style={styles.integrationModalDescription}>
                 To use Google Meet, you need to integrate Google
@@ -2116,7 +2290,7 @@ const CreateEventScreen = () => {
               >
                 <Text style={styles.integrationModalCancelText}>Cancel</Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
                 style={styles.integrationModalContinueButton}
                 onPress={() => {
@@ -2167,8 +2341,7 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: scaleHeight(40),
-    paddingBottom: spacing.lg,
+    paddingTop: spacing.lg,
     width: '100%',
     position: 'relative',
     paddingLeft: scaleWidth(10),
@@ -2196,8 +2369,8 @@ const styles = StyleSheet.create({
   },
   eventTypeDropdown: {
     position: 'absolute',
-    top: scaleHeight(100),
-    left: scaleWidth(166),
+    top: scaleHeight(70),
+    left: scaleWidth(140),
     width: scaleWidth(138),
     backgroundColor: colors.white,
     borderRadius: 8,
@@ -2289,7 +2462,7 @@ const styles = StyleSheet.create({
   dateTimeSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.md,
+    marginBottom: spacing.sm,
   },
   dateTimeSelector: {
     flex: 1,
@@ -2692,44 +2865,19 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Custom Recurrence Modal Styles
-  customRecurrenceModalContainer: {
-    backgroundColor: colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    minHeight: '60%',
-    paddingBottom: scaleHeight(40),
-  },
+
   customRecurrenceContent: {
     flex: 1,
     paddingHorizontal: spacing.lg,
-  },
-  // Custom Modal Styles
-  customModalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  customModalHeader: {
-    marginBottom: spacing.xl,
-    alignItems: 'center',
-  },
-  customModalTitle: {
-    fontSize: fontSize.textSize20,
-    fontWeight: '600',
-    color: colors.blackText,
+    overflow: 'visible', // Add this
   },
   customRecurrenceSection: {
     marginBottom: spacing.xl,
+    overflow: 'visible', // Add this
   },
-  customRecurrenceSectionTitle: {
-    fontSize: fontSize.textSize16,
-    fontWeight: '600',
-    color: colors.blackText,
-    marginBottom: spacing.md,
+  customRepeatEveryContainer: {
+    position: 'relative',
+    zIndex: 1000, // Add this
   },
   customRepeatEveryRow: {
     flexDirection: 'row',
@@ -2738,12 +2886,12 @@ const styles = StyleSheet.create({
   },
   customRepeatEveryInput: {
     width: scaleWidth(60),
-    height: scaleHeight(40),
+    height: scaleHeight(36),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
     textAlign: 'center',
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     color: colors.blackText,
     paddingHorizontal: 4,
   },
@@ -2755,15 +2903,79 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    height: scaleHeight(40),
+    height: scaleHeight(36),
     minWidth: scaleWidth(80),
+    backgroundColor: colors.white, // Add this
   },
   customRepeatUnitText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     color: colors.blackText,
     fontWeight: '400',
     marginRight: spacing.xs,
   },
+  dropdownContainer: {
+    position: 'absolute',
+    top: scaleHeight(45), // Position below the button row
+    left: scaleWidth(60) + spacing.sm, // Align with dropdown button
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    minWidth: scaleWidth(120),
+    maxWidth: scaleWidth(150),
+    paddingVertical: spacing.xs,
+    zIndex: 1001,
+  },
+  dropdownItem: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  dropdownItemText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+  },
+  // Custom Modal Styles
+  customModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  customRecurrenceModalContainer: {
+    backgroundColor: colors.white,
+    borderTopLeftRadius: 20,
+    borderTopRightRadius: 20,
+    maxHeight: '80%', // Increased from 80%
+    minHeight: '70%',
+    overflow: 'visible',
+    width: '100%', // Takes full width minus overlay padding
+    alignSelf: 'stretch',
+    paddingVertical: spacing.lg,
+  },
+  customModalHeader: {
+    marginBottom: spacing.xl,
+    alignItems: 'center',
+  },
+  customModalTitle: {
+    fontSize: fontSize.textSize20,
+    fontWeight: '600',
+    color: colors.blackText,
+  },
+
+  customRecurrenceSectionTitle: {
+    fontSize: fontSize.textSize16,
+    fontWeight: '600',
+    color: colors.blackText,
+    marginBottom: spacing.md,
+  },
+
+
   customDaysRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -2813,20 +3025,22 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryblue,
   },
   customEndsOptionText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     color: colors.blackText,
     fontWeight: '400',
     minWidth: scaleWidth(40),
+
   },
   customEndsInput: {
     width: scaleWidth(100),
-    height: scaleHeight(32),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
     paddingHorizontal: spacing.sm,
-    fontSize: fontSize.textSize14,
+    fontSize: fontSize.textSize12,
     color: colors.blackText,
+    paddingVertical: spacing.sm,
+    lineHeight: scaleHeight(13),
   },
   customEndsInputDisabled: {
     backgroundColor: '#F5F5F5',
@@ -2841,15 +3055,21 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: spacing.md,
+    paddingHorizontal: spacing.lg, // Add horizontal padding to match content
+    paddingTop: spacing.sm, // Add top padding/spacing
+    // Add bottom padding
+    borderTopWidth: 1, // Optional: add a separator line
+    borderTopColor: '#E5E7EB', // Optional: separator color
+    backgroundColor: colors.white,
   },
   customCancelButton: {
-    paddingVertical: spacing.md,
+    paddingVertical: 10, // Changed from spacing.md
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,
     backgroundColor: '#F3F4F6',
   },
   customCancelButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14, // Optional: reduce font size too
     fontWeight: '500',
     color: '#6B7280',
   },
@@ -2858,12 +3078,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   customDoneButtonGradient: {
-    paddingVertical: spacing.md,
+    paddingVertical: 10, // Changed from spacing.md
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   customDoneButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14, // Optional: reduce font size too
     fontWeight: '600',
     color: colors.white,
   },
@@ -2877,7 +3097,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     marginTop: spacing.sm,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.lg,
   },
   timezoneTagText: {
     fontSize: fontSize.textSize14,
@@ -3103,6 +3323,13 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     marginLeft: spacing.sm,
   },
+  dropdownWrapper: {
+    position: 'absolute',
+    top: '35%', // Adjust based on where your "Repeat every" section is
+    left: spacing.lg + scaleWidth(60) + spacing.sm, // Position next to the input
+    zIndex: 1000,
+  },
+
   // Integration Modal Styles
   integrationModalOverlay: {
     flex: 1,

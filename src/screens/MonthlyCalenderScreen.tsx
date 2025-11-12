@@ -11,11 +11,16 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import EventDetailsModal from '../components/EventDetailsModal';
-import { colors } from '../utils/LightTheme';
+import { colors, spacing } from '../utils/LightTheme';
 import { BlockchainService } from '../services/BlockChainService';
 import { useToken } from '../stores/useTokenStore';
 import { NECJSPRIVATE_KEY } from '../constants/Config';
 import { useApiClient } from '../hooks/useApi';
+import ExitConfirmModal from "../components/ExitConfirmModal";
+import ClockIcon from '../assets/svgs/clock.svg';
+import CalendarIcon from '../assets/svgs/calendar.svg';
+import EventIcon from '../assets/svgs/eventIcon.svg';
+import TaskIcon from '../assets/svgs/taskIcon.svg';
 
 interface MonthlyCalendarProps {
   onDateSelect?: (date: string) => void;
@@ -43,6 +48,8 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const token = useToken(state => state.token);
   const { api } = useApiClient();
   const [isDeleting, setIsDeleting] = useState(false);
+  const [exitModal, setExitModal] = useState(false);
+  const [navigationAction, setNavigationAction] = useState(null);
 
   // Format date to YYYY-MM-DD for react-native-calendars
   const formatDate = (date: Date): string => {
@@ -52,12 +59,111 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     return `${year}-${month}-${day}`;
   };
 
-  const selectedDateString = useMemo(() => formatDate(selectedDate), [selectedDate]);
+  const selectedDateString = useMemo(() => {
+    const dateString = formatDate(selectedDate);
+    console.log('✅ Calendar `current` date updated:', dateString);
+    return dateString;
+  }, [selectedDate]);
 
-  // Process events and create marked dates with periods for multi-day events
+  const generateRecurringInstances = (
+    event: any,
+    viewStartDate: Date,
+    viewEndDate: Date
+  ): Array<{ date: Date; event: any }> => {
+    const instances: Array<{ date: Date; event: any }> = [];
+
+    const startDate = parseTimeToPST(event.fromTime);
+    const endDate = parseTimeToPST(event.toTime);
+
+    if (!startDate || !endDate) return instances;
+
+    const repeatType = event.repeatEvent || event.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+
+    if (!repeatType || repeatType === 'Does not repeat') {
+      return [{ date: startDate, event }];
+    }
+
+    const eventDurationMs = endDate.getTime() - startDate.getTime();
+
+    let currentDate = new Date(startDate);
+    currentDate.setHours(0, 0, 0, 0);
+
+    const maxDate = new Date(viewEndDate);
+    maxDate.setHours(23, 59, 59, 999);
+
+    const oneYearFromNow = new Date();
+    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+    const limitDate = maxDate < oneYearFromNow ? maxDate : oneYearFromNow;
+
+    while (currentDate <= limitDate) {
+      if (currentDate >= viewStartDate && currentDate <= viewEndDate) {
+        instances.push({
+          date: new Date(currentDate),
+          event: {
+            ...event,
+            displayDate: new Date(currentDate),
+          },
+        });
+      }
+
+      switch (repeatType.toLowerCase()) {
+        case 'daily':
+        case 'every day':
+          currentDate.setDate(currentDate.getDate() + 1);
+          break;
+
+        case 'weekly':
+        case 'every week':
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+
+        case 'bi-weekly':
+        case 'every 2 weeks':
+          currentDate.setDate(currentDate.getDate() + 14);
+          break;
+
+        case 'monthly':
+        case 'every month':
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+
+        case 'yearly':
+        case 'every year':
+          currentDate.setFullYear(currentDate.getFullYear() + 1);
+          break;
+
+        case 'weekdays':
+        case 'every weekday':
+          do {
+            currentDate.setDate(currentDate.getDate() + 1);
+          } while (currentDate.getDay() === 0 || currentDate.getDay() === 6);
+          break;
+
+        default:
+          return instances;
+      }
+
+      if (instances.length > 366) {
+        console.warn('Too many recurring instances generated, stopping at 366');
+        break;
+      }
+    }
+
+    return instances;
+  };
+
   const { markedDates, eventsByDate } = useMemo(() => {
     const marked: any = {};
     const byDate: { [key: string]: any[] } = {};
+
+    const firstDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth(), 1);
+    const lastDayOfMonth = new Date(selectedDate.getFullYear(), selectedDate.getMonth() + 1, 0);
+
+    const viewStartDate = new Date(firstDayOfMonth);
+    viewStartDate.setDate(viewStartDate.getDate() - 7);
+
+    const viewEndDate = new Date(lastDayOfMonth);
+    viewEndDate.setDate(viewEndDate.getDate() + 7);
 
     (userEvents || []).forEach(ev => {
       const startDate = parseTimeToPST(ev.fromTime);
@@ -69,23 +175,78 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       }
 
       const isTask = ev.list?.some((item: any) => item.key === 'task' && item.value === 'true');
-      const isRecurring = ev.list?.some((item: any) => item.key === 'repeatEvent');
-      const isMultiDay = startDate.toDateString() !== endDate.toDateString();
+      const repeatType = ev.repeatEvent || ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+      const isRecurring = repeatType && repeatType !== 'Does not repeat';
 
-      // Determine color based on event type
-      const eventColor = isTask ? '#9976FF4D' : '#337E894D';
+      const eventColor = isTask ? '#8DC63F' : '#00AEEF';
 
-      if (isMultiDay) {
-        // Create period marking for multi-day events
-        const currentDate = new Date(startDate);
-        currentDate.setHours(0, 0, 0, 0);
-        const endDateOnly = new Date(endDate);
-        endDateOnly.setHours(0, 0, 0, 0);
+      const instances = generateRecurringInstances(ev, viewStartDate, viewEndDate);
 
-        while (currentDate <= endDateOnly) {
-          const dateString = formatDate(currentDate);
-          const isStart = currentDate.toDateString() === startDate.toDateString();
-          const isEnd = currentDate.toDateString() === endDate.toDateString();
+      instances.forEach(({ date: instanceDate, event }) => {
+        const instanceStartDate = new Date(instanceDate);
+        instanceStartDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds());
+
+        const instanceEndDate = new Date(instanceDate);
+        instanceEndDate.setHours(endDate.getHours(), endDate.getMinutes(), endDate.getSeconds());
+
+        if (startDate.toDateString() !== endDate.toDateString()) {
+          const duration = endDate.getTime() - startDate.getTime();
+          instanceEndDate.setTime(instanceStartDate.getTime() + duration);
+        }
+
+        const isMultiDay = instanceStartDate.toDateString() !== instanceEndDate.toDateString();
+
+        if (isMultiDay) {
+          const currentDate = new Date(instanceStartDate);
+          currentDate.setHours(0, 0, 0, 0);
+          const endDateOnly = new Date(instanceEndDate);
+          endDateOnly.setHours(0, 0, 0, 0);
+
+          while (currentDate <= endDateOnly) {
+            const dateString = formatDate(currentDate);
+            const isStart = currentDate.toDateString() === instanceStartDate.toDateString();
+            const isEnd = currentDate.toDateString() === instanceEndDate.toDateString();
+
+            if (!marked[dateString]) {
+              marked[dateString] = { periods: [] };
+            }
+            if (!marked[dateString].periods) {
+              marked[dateString].periods = [];
+            }
+
+            marked[dateString].periods.push({
+              startingDay: isStart,
+              endingDay: isEnd,
+              color: eventColor,
+              textColor: '#000000',
+            });
+
+            if (!byDate[dateString]) {
+              byDate[dateString] = [];
+            }
+
+            const alreadyExists = byDate[dateString].some(e =>
+              e.uid === ev.uid &&
+              e.instanceDate === dateString
+            );
+
+            if (!alreadyExists) {
+              byDate[dateString].push({
+                ...ev,
+                instanceDate: dateString,
+                instanceStartTime: instanceStartDate,
+                instanceEndTime: instanceEndDate,
+                isTask,
+                isRecurring,
+                isMultiDay,
+                color: eventColor,
+              });
+            }
+
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        } else {
+          const dateString = formatDate(instanceStartDate);
 
           if (!marked[dateString]) {
             marked[dateString] = { periods: [] };
@@ -95,69 +256,64 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
           }
 
           marked[dateString].periods.push({
-            startingDay: isStart,
-            endingDay: isEnd,
-            color: eventColor, // Add transparency
-            textColor: '#000000',
+            color: eventColor,
+            selectedColor: eventColor,
           });
 
-          // Store event for this date
           if (!byDate[dateString]) {
             byDate[dateString] = [];
           }
-          byDate[dateString].push({
-            ...ev,
-            isTask,
-            isRecurring,
-            isMultiDay,
-            color: eventColor,
-          });
 
-          currentDate.setDate(currentDate.getDate() + 1);
-        }
-      } else {
-        // Single day event - use dot marker
-        const dateString = formatDate(startDate);
+          const alreadyExists = byDate[dateString].some(e =>
+            e.uid === ev.uid &&
+            e.instanceDate === dateString
+          );
 
-        if (!marked[dateString]) {
-          marked[dateString] = { dots: [] };
+          if (!alreadyExists) {
+            byDate[dateString].push({
+              ...ev,
+              instanceDate: dateString,
+              instanceStartTime: instanceStartDate,
+              instanceEndTime: instanceEndDate,
+              isTask,
+              isRecurring,
+              isMultiDay: false,
+              color: eventColor,
+            });
+          }
         }
-        if (!marked[dateString].dots) {
-          marked[dateString].dots = [];
-        }
-
-        marked[dateString].dots.push({
-          color: eventColor,
-          selectedDotColor: eventColor,
-        });
-
-        // Store event for this date
-        if (!byDate[dateString]) {
-          byDate[dateString] = [];
-        }
-        byDate[dateString].push({
-          ...ev,
-          isTask,
-          isRecurring,
-          isMultiDay: false,
-          color: eventColor,
-        });
-      }
+      });
     });
 
-    // Add selected state to the selected date
     if (marked[selectedDateString]) {
       marked[selectedDateString].selected = true;
-      marked[selectedDateString].selectedColor = colors.figmaLightBlue || '#2196F3';
+      marked[selectedDateString].selectedColor = '#2196F3';
     } else {
       marked[selectedDateString] = {
         selected: true,
-        selectedColor: colors.figmaLightBlue || '#2196F3',
+        selectedColor: '#2196F3',
       };
     }
 
     return { markedDates: marked, eventsByDate: byDate };
-  }, [userEvents, selectedDateString]);
+  }, [userEvents, selectedDateString, selectedDate]);
+
+  useEffect(() => {
+    navigation.setOptions({
+      gestureEnabled: false,
+    });
+
+    const unsub = navigation.addListener("beforeRemove", (e) => {
+      if (exitModal) return;
+
+      e.preventDefault();
+      setExitModal(true);
+
+      setNavigationAction(e.data.action);
+    });
+
+    return unsub;
+  }, [navigation, exitModal]);
 
   const handleMenuPress = () => {
     setIsDrawerOpen(true);
@@ -170,10 +326,12 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const handleMonthSelect = (monthIndex: number) => {
     setCurrentMonthByIndex(monthIndex);
     const newDate = new Date(selectedDate.getFullYear(), monthIndex, 1);
+    console.log('New Selected Date:', newDate.toDateString());
     setSelectedDate(newDate);
   };
 
   const handleDateSelect = (date: Date) => {
+    console.log('Date selected:', date.toDateString());
     setSelectedDate(date);
     setCurrentMonthByIndex(date.getMonth());
   };
@@ -219,7 +377,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         return false;
       }
 
-      // Close modal first
       handleCloseEventModal();
 
       setIsDeleting(true);
@@ -228,13 +385,37 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     } catch (err) {
       console.error("Delete Event Failed:", err);
       Alert.alert("Error", "Failed to move the event to the trash");
-    }
-    finally {
+    } finally {
       setIsDeleting(false);
     }
   };
-  // Get events for selected date
+
+  const getRecurrenceDayText = (event: any): string => {
+    if (!event) return 'Recurring';
+
+    // Try to extract repeat type safely
+    const repeatType =
+      event.repeatEvent ??
+      event.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+
+    if (!repeatType || typeof repeatType !== 'string') return 'Recurring';
+
+    const type = repeatType.toLowerCase();
+
+    if (type.includes('weekday')) return 'Mon - Fri';
+    if (type.includes('week')) return 'Weekly';
+    if (type.includes('day')) return 'Daily';
+    if (type.includes('month')) return 'Monthly';
+    if (type.includes('year')) return 'Yearly';
+
+    return repeatType;
+  };
+
+
   const selectedDateEvents = eventsByDate[selectedDateString] || [];
+
+  console.log('Selected date:', selectedDateString);
+  console.log('Events for selected date:', selectedDateEvents.length);
 
   return (
     <View style={styles.container}>
@@ -256,92 +437,105 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         selectedDate={selectedDate}
       />
 
-      <Calendar
-        current={selectedDateString}
-        markedDates={markedDates}
-        markingType="multi-dot"  // Change from "multi-period" to "multi-dot"
-        onDayPress={handleDayPress}
-        onMonthChange={handleMonthChange}
-        firstDay={1} // Start week on Monday
-        theme={{
-          backgroundColor: '#ffffff',
-          calendarBackground: '#ffffff',
-          textSectionTitleColor: '#b6c1cd',
-          selectedDayBackgroundColor: colors.figmaLightBlue || '#2196F3',
-          selectedDayTextColor: '#ffffff',
-          todayTextColor: colors.figmaLightBlue || '#2196F3',
-          dayTextColor: '#2d4150',
-          textDisabledColor: '#d9e1e8',
-          dotColor: '#337E89',
-          selectedDotColor: '#ffffff',
-          arrowColor: colors.figmaLightBlue || '#2196F3',
-          monthTextColor: '#2d4150',
-          textDayFontFamily: 'DM Sans',
-          textMonthFontFamily: 'DM Sans',
-          textDayHeaderFontFamily: 'DM Sans',
-          textDayFontSize: 14,
-          textMonthFontSize: 16,
-          textDayHeaderFontSize: 12,
-        }}
-      />
+      <View style={styles.calendarWrapper}>
+        <Calendar
+          key={selectedDateString}
+          current={selectedDateString}
+          markedDates={markedDates}
+          markingType="multi-period"
+          onDayPress={handleDayPress}
+          firstDay={1}
+          theme={{
+            backgroundColor: '#ffffff',
+            calendarBackground: '#ffffff',
+            textSectionTitleColor: '#b6c1cd',
+            selectedDayBackgroundColor: '#000',
+            selectedDayTextColor: '#ffffff',
+            todayTextColor: colors.figmaLightBlue || '#2196F3',
+            dayTextColor: '#2d4150',
+            textDisabledColor: '#d9e1e8',
+            dotColor: '#337E89',
+            selectedDotColor: '#ffffff',
+            arrowColor: colors.figmaLightBlue || '#2196F3',
+            monthTextColor: '#2d4150',
+            textDayFontFamily: 'DM Sans',
+            textMonthFontFamily: 'DM Sans',
+            textDayHeaderFontFamily: 'DM Sans',
+            textDayFontSize: 14,
+            textMonthFontSize: 16,
+            textDayHeaderFontSize: 12,
+          }}
+          renderHeader={() => null}
+          hideArrows={true}
+        />
+      </View>
 
-      {/* Events list for selected date */}
       <View style={styles.eventsContainer}>
-        <Text style={styles.eventsTitle}>
-          Events on {selectedDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
-        </Text>
+        <Text style={styles.eventsTitle}>Timeline</Text>
+
         <ScrollView style={styles.eventsList}>
           {selectedDateEvents.length > 0 ? (
             selectedDateEvents.map((event, index) => (
-              <TouchableOpacity
-                key={`${event.uid}-${index}`}
-                style={[
-                  styles.eventItem,
-                  {
-                    borderLeftColor: event.color,
-                    borderLeftWidth: 4,
-                  },
-                ]}
-                onPress={() => handleEventPress(event)}
-              >
-                <View style={styles.eventContent}>
-                  <Text style={styles.eventTitle} numberOfLines={1}>
-                    {event.title}
-                  </Text>
-                  <Text style={styles.eventTime}>
-                    {parseTimeToPST(event.fromTime)?.toLocaleTimeString('en-US', {
-                      hour: 'numeric',
-                      minute: '2-digit',
-                    })}
-                    {' - '}
-                    {parseTimeToPST(event.toTime)?.toLocaleTimeString('en-US', {
+              <View key={`${event.uid}-${index}`}
+                style={{ display: 'flex', flexDirection: 'column', marginBottom: 10 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+                  <Text style={[styles.eventTime]}>
+                    {event.instanceStartTime?.toLocaleTimeString('en-US', {
                       hour: 'numeric',
                       minute: '2-digit',
                     })}
                   </Text>
-                  <View style={styles.eventBadges}>
-                    {event.isTask && (
-                      <View style={[styles.badge, {
-                        backgroundColor: event.isTask ? '#9976FF1A' : '#337E891A'
-                      }]}>
-                        <Text style={[styles.badgeText, {
-                          color: event.isTask ? colors.figmaPurple : '#337E89'
-                        }]}>Task</Text>
-                      </View>
-                    )}
-                    {event.isRecurring && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Recurring</Text>
-                      </View>
-                    )}
-                    {event.isMultiDay && (
-                      <View style={styles.badge}>
-                        <Text style={styles.badgeText}>Multi-day</Text>
-                      </View>
-                    )}
-                  </View>
+
+                  {/* Line */}
+                  <View style={{ flex: 1, height: 1, backgroundColor: '#D5D7DA', marginLeft: 14 }} />
                 </View>
-              </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.eventItem}
+                  onPress={() => handleEventPress(event)}
+                >
+                  <View style={styles.eventContent}>
+                    <Text style={styles.eventTitle} numberOfLines={1}>
+                      {event.title}
+                    </Text>
+
+                    <View style={styles.eventBadges}>
+                      <View style={styles.badge}>
+                        <ClockIcon height={14} width={14} />
+                        <Text style={styles.eventTime}>
+                          {parseTimeToPST(event.fromTime)?.toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                          {' - '}
+                          {parseTimeToPST(event.toTime)?.toLocaleTimeString('en-US', {
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}
+                        </Text>
+                      </View>
+
+                      {event.isRecurring && (
+                        <View style={styles.badge}>
+                          <CalendarIcon height={14} width={14} />
+                          <Text style={styles.badgeText}>
+                            {getRecurrenceDayText(event)}
+                          </Text>
+                        </View>
+                      )}
+
+                      <View style={[styles.badge, {
+                        borderColor: event.isTask ? '#8DC63F' : '#00AEEF',
+                      }]}>
+                        {event.isTask? <TaskIcon height={14} width={14}/> : <EventIcon height={14} width={14}/>}
+                        <Text style={styles.badgeText}>
+                          {event.isTask ? 'Task' : 'Event'}
+                        </Text>
+                      </View>
+                    </View>
+                  </View>
+                </TouchableOpacity>
+              </View>
             ))
           ) : (
             <Text style={styles.noEventsText}>No events for this date</Text>
@@ -362,12 +556,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         onOptionSelect={option => {
           console.log('Selected option:', option);
           switch (option) {
-            case 'goal':
-              console.log('Create Goal');
-              break;
-            case 'reminder':
-              navigation.navigate(Screen.RemindersScreen as never);
-              break;
             case 'task':
               navigation.navigate(Screen.CreateTaskScreen as never);
               break;
@@ -381,6 +569,21 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       />
 
       <CustomDrawer isOpen={isDrawerOpen} onClose={handleDrawerClose} />
+      <ExitConfirmModal
+        visible={exitModal}
+        onCancel={() => {
+          setExitModal(false);
+          setNavigationAction(null);
+        }}
+        onConfirm={() => {
+          setExitModal(false);
+          if (navigationAction) {
+            navigation.dispatch(navigationAction);
+          } else {
+            navigation.goBack();
+          }
+        }}
+      />
     </View>
   );
 };
@@ -388,18 +591,24 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
+    backgroundColor: '#F5F5F5',
+  },
+  calendarWrapper: {
+    marginHorizontal: spacing.md,
+    marginVertical: spacing.lg,
+    borderRadius: 14,
+    overflow: 'hidden',
   },
   eventsContainer: {
+    marginHorizontal: spacing.md,
+    paddingHorizontal: 4,
     flex: 1,
-    padding: 16,
-    backgroundColor: '#f5f5f5',
   },
   eventsTitle: {
     fontSize: 16,
     fontWeight: '600',
     fontFamily: 'DM Sans',
-    marginBottom: 12,
+    marginBottom: spacing.md,
     color: '#2d4150',
   },
   eventsList: {
@@ -407,46 +616,56 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     backgroundColor: '#ffffff',
-    borderRadius: 8,
-    padding: 12,
-    marginBottom: 8,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-    elevation: 2,
+    borderRadius: 12,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    marginBottom: spacing.sm,
+    borderColor: '#D5D7DA',
+    borderWidth: 1,
+    borderLeftColor: '#D5D7DA',
+    borderLeftWidth: 1
   },
   eventContent: {
-    marginLeft: 8,
+    gap: 12,
   },
   eventTitle: {
     fontSize: 14,
     fontWeight: '600',
     fontFamily: 'DM Sans',
-    color: '#2d4150',
-    marginBottom: 4,
+    color: '#1a1a1a',
+    marginBottom: 0,
   },
   eventTime: {
-    fontSize: 12,
-    fontFamily: 'DM Sans',
-    color: '#666',
-    marginBottom: 6,
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'left',
+  },
+  eventStartTime: {
+    fontSize: 10,
+    fontWeight: '600',
+    textAlign: 'left',
+    borderWidth: 1,
   },
   eventBadges: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 6,
+    gap: 8,
   },
   badge: {
-    backgroundColor: '#e3f2fd',
+    display: 'flex',
+    flexDirection: 'row',
+    gap: 4,
+    backgroundColor: '#fff',
     paddingHorizontal: 8,
-    paddingVertical: 3,
-    borderRadius: 12,
+    paddingVertical: 4,
+    borderRadius: 100,
+    borderWidth: 0.5,
+    borderColor: '#D5D7DA',
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: 12,
     fontFamily: 'DM Sans',
-    color: '#1976d2',
+    color: '#666',
     fontWeight: '500',
   },
   noEventsText: {

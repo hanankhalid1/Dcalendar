@@ -1,7 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
-  Text, 
+  Text,
   StyleSheet,
   TouchableOpacity,
   StatusBar,
@@ -12,29 +12,25 @@ import {
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import FeatherIcon from 'react-native-vector-icons/Feather';
-import { useNavigation, useRoute } from '@react-navigation/native';
+import { useNavigation } from '@react-navigation/native';
+import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useApiClient } from '../hooks/useApi';
 import { useActiveAccount } from '../stores/useActiveAccount';
-import GoogleOAuthWebView from '../components/GoogleOAuthWebView';
+import GoogleOAuthWebView from '../components/GoogleOAuthWebFlow';
 import { colors, fontSize, spacing, borderRadius, shadows } from '../utils/LightTheme';
-import { scaleWidth, scaleHeight, moderateScale } from '../utils/dimensions';
-import NcogIntegration from '../services/SimpleNcogIntegration';
-import { Screen } from '../navigations/appNavigation.type';
-import PlainHeader from '../components/PlainHeader';
-import CustomDrawer from '../components/CustomDrawer';
+import { scaleWidth } from '../utils/dimensions';
+import { useRoute, RouteProp } from '@react-navigation/native';
 
 const IntegrationScreen = () => {
   const navigation = useNavigation();
-  const route = useRoute<any>();
-  const { returnToScreen } = route.params || {};
-  const { 
-    googleIntegration, 
-    connectGoogle, 
+  const {
+    googleIntegration,
+    connectGoogle,
     disconnectGoogle,
     zoomIntegration,
     connectZoom,
-    disconnectZoom 
+    disconnectZoom
   } = useAuthStore();
   const { api } = useApiClient();
   const activeAccount = useActiveAccount(state => state.account);
@@ -42,25 +38,28 @@ const IntegrationScreen = () => {
   const [isLoadingZoom, setIsLoadingZoom] = useState(false);
   const [showWebView, setShowWebView] = useState(false);
   const [authUrl, setAuthUrl] = useState('');
-  const [oauthType, setOauthType] = useState<'google' | 'zoom'>('google');
-  const ncogIntegration = React.useRef(new NcogIntegration('DCalendar', 'dcalendar'));
-  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const route = useRoute();
+  const returnToScreen = route.params?.returnToScreen;
+  // Configure Google Sign-In on mount
+  useEffect(() => {
+    GoogleSignin.configure({
+      webClientId: '803362654752-hi8nfh7l9ofq3cmgta7jpabjcf2kn3is.apps.googleusercontent.com', // From Google Cloud Console
+      offlineAccess: true, // To get refresh token
+      forceCodeForRefreshToken: true,
+      scopes: [
+        'https://www.googleapis.com/auth/calendar',
+        'https://www.googleapis.com/auth/calendar.events',
+      ],
+    });
+  }, []);
 
-  const handleMenuPress = () => {
-    setIsDrawerOpen(true);
-  };
-
-  const handleDrawerClose = () => {
-    setIsDrawerOpen(false);
-  };
-
-  // Helper to safely stringify objects with BigInt (for blockchain data)
   const safeStringify = (obj: any): string => {
     return JSON.stringify(obj, (key, value) =>
       typeof value === 'bigint' ? value.toString() : value
     );
   };
 
+  // Native Google Sign-In Handler
   const handleGoogleConnect = async () => {
     try {
       if (googleIntegration.isConnected) {
@@ -71,102 +70,149 @@ const IntegrationScreen = () => {
       }
 
       setIsLoading(true);
-      
-      // Get username - check activeAccount structure
-      console.log('Active Account:', safeStringify(activeAccount));
-      
-      // Try userName first (most common), then other fields
-      const userName = activeAccount?.userName || 
-                       activeAccount?.user_name || 
-                       activeAccount?.username || 
-                       activeAccount?.name;
-      
-      console.log('Using username:', userName);
-      
+
+      // Check if Google Play Services are available (Android)
+      console.log("Checking for play services...");
+      await GoogleSignin.hasPlayServices();
+
+      console.log("Initiating Google Sign-In...");
+      // Sign in with native Google Sign-In
+      const signInResult = await GoogleSignin.signIn();
+      const user = signInResult.data.user;
+      const serverAuthCode = signInResult.data.serverAuthCode;
+      console.log('Google Sign-In User Info:', safeStringify(signInResult.data));
+
+      // Get tokens
+      const tokens = await GoogleSignin.getTokens();
+      console.log('Google Sign-In Tokens:', safeStringify(tokens));
+
+
+      // Get username from activeAccount
+      const userName = activeAccount?.userName ||
+        activeAccount?.user_name ||
+        activeAccount?.username ||
+        activeAccount?.name;
+
       if (!userName) {
-        Alert.alert(
-          'User Not Found', 
-          'Cannot find username. Please ensure you are logged in.\n\n' +
-          `Account data: ${safeStringify(activeAccount).substring(0, 300)}`
-        );
+        Alert.alert('Error', 'Cannot find username. Please ensure you are logged in.');
         setIsLoading(false);
         return;
       }
 
-      try {
-        // Call API - same as web code: getGoogleAuthUrl(user_name)
-        const response = await api('GET', `/google/auth-url?user_name=${encodeURIComponent(userName)}`, undefined);
-        
-        console.log('API Response:', safeStringify(response.data));
-        
-        // Extract URL - handle nested data structure (response.data.data || response.data)
-        const url = response.data?.data || response.data;
-        
-        // Check if it's an error response
-        if (url?.statusCode === 400 || url?.status === false) {
-          Alert.alert('Error', url?.message || 'Backend returned an error. Check if user exists.');
-          setIsLoading(false);
-          return;
-        }
-        
-        // Get the actual URL string
-        const authUrl = typeof url === 'string' ? url : url?.authUrl || url?.url;
-        
-        if (!authUrl || !authUrl.startsWith('http')) {
-          Alert.alert(
-            'Error', 
-            `No valid URL found.\n\nResponse: ${safeStringify(url).substring(0, 200)}`
-          );
-          setIsLoading(false);
-          return;
-        }
+      // Send tokens to your backend
 
-        // Open WebView with URL
-        setOauthType('google');
-        setAuthUrl(authUrl);
-        setShowWebView(true);
-        
-      } catch (error: any) {
-        const errorMsg = error.response?.data?.message || error.message || 'API call failed';
-        Alert.alert('Error', errorMsg);
-      } finally {
-        setIsLoading(false);
-      }
+      console.log("email here:", user.email);
+
+      // const response = await api('POST', '/google/connect', {
+      //   user_name: userName,
+      //   server_auth_code: serverAuthCode, // ✅ Send this separately
+      //   id_token: tokens.idToken,
+      //   email: user.email,
+      //   name: user.name,
+      //   photo: user.photo,
+      // });
+
+      // // ✅ Backend should return actual tokens after exchange
+      // const { access_token, refresh_token } = response.data;
+
+      // ✅ Store correct tokens from backend response
+      // connectGoogle({
+      //   accessToken: access_token,
+      //   refreshToken: refresh_token, // ✅ Real refresh token from backend
+      //   email: user.email,
+      //   fullName: user.name,
+      //   photo: user.photo,
+      // });
+
+      connectGoogle({
+        accessToken: tokens.accessToken, // ✅ From GoogleSignin.getTokens()
+        refreshToken: undefined, // Google Sign-In SDK doesn’t return refreshToken
+        email: user.email,
+        fullName: user.name,
+        photo: user.photo,
+      });
+
+      Alert.alert("Success","Connected successfully");
+      return true;
+      // if (response.data.success) {
+      //   Alert.alert('✅ Connected', 'Google account connected successfully!', [
+      //     {
+      //       text: 'OK',
+      //       onPress: () => {
+      //         const returnTo = route.params?.returnToScreen;
+      //         if (returnTo) {
+      //           // 🔁 Go back to the screen that requested integration
+      //           navigation.navigate(returnTo);
+      //         } else {
+      //           // 🟢 Stay here if opened directly
+      //           // Optionally, you can refresh UI or show connected state
+      //           setIsConnected(true);
+      //         }
+      //       },
+      //     },
+      //   ]);
+      // } else {
+      //   Alert.alert('❌ Failed', 'Could not connect Google account');
+      // }
+
+
     } catch (error: any) {
-      console.error('Google OAuth error:', error);
-      const errorMessage = error.response?.data?.message || error.message || 'Failed to get OAuth URL';
-      Alert.alert('Error', errorMessage);
+      console.error('Google Sign-In Error:', error);
+
+      if (error.code === statusCodes.SIGN_IN_CANCELLED) {
+        // User cancelled the sign-in
+        console.log('User cancelled sign-in');
+      } else if (error.code === statusCodes.IN_PROGRESS) {
+        Alert.alert('In Progress', 'Sign-in is already in progress');
+      } else if (error.code === statusCodes.PLAY_SERVICES_NOT_AVAILABLE) {
+        Alert.alert(
+          'Google Play Services Required',
+          'Please install or update Google Play Services to use this feature'
+        );
+      } else {
+        Alert.alert('Sign-In Failed', error.message || 'Failed to sign in with Google');
+      }
     } finally {
       setIsLoading(false);
     }
   };
+
+  
 
   const handleGoogleDisconnect = async () => {
     try {
       setIsLoading(true);
+
+      // Get username
+      const userName = activeAccount?.userName ||
+        activeAccount?.user_name ||
+        activeAccount?.username ||
+        activeAccount?.name;
+
+      // Sign out from Google
+      await GoogleSignin.signOut();
+
+      // Disconnect from backend
+      if (userName) {
+        try {
+          await api('PUT', '/google/disconnect', { user_name: userName });
+        } catch (error) {
+          console.error('Backend disconnect error:', error);
+        }
+      }
+
+      // Update local state
       disconnectGoogle();
       Alert.alert('Disconnected', 'Google account disconnected successfully');
     } catch (error) {
+      console.error('Disconnect error:', error);
       Alert.alert('Error', 'Failed to disconnect');
-      console.log(error);
     } finally {
       setIsLoading(false);
     }
   };
 
-  const handleOAuthError = (error: string) => {
-    setShowWebView(false);
-    const errorMsg = oauthType === 'zoom' 
-      ? error || 'Failed to authenticate with Zoom'
-      : error || 'Failed to authenticate with Google';
-    Alert.alert('Authentication Error', errorMsg);
-  };
-
-  const handleOAuthCancel = () => {
-    setShowWebView(false);
-  };
-
-  // Zoom OAuth Handlers - matches web code: getZoomAuthUrl()
+  // Zoom OAuth Handlers (keep WebView for Zoom since it might not have native SDK)
   const handleZoomConnect = async () => {
     try {
       if (zoomIntegration.isConnected) {
@@ -179,52 +225,35 @@ const IntegrationScreen = () => {
       setIsLoadingZoom(true);
 
       try {
-        // Call API - matches web: getZoomAuthUrl() which calls GET /zoom/auth
         const response = await api('GET', `/zoom/auth`, undefined);
-        
         console.log('Zoom API Response:', safeStringify(response.data));
-        
-        // Extract URL - handle nested data structure
+
         const url = response.data?.data || response.data;
-        
-        // Check if it's an error response
+
         if (url?.statusCode === 400 || url?.status === false) {
-          Alert.alert('Error', url?.message || 'Backend returned an error. Check if user exists.');
-          setIsLoadingZoom(false);
-          return;
-        }
-        
-        // Get the actual URL string
-        const zoomAuthUrl = typeof url === 'string' ? url : url?.authUrl || url?.url;
-        
-        if (!zoomAuthUrl || !zoomAuthUrl.startsWith('http')) {
-          Alert.alert(
-            'Error', 
-            `No valid URL found.\n\nResponse: ${safeStringify(url).substring(0, 200)}`
-          );
+          Alert.alert('Error', url?.message || 'Backend returned an error');
           setIsLoadingZoom(false);
           return;
         }
 
-        // Open WebView with URL
-        setOauthType('zoom');
+        const zoomAuthUrl = typeof url === 'string' ? url : url?.authUrl || url?.url;
+
+        if (!zoomAuthUrl || !zoomAuthUrl.startsWith('http')) {
+          Alert.alert('Error', 'No valid Zoom auth URL found');
+          setIsLoadingZoom(false);
+          return;
+        }
+
         setAuthUrl(zoomAuthUrl);
         setShowWebView(true);
-        
+
       } catch (error: any) {
         console.error('Zoom OAuth API error:', error);
-        
-        // Handle 404 - endpoint doesn't exist
+
         if (error.response?.status === 404) {
           Alert.alert(
             'Zoom Integration Not Available',
-            'The Zoom OAuth endpoint is not configured on the backend yet.\n\n' +
-            'Backend needs to implement:\n' +
-            '• GET /zoom/auth\n' +
-            '• PUT /zoom/disconnect\n' +
-            '• OAuth callback handler for Zoom\n' +
-            '• Integration status endpoint for Zoom\n\n' +
-            'Please contact your backend developer to add Zoom OAuth support.',
+            'The Zoom OAuth endpoint is not configured on the backend yet.',
             [{ text: 'OK' }]
           );
         } else {
@@ -236,18 +265,7 @@ const IntegrationScreen = () => {
       }
     } catch (error: any) {
       console.error('Zoom OAuth error:', error);
-      
-      if (error.response?.status === 404) {
-        Alert.alert(
-          'Zoom Integration Not Available',
-          'The Zoom OAuth endpoint is not configured on the backend yet.\n\n' +
-          'Please contact your backend developer to add Zoom OAuth support.',
-          [{ text: 'OK' }]
-        );
-      } else {
-        const errorMessage = error.response?.data?.message || error.message || 'Failed to get OAuth URL';
-        Alert.alert('Error', errorMessage);
-      }
+      Alert.alert('Error', error.message || 'Failed to connect Zoom');
       setIsLoadingZoom(false);
     }
   };
@@ -255,7 +273,6 @@ const IntegrationScreen = () => {
   const handleZoomDisconnect = async () => {
     try {
       setIsLoadingZoom(true);
-      // Call API - matches web: disconnectZoomStatus() which calls PUT /zoom/disconnect
       await api('PUT', '/zoom/disconnect', {});
       disconnectZoom();
       Alert.alert('Disconnected', 'Zoom account disconnected successfully');
@@ -268,7 +285,6 @@ const IntegrationScreen = () => {
     }
   };
 
-  // Updated OAuth success handler to handle both Google and Zoom
   const handleOAuthSuccess = async (data: {
     accessToken?: string;
     refreshToken?: string;
@@ -278,140 +294,59 @@ const IntegrationScreen = () => {
   }) => {
     try {
       setShowWebView(false);
-      
-      // If we have tokens directly, save them
+
       if (data.accessToken) {
-        if (oauthType === 'zoom') {
-          connectZoom({
-            accessToken: data.accessToken,
-            refreshToken: data.refreshToken,
-            email: data.email,
-            fullName: data.name,
-            photo: data.photo,
-          });
-          Alert.alert('✅ Connected', 'Zoom account connected successfully!');
-        } else {
-          connectGoogle({
-            accessToken: data.accessToken,
-            refreshToken: data.refreshToken,
-            email: data.email,
-            fullName: data.name,
-            photo: data.photo,
-          });
-          
-          // After Google connection succeeds, immediately trigger NCOG wallet connection
-          try {
-            console.log('Google connected successfully - triggering NCOG wallet connection...');
-            await ncogIntegration.current.connectToNcog();
-          } catch (ncogError) {
-            console.error('Failed to open NCOG wallet:', ncogError);
-            // Don't show error - user can connect wallet later
-          }
-          
-          // If we came from CreateEventScreen, navigate back first, then show alert
-          if (returnToScreen) {
-            navigation.navigate(returnToScreen as any);
-            // Show success alert after navigation
-            setTimeout(() => {
-              Alert.alert('✅ Connected', 'Google account connected successfully!');
-            }, 500);
-          } else {
-            Alert.alert('✅ Connected', 'Google account connected successfully!');
-          }
-        }
+        connectZoom({
+          accessToken: data.accessToken,
+          refreshToken: data.refreshToken,
+          email: data.email,
+          fullName: data.name,
+          photo: data.photo,
+        });
+        Alert.alert('✅ Connected', 'Zoom account connected successfully!');
         return;
       }
 
-      // If no tokens, backend handled it - verify with backend
-      const loadingState = oauthType === 'zoom' ? setIsLoadingZoom : setIsLoading;
-      loadingState(true);
-      
+      setIsLoadingZoom(true);
+
       try {
-        // Check if backend successfully processed OAuth
         const statusResponse = await api('GET', '/calendarIntgrationStatus', undefined);
-        
         const integrations = statusResponse.data?.data || statusResponse.data || {};
-        
-        if (oauthType === 'zoom') {
-          if (integrations.isZoomConnected) {
-            connectZoom({
-              email: integrations.zoomEmail,
-              fullName: integrations.zoomName,
-            });
-            Alert.alert('✅ Connected', 'Zoom account connected successfully!');
-          } else {
-            Alert.alert(
-              'Backend Error',
-              'Zoom OAuth completed but backend returned an error.\n\n' +
-              'This might mean:\n' +
-              '1. Backend callback handler has an issue\n' +
-              '2. Check backend logs for details\n' +
-              '3. Try again or contact support'
-            );
-          }
+
+        if (integrations.isZoomConnected) {
+          connectZoom({
+            email: integrations.zoomEmail,
+            fullName: integrations.zoomName,
+          });
+          Alert.alert('✅ Connected', 'Zoom account connected successfully!');
         } else {
-          if (integrations.isGoogleConnected) {
-            connectGoogle({
-              email: integrations.googleEmail,
-              fullName: integrations.googleName,
-            });
-            
-            // After Google connection succeeds, immediately trigger NCOG wallet connection
-            try {
-              console.log('Google connected successfully - triggering NCOG wallet connection...');
-              await ncogIntegration.current.connectToNcog();
-            } catch (ncogError) {
-              console.error('Failed to open NCOG wallet:', ncogError);
-              // Don't show error - user can connect wallet later
-            }
-            
-            // If we came from CreateEventScreen, navigate back first, then show alert
-            if (returnToScreen) {
-              navigation.navigate(returnToScreen as any);
-              // Show success alert after navigation
-              setTimeout(() => {
-                Alert.alert('✅ Connected', 'Google account connected successfully!');
-              }, 500);
-            } else {
-              Alert.alert('✅ Connected', 'Google account connected successfully!');
-            }
-          } else {
-            Alert.alert(
-              'Backend Error',
-              'Google OAuth completed but backend returned an error.\n\n' +
-              'This might mean:\n' +
-              '1. Backend callback handler has an issue\n' +
-              '2. Check backend logs for details\n' +
-              '3. Try again or contact support'
-            );
-          }
+          Alert.alert('Backend Error', 'Zoom OAuth completed but backend returned an error.');
         }
       } catch (err: any) {
         console.error('Error checking integration status:', err);
-        Alert.alert(
-          'Status Check Failed',
-          'Could not verify OAuth status from backend.\n\n' +
-          'Error: ' + (err.response?.data?.message || err.message) + '\n\n' +
-          'If you completed sign-in, the connection may still be successful. Check your integrations.'
-        );
+        Alert.alert('Status Check Failed', 'Could not verify OAuth status from backend.');
       } finally {
-        loadingState(false);
+        setIsLoadingZoom(false);
       }
     } catch (error) {
-      console.error(`Error saving ${oauthType} integration:`, error);
+      console.error('Error saving zoom integration:', error);
       Alert.alert('Error', 'Failed to save connection');
-      if (oauthType === 'zoom') {
-        setIsLoadingZoom(false);
-      } else {
-        setIsLoading(false);
-      }
+      setIsLoadingZoom(false);
     }
+  };
+
+  const handleOAuthError = (error: string) => {
+    setShowWebView(false);
+    Alert.alert('Authentication Error', error || 'Failed to authenticate with Zoom');
+  };
+
+  const handleOAuthCancel = () => {
+    setShowWebView(false);
   };
 
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
-      <PlainHeader onMenuPress={handleMenuPress} title="Integration" />
       <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <View style={styles.mainCard}>
           <Text style={styles.title}>Connect Your Apps</Text>
@@ -450,8 +385,8 @@ const IntegrationScreen = () => {
                   isLoading
                     ? [colors.grey400, colors.grey400]
                     : googleIntegration.isConnected
-                    ? ['#FF6B6B', '#EE5A52']
-                    : ['#18F06E', '#0B6DE0']
+                      ? ['#FF6B6B', '#EE5A52']
+                      : ['#18F06E', '#0B6DE0']
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -499,8 +434,8 @@ const IntegrationScreen = () => {
                   isLoadingZoom
                     ? [colors.grey400, colors.grey400]
                     : zoomIntegration.isConnected
-                    ? ['#FF6B6B', '#EE5A52']
-                    : ['#18F06E', '#0B6DE0']
+                      ? ['#FF6B6B', '#EE5A52']
+                      : ['#2D8CFF', '#1E6BD8']
                 }
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
@@ -519,7 +454,7 @@ const IntegrationScreen = () => {
         </View>
       </ScrollView>
 
-      {/* OAuth WebView Modal */}
+      {/* OAuth WebView Modal (for Zoom) */}
       {showWebView && authUrl && (
         <GoogleOAuthWebView
           authUrl={authUrl}
@@ -528,109 +463,29 @@ const IntegrationScreen = () => {
           onCancel={handleOAuthCancel}
         />
       )}
-
-      {/* Custom Drawer */}
-      <CustomDrawer
-        isOpen={isDrawerOpen}
-        onClose={handleDrawerClose}
-      />
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: colors.white 
-  },
-  content: { 
-    flex: 1, 
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.md,
-  },
-  mainCard: { 
-    backgroundColor: colors.white, 
-    borderRadius: borderRadius.xl, 
-    padding: spacing.xl, 
-    marginTop: spacing.md,
-    ...shadows.sm 
-  },
-  title: { 
-    fontSize: fontSize.textSize24, 
-    fontWeight: 'bold', 
-    textAlign: 'center', 
-    marginBottom: spacing.md,
-    color: colors.blackText,
-  },
-  description: { 
-    fontSize: fontSize.textSize14, 
-    textAlign: 'center', 
-    marginBottom: spacing.xl,
-    color: colors.grey400,
-    lineHeight: 20,
-  },
-  integrationCard: { 
-    backgroundColor: colors.white, 
-    borderRadius: borderRadius.lg, 
-    padding: spacing.lg, 
-    borderWidth: 1, 
-    borderColor: colors.grey20,
-    marginBottom: spacing.md,
-  },
-  integrationHeader: { 
-    flexDirection: 'row', 
-    alignItems: 'center', 
-    marginBottom: spacing.md 
-  },
-  integrationLogoContainer: { 
-    width: scaleWidth(48), 
-    height: scaleWidth(48), 
-    borderRadius: borderRadius.md, 
-    backgroundColor: '#F8F9FA', 
-    justifyContent: 'center', 
-    alignItems: 'center', 
-    borderWidth: 1, 
-    borderColor: colors.grey20,
-    marginRight: spacing.md,
-  },
-  integrationInfo: { 
-    flex: 1 
-  },
-  integrationName: { 
-    fontSize: fontSize.textSize18, 
-    fontWeight: '600',
-    color: colors.blackText,
-  },
-  connectedEmail: { 
-    fontSize: fontSize.textSize12, 
-    color: colors.figmaAccent, 
-    marginTop: spacing.xs 
-  },
-  connectedName: { 
-    fontSize: fontSize.textSize12, 
-    color: colors.mediumgray, 
-    marginTop: 2 
-  },
-  connectButton: { 
-    borderRadius: borderRadius.lg, 
-    overflow: 'hidden', 
-    ...shadows.sm,
-    marginTop: spacing.sm,
-  },
+  container: { flex: 1, backgroundColor: colors.white },
+  content: { flex: 1, paddingHorizontal: spacing.lg },
+  mainCard: { backgroundColor: colors.white, borderRadius: borderRadius.xl, padding: spacing.xl, ...shadows.sm },
+  title: { fontSize: fontSize.textSize24, fontWeight: 'bold', textAlign: 'center', marginBottom: spacing.md },
+  description: { fontSize: fontSize.textSize14, textAlign: 'center', marginBottom: spacing.xl },
+  integrationCard: { backgroundColor: colors.white, borderRadius: borderRadius.lg, padding: spacing.lg, borderWidth: 1, borderColor: colors.grey20 },
+  integrationHeader: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
+  integrationLogoContainer: { width: scaleWidth(48), height: scaleWidth(48), borderRadius: borderRadius.md, backgroundColor: '#F8F9FA', justifyContent: 'center', alignItems: 'center', borderWidth: 1, borderColor: colors.grey20 },
+  integrationInfo: { flex: 1, marginLeft: spacing.md },
+  integrationName: { fontSize: fontSize.textSize18, fontWeight: '600' },
+  connectedEmail: { fontSize: fontSize.textSize12, color: colors.figmaAccent, marginTop: spacing.xs },
+  connectedName: { fontSize: fontSize.textSize12, color: colors.mediumgray, marginTop: 2 },
+  connectButton: { borderRadius: borderRadius.lg, overflow: 'hidden', ...shadows.sm },
   connectButtonActive: {},
   disconnectButton: {},
-  buttonDisabled: { 
-    opacity: 0.6 
-  },
-  gradient: { 
-    paddingVertical: spacing.md, 
-    alignItems: 'center' 
-  },
-  connectButtonText: { 
-    fontSize: fontSize.textSize16, 
-    color: colors.white, 
-    fontWeight: '600' 
-  },
+  buttonDisabled: { opacity: 0.6 },
+  gradient: { paddingVertical: spacing.md, alignItems: 'center' },
+  connectButtonText: { fontSize: fontSize.textSize16, color: colors.white, fontWeight: '600' },
 });
 
 export default IntegrationScreen;
