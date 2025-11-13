@@ -522,7 +522,7 @@ const CreateEventScreen = () => {
 
   useFocusEffect(
     React.useCallback(() => {
-      // Check if we're returning from IntegrationScreen after Google connection
+      // Check if we're returning from Settings after Google connection
       // If Google is connected, show video conferencing options and auto-select Google Meet
       if (googleIntegration.isConnected) {
         // Show video conferencing options if not already shown
@@ -2295,8 +2295,8 @@ const CreateEventScreen = () => {
                 style={styles.integrationModalContinueButton}
                 onPress={() => {
                   setShowIntegrationModal(false);
-                  navigation.navigate(Screen.IntegrationScreen, {
-                    returnToScreen: Screen.CreateEventScreen,
+                  navigation.navigate(Screen.SettingsScreen, {
+                    expandIntegration: true,
                   });
                 }}
               >

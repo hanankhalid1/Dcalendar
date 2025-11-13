@@ -8,6 +8,7 @@ import {
   Animated,
   Image,
   ActivityIndicator,
+  Easing,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CalenderIcon from 'react-native-vector-icons/MaterialIcons';
@@ -52,6 +53,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   onClose,
 }) => {
   const slideAnim = useRef(new Animated.Value(-scaleWidth(280))).current;
+  const backdropOpacity = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<any>();
 
   // State for calendar items check/uncheck
@@ -239,23 +241,41 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
   useEffect(() => {
     if (isOpen) {
-      Animated.timing(slideAnim, {
-        toValue: 0,
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      // Animate drawer slide in and backdrop fade in
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 1,
+          duration: 300,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
     } else {
-      Animated.timing(slideAnim, {
-        toValue: -scaleWidth(280),
-        duration: 300,
-        useNativeDriver: true,
-      }).start();
+      // Animate drawer slide out and backdrop fade out
+      Animated.parallel([
+        Animated.timing(slideAnim, {
+          toValue: -scaleWidth(280),
+          duration: 300,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.timing(backdropOpacity, {
+          toValue: 0,
+          duration: 300,
+          easing: Easing.in(Easing.cubic),
+          useNativeDriver: true,
+        }),
+      ]).start();
     }
     setShowCreateMenu(false);
     setIsAccountDropdownOpen(false); // Close dropdown when drawer closes
-  }, [isOpen, slideAnim]);
-
-  if (!isOpen) return null;
+  }, [isOpen, slideAnim, backdropOpacity]);
 
   const renderAccountDropdown = () => {
     if (!isAccountDropdownOpen || accounts.length === 0) return null;
@@ -351,16 +371,30 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     }
   }
 
+  // Keep component mounted during animation for smooth transitions
+  // Only hide when fully closed (handled by pointerEvents)
+
   return (
-    <View style={styles.overlay}>
-      <TouchableOpacity
-        style={styles.backdrop}
-        onPress={() => {
-          setShowCreateMenu(false);
-          setIsAccountDropdownOpen(false);
-          onClose();
-        }}
-      />
+    <View style={styles.overlay} pointerEvents={isOpen ? 'auto' : 'none'}>
+      <Animated.View
+        style={[
+          styles.backdrop,
+          {
+            opacity: backdropOpacity,
+          },
+        ]}
+        pointerEvents={isOpen ? 'auto' : 'none'}
+      >
+        <TouchableOpacity
+          style={StyleSheet.absoluteFill}
+          onPress={() => {
+            setShowCreateMenu(false);
+            setIsAccountDropdownOpen(false);
+            onClose();
+          }}
+          activeOpacity={1}
+        />
+      </Animated.View>
 
       <Animated.View
         style={[styles.drawer, { transform: [{ translateX: slideAnim }] }]}
@@ -640,16 +674,6 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 source={require('../assets/images/Primaryfolder-open.png')}
               />
               <Text style={styles.navText}>Settings</Text>
-            </TouchableOpacity>
-             <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                doNavigate('IntegrationScreen');
-                onClose();
-              }}
-            >
-              <Icon name="link-variant" size={24} color="#FFFFFF" />
-              <Text style={styles.navText}>Integration</Text>
             </TouchableOpacity>
             <TouchableOpacity
               style={styles.navItem}

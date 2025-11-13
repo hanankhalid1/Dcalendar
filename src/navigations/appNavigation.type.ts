@@ -29,7 +29,7 @@ export type RootStackParamList = {
   [Screen.CreateTaskScreen]: undefined;
   [Screen.CreateEventScreen]: undefined;
   [Screen.CreateOutOfOfficeScreen]: undefined;
-  [Screen.SettingsScreen]: undefined;
+  [Screen.SettingsScreen]: { expandIntegration?: boolean } | undefined;
   [Screen.DeletedEventsScreen]: undefined;
   [Screen.IntegrationScreen]: { returnToScreen?: Screen } | undefined;
 };

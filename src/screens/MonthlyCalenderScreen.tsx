@@ -52,6 +52,10 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const [exitModal, setExitModal] = useState(false);
   const [navigationAction, setNavigationAction] = useState(null);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [loading, setLoading] = useState(false);
+  
+  // Extract userName similar to HomeScreen
+  const userName = account?.username || '';
 
   // Format date to YYYY-MM-DD for react-native-calendars
   const formatDate = (date: Date): string => {
@@ -299,6 +303,29 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
 
     return { markedDates: marked, eventsByDate: byDate };
   }, [userEvents, selectedDateString, selectedDate]);
+
+  // Fetch events when component mounts or userName changes (same flow as HomeScreen)
+  useEffect(() => {
+    const fetchEvents = async () => {
+      if (!account || !account[3]) {
+        console.log('No account or userName found, skipping event fetch');
+        return;
+      }
+
+      try {
+        setLoading(true);
+        console.log('Fetching events for user:', account[3]);
+
+        const events = await getUserEvents(account[3], api);
+        console.log("events fetched in MonthlyCalendarScreen", events);
+      } catch (error) {
+        console.error('Error fetching events:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchEvents();
+  }, [userName]);
 
   useEffect(() => {
     navigation.setOptions({

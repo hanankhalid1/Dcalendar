@@ -12,9 +12,11 @@ import {
   Dimensions,
   Alert,
   Platform,
+  ScrollView,
 } from 'react-native';
 import Share from 'react-native-share';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import { useRoute } from '@react-navigation/native';
 import Header from '../components/Header';
 import { Fonts } from '../constants/Fonts';
 import { Colors } from '../constants/Colors';
@@ -34,6 +36,7 @@ import { set } from 'react-hook-form';
 import { pick } from '@react-native-documents/picker';
 import RNBlobUtil from 'react-native-blob-util';
 import { apiClient, useApiClient } from '../hooks/useApi';
+import IntegrationsComponent from '../components/IntegrationsComponent';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 const blockchainService = new BlockchainService();
@@ -323,6 +326,8 @@ const TimeZoneModal = ({ visible, onClose, selectedTimeZone, onSelectTimeZone })
 
 // Main Settings Screen Component
 const SettingsScreen = () => {
+  const route = useRoute<any>();
+  const { expandIntegration } = route.params || {};
   const [showDayModal, setShowDayModal] = useState(false);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showTimeZoneModal, setShowTimeZoneModal] = useState(false);
@@ -520,7 +525,6 @@ const SettingsScreen = () => {
     }
   }
 
-
   const handleMenuPress = () => {
     setIsDrawerOpen(true);
     console.log("Menu button pressed");
@@ -534,7 +538,7 @@ const SettingsScreen = () => {
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
       <PlainHeader onMenuPress={handleMenuPress} title="Settings" />
 
-      <View style={styles.content}>
+      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
         <SettingRow
           title="Start of the week"
           subtitle={selectedDay}
@@ -612,7 +616,10 @@ const SettingsScreen = () => {
           onButtonPress={handleImportEvents}
         /> */}
 
-      </View>
+        {/* Integration Component */}
+        <IntegrationsComponent initialExpanded={expandIntegration || false} />
+
+      </ScrollView>
 
       <DaySelectionModal
         visible={showDayModal}
