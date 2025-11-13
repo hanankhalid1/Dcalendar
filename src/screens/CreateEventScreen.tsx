@@ -93,6 +93,9 @@ const CreateEventScreen = () => {
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
   const [selectedRecurrence, setSelectedRecurrence] = useState('Does not repeat');
   const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
+  const [meetingLink, setMeetingLink] = useState('');
+  const [meetingEventId, setMeetingEventId] = useState('');
+
   const [customRecurrence, setCustomRecurrence] = useState(() => {
     const weekday =
       selectedStartDate
@@ -226,6 +229,14 @@ const CreateEventScreen = () => {
         case 'deletedTime':
           parsedData.deletedTime = value;
           console.log('Set deletedTime:', value);
+          break;
+        case 'meetingLink':
+          parsedData.meetingLink = value;
+          console.log('Set meetingLink:', value);
+          break;
+        case 'meetingEventId':
+          parsedData.meetingEventId = value;
+          console.log('Set meetingEventId:', value);
           break;
         default:
           console.log('Unknown key:', key, 'with value:', value);
@@ -405,11 +416,6 @@ const CreateEventScreen = () => {
       setDescription(editEventData.description || '');
       setLocation(parsedData.location || '');
 
-      if (parsedData.locationType) {
-        setSelectedVideoConferencing(parsedData.locationType);
-        setShowVideoConferencingOptions(true);
-      }
-
       // ✅ CHECK IF IT'S AN ALL-DAY EVENT FIRST
       if (editEventData.fromTime && editEventData.toTime) {
         const isAllDay = isAllDayEventCheck(editEventData.fromTime, editEventData.toTime);
@@ -516,29 +522,49 @@ const CreateEventScreen = () => {
         setShowDetailedDateTime(true);
       }
 
+      if (parsedData.locationType) {
+        setSelectedVideoConferencing(parsedData.locationType);
+        setShowVideoConferencingOptions(true);
+      }
+
+      // ✅ Handle Google Meet or any video meeting
+      if (
+        parsedData.locationType === 'google' ||
+        editEventData?.meetingLink?.includes('meet.google.com')
+      ) {
+        console.log('Detected Google Meet in existing event');
+
+        setSelectedVideoConferencing('google');
+        setShowVideoConferencingOptions(true);
+
+        if (editEventData.meetingLink) {
+          setMeetingLink(editEventData.meetingLink);
+        }
+
+        const meetingEventId =
+          parsedData.meetingEventId ||
+          editEventData.meetingEventId ||
+          (editEventData.list || []).find((i: any) => i.key === 'meetingEventId')?.value;
+
+        if (meetingEventId) {
+          setMeetingEventId(meetingEventId);
+          console.log('Meeting Event ID found:', meetingEventId);
+        }
+      }
+
+
 
     }
   }, [editEventData, mode]);
 
   useFocusEffect(
     React.useCallback(() => {
-      // Check if we're returning from IntegrationScreen after Google connection
-      // If Google is connected, show video conferencing options and auto-select Google Meet
-      if (googleIntegration.isConnected) {
-        // Show video conferencing options if not already shown
-        if (!showVideoConferencingOptions) {
-          setShowVideoConferencingOptions(true);
-        }
-        // Auto-select Google Meet if nothing is selected yet or if it's not already selected
-        if (selectedVideoConferencing !== 'google') {
-          setTimeout(() => {
-            setSelectedVideoConferencing('google');
-          }, 300);
-        }
+      // Just show the video conferencing options when Google is connected
+      if (googleIntegration.isConnected && !showVideoConferencingOptions) {
+        setShowVideoConferencingOptions(true);
       }
-    }, [googleIntegration.isConnected, showVideoConferencingOptions, selectedVideoConferencing])
+    }, [googleIntegration.isConnected, showVideoConferencingOptions])
   );
-
   const handleGoogleMeetClick = () => {
     if (!googleIntegration.isConnected) {
       // Show modal first, then navigate on Continue
@@ -833,38 +859,37 @@ const CreateEventScreen = () => {
     }
   };
 
-  // Helper function to add minutes to a time string
-  const addMinutesToTime = (timeString: string, minutesToAdd: number): string => {
-    const [time, period] = timeString.split(' ');
-    const [hours, minutes] = time.split(':').map(Number);
-    let totalMinutes = hours * 60 + minutes;
 
-    if (period === 'PM' && hours !== 12) {
-      totalMinutes += 12 * 60;
+  const addMinutesToTime = (timeString: string, minutesToAdd: number): string => {
+    const [timePart, period] = timeString.split(' ');
+    let [hours, minutes] = timePart.split(':').map(Number);
+
+    // Convert 12-hour to 24-hour
+    if (period === 'PM' && hours < 12) {
+      hours += 12;
     } else if (period === 'AM' && hours === 12) {
-      totalMinutes -= 12 * 60;
+      hours = 0;
     }
 
-    totalMinutes += minutesToAdd;
+    // Total minutes
+    let totalMinutes = hours * 60 + minutes + minutesToAdd;
 
-    // Convert back to time string
-    const newHours = Math.floor(totalMinutes / 60) % 24;
+    // Handle overflow past 24 hours
+    totalMinutes = totalMinutes % (24 * 60);
+
+    // Convert back to hours/minutes
+    const newHours24 = Math.floor(totalMinutes / 60);
     const newMinutes = totalMinutes % 60;
 
-    let displayHours = newHours;
-    let newPeriod = 'AM';
+    // Convert back to 12-hour format
+    let displayHours = newHours24 % 12;
+    if (displayHours === 0) displayHours = 12;
 
-    if (newHours === 0) {
-      displayHours = 12;
-    } else if (newHours === 12) {
-      newPeriod = 'PM';
-    } else if (newHours > 12) {
-      displayHours = newHours - 12;
-      newPeriod = 'PM';
-    }
+    const newPeriod = newHours24 >= 12 ? 'PM' : 'AM';
 
     return `${displayHours}:${newMinutes.toString().padStart(2, '0')} ${newPeriod}`;
   };
+
 
   // Form validation
   const validateForm = () => {
@@ -938,79 +963,203 @@ const CreateEventScreen = () => {
     return true;
   };
 
-
-  const handleEditEvent = async (event: any, activeAccount: any) => {
-    let txHash = null; // Store blockchain transaction hash
-    let apiResponse = null;
-
+  const handleEditEvent = async (eventData: any, activeAccount: any) => {
     try {
-      console.log("CreateEventScreen: Active account ==>", activeAccount);
-      console.log("CreateEventScreen: Event to update ==>", event);
-      console.log("CreateEventScreen: Event UUID to update ==>", event.uuid);
-      // 1. Build the required server payload structure
-      const repeatEvents = (event?.list || [])
-        .filter((data: any) => data.key === "repeatEvent")
-        .map((data: any) => data.value)
-        .filter((value: any) => value !== null);
-      // ... [Same customRepeat and meetingEventIdValue extraction logic] ...
-      const customRepeat = (event?.list || [])
-        .filter((data: any) => data.key === "customRepeatEvent")
-        .map((data: any) => data.value)
-        .filter((value: any) => value !== null);
-      const meetingEventIdValue = (event?.list || [])
-        .find((i: any) => i.key === 'meetingEventId')?.value || '';
+      // ✅ If Google Meet is selected and user is connected to Google
+      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
+        console.log('Updating Google Meet meeting...');
 
-      const updatePayload = {
-        events: [{
-          uid: event?.uid,
-          fromTime: event?.fromTime,
-          toTime: event?.toTime,
-          repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
-          customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
-          meetingEventId: meetingEventIdValue
-        }],
-        active: activeAccount?.userName,
-        type: 'update',
-      };
+        const googleEvent = {
+          summary: eventData.title,
+          description: eventData.description,
+          start: {
+            dateTime: new Date(selectedStartDate).toISOString(),
+            timeZone: 'UTC', // match web
+          },
+          end: {
+            dateTime: new Date(selectedEndDate).toISOString(),
+            timeZone: 'UTC',
+          },
+          attendees: [
+            {
+              email: activeAccount.userName,
+              displayName: activeAccount.userName.split('@')[0] || 'Organizer',
+              responseStatus: 'accepted',
+            },
+            ...(eventData.guests?.map((email) => ({
+              email,
+              displayName: email.split('@')[0],
+              responseStatus: 'needsAction',
+            })) || []),
+          ],
+          conferenceData: {
+            createRequest: {
+              requestId: `meet_${Date.now()}`,
+            },
+          },
+        };
 
-      console.log("CreateEventScreen: Update payload ==>", updatePayload);
+        // Add recurrence if exists
+        if (eventData.recurrenceRule) {
+          googleEvent.recurrence = [eventData.recurrenceRule];
+        }
 
-      // 2. 🎯 CRITICAL: EXECUTE BLOCKCHAIN SEQUENTIALLY
+        // Wrap same as web code
+        const payload = {
+          eventDetails: googleEvent,
+          user_name: activeAccount.userName,
+          eventId: eventData.meetingEventId, // must match backend parameter
+        };
+
+        console.log('Google Event Update Payload:', payload);
+
+        try {
+          // ✅ Direct backend call for updating Google Meet event
+          const response = await api('POST', '/google/update-event', {
+            eventDetails: payload,
+            user_name: payload.user_name,
+            eventId: payload.eventId
+          });
+          const data = response?.data?.data || response?.data;
+
+          if (data?.hangoutLink) {
+            console.log('✅ Google Meet updated via backend:', data.hangoutLink);
+            eventData.location = data.hangoutLink;
+            eventData.meetingEventId = data.id;
+          } else {
+            console.error('❌ Failed to update Google Meet via backend:', data);
+            Alert.alert('Error', 'Failed to update Google Meet');
+          }
+        } catch (err) {
+          console.error('❌ Google Meet update error via backend:', err);
+          Alert.alert('Error', 'Failed to update Google Meet');
+        }
+      }
+
+      console.log('Editing event payload:', eventData);
+
       const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-      txHash = await blockchainService.updateEvent(event, activeAccount, token);
+      const response = await blockchainService.updateEvent(
+        eventData,
+        activeAccount,
+        token,
+      );
 
-      if (!txHash) {
-        Alert.alert('Blockchain Error', 'Failed to confirm blockchain update.');
-        return; // Stop if blockchain fails
-      }
-      console.log('Blockchain update successful:', txHash);
+      if (response) {
+        const repeatEvents = (eventData?.list || [])
+          .filter((data: any) => data.key === 'repeatEvent')
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+        const customRepeat = (eventData?.list || [])
+          .filter((data: any) => data.key === 'customRepeatEvent')
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+        const meetingEventIdValue =
+          (eventData?.list || []).find((i: any) => i.key === 'meetingEventId')?.value || '';
 
-      // 3. 🎯 CRITICAL: EXECUTE API SEQUENTIALLY (ONLY AFTER BLOCKCHAIN SUCCESS)
-      apiResponse = await api('POST', '/updateevents', updatePayload);
-      console.log('API response data:', apiResponse.data);
+        const updatePayload = {
+          events: [
+            {
+              uid: eventData?.uid,
+              fromTime: eventData?.fromTime,
+              toTime: eventData?.toTime,
+              repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
+              customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
+              meetingEventId: meetingEventIdValue,
+            },
+          ],
+          active: activeAccount?.userName,
+          type: 'update',
+        };
 
-      if (apiResponse?.data) {
-        // 5. Final Success Alert and Navigation
+        const apiResponse = await api('POST', '/updateevents', updatePayload);
+        console.log('API response data (edit):', apiResponse.data);
+
         await getUserEvents(activeAccount.userName, api);
+
         navigation.goBack();
-        Alert.alert('Success', 'Event Updated Successfully');
+        Alert.alert('Event Updated', 'Event Updated Successfully');
       } else {
-        Alert.alert('Failed', 'Failed to Update Event');
+        Alert.alert('Event Update Failed', 'Failed to Update Event');
       }
-
-    }
-    catch (error) {
-      console.log('CreateEventScreen: Error updating event ==>', error);
-
-      const errorMessage = txHash
-        ? "Server sync failed after blockchain success."
-        : "Event update failed (Blockchain or API).";
-
-      Alert.alert('Error', errorMessage);
+    } catch (error) {
+      console.error('❌ Error in handleEditEvent:', error);
+      Alert.alert('Error', 'Failed to Update Event');
     }
   };
+
+
   const handleCreateEvent = async (eventData: any, activeAccount: any) => {
     try {
+      // If Google Meet is selected
+      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
+        console.log('Creating Google Meet meeting...');
+
+        const googleEvent = {
+          summary: eventData.title,
+          description: eventData.description,
+          start: {
+            dateTime: new Date(selectedStartDate).toISOString(),
+            timeZone: 'UTC', // match web code
+          },
+          end: {
+            dateTime: new Date(selectedEndDate).toISOString(),
+            timeZone: 'UTC',
+          },
+          attendees: [
+            {
+              email: activeAccount.userName, // organizer / current user
+              displayName: activeAccount.userName.split('@')[0] || 'Organizer',
+              responseStatus: 'accepted',
+            },
+            ...(eventData.guests?.map((email) => ({
+              email,
+              displayName: email.split('@')[0],
+              responseStatus: 'needsAction', // default for guests
+            })) || []),
+          ],
+          conferenceData: {
+            createRequest: {
+              requestId: `meet_${Date.now()}`,
+            },
+          },
+        };
+
+        // Add recurrence if exists
+        if (eventData.recurrenceRule) {
+          googleEvent.recurrence = [eventData.recurrenceRule];
+        }
+
+        // Wrap in the same structure as web
+        const payload = {
+          user_name: activeAccount.userName,
+          eventDetails: googleEvent,
+        };
+
+        console.log('Google Event Payload:', googleEvent);
+        try {
+          // ✅ Call backend API directly
+          const response = await api('POST', '/google/create-event', payload);
+
+          // ✅ Many Axios wrappers put backend data inside `response.data.data`
+          const data = response?.data?.data || response?.data;
+
+          if (data?.hangoutLink) {
+            console.log('✅ Google Meet created via backend:', data.hangoutLink);
+            eventData.location = data.hangoutLink;
+            eventData.meetingEventId = data.id;
+          } else {
+            console.error('❌ Failed to create Google Meet via backend:', data);
+            Alert.alert('Error', 'Failed to create Google Meet');
+          }
+
+        } catch (err) {
+          console.error('❌ Google Meet creation error via backend:', err);
+          Alert.alert('Error', 'Failed to create Google Meet');
+        }
+      }
+
+
       console.log("Active account: ", activeAccount.userName);
       console.log("Create event payload: ", eventData);
       const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
@@ -1051,9 +1200,6 @@ const CreateEventScreen = () => {
         await getUserEvents(activeAccount.userName, api);
 
         navigation.goBack();
-
-
-
 
         Alert.alert('Event created', 'Event Created Successfully');
       } else {
@@ -1237,6 +1383,7 @@ const CreateEventScreen = () => {
         guests: selectedGuests,
         location: location.trim(),
         locationType: selectedVideoConferencing,
+        meetingEventId: meetingEventId || '',
         busy: selectedStatus || 'Busy',
         visibility: selectedVisibility || 'Default Visibility',
         notification: selectedNotificationType,
@@ -1252,57 +1399,7 @@ const CreateEventScreen = () => {
         list: [],
       };
 
-      // If Google Meet is selected
-      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
-        console.log('Creating Google Meet meeting...');
 
-        // Use Google Calendar API directly
-        const googleEvent = {
-          summary: eventData.title,
-          description: eventData.description,
-          start: {
-            dateTime: new Date(selectedStartDate).toISOString(),
-            timeZone: eventData.timezone || 'UTC',
-          },
-          end: {
-            dateTime: new Date(selectedEndDate).toISOString(),
-            timeZone: eventData.timezone || 'UTC',
-          },
-          attendees: eventData.guests?.map((email) => ({ email })),
-          conferenceData: {
-            createRequest: {
-              requestId: `meet_${Date.now()}`,
-              conferenceSolutionKey: { type: 'hangoutsMeet' },
-            },
-          },
-        };
-
-        try {
-          const response = await fetch(
-            'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
-            {
-              method: 'POST',
-              headers: {
-                Authorization: `Bearer ${googleIntegration.accessToken}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify(googleEvent),
-            }
-          );
-
-          const data = await response.json();
-          if (response.ok) {
-            console.log('✅ Google Meet created:', data.hangoutLink);
-
-            // Save the meeting link in your event data
-          } else {
-            console.error('❌ Failed to create Google Meet:', data);
-            Alert.alert('Error', data.error?.message || 'Failed to create Google Meet');
-          }
-        } catch (err) {
-          console.error('❌ Google Meet creation error:', err);
-        }
-      }
 
 
       console.log('>>>>>>>> START DATE/TIME <<<<<<<<', {
@@ -1661,12 +1758,12 @@ const CreateEventScreen = () => {
             <TouchableOpacity
               style={[
                 styles.videoConferencingButton,
-                selectedVideoConferencing === 'inPerson' &&
+                selectedVideoConferencing === 'inperson' &&
                 styles.videoConferencingButtonSelected,
               ]}
               onPress={() =>
                 setSelectedVideoConferencing(
-                  selectedVideoConferencing === 'inPerson' ? null : 'inPerson'
+                  selectedVideoConferencing === 'inperson' ? null : 'inperson'
                 )
               }
             >
@@ -1676,14 +1773,14 @@ const CreateEventScreen = () => {
               <Text
                 style={[
                   styles.videoConferencingButtonText,
-                  selectedVideoConferencing === 'inPerson' &&
+                  selectedVideoConferencing === 'inperson' &&
                   styles.videoConferencingButtonTextSelected,
                 ]}
               >
                 In-person
               </Text>
             </TouchableOpacity>
-{/* 
+            {/* 
             <TouchableOpacity
               style={[
                 styles.videoConferencingButton,
@@ -2295,9 +2392,7 @@ const CreateEventScreen = () => {
                 style={styles.integrationModalContinueButton}
                 onPress={() => {
                   setShowIntegrationModal(false);
-                  navigation.navigate(Screen.IntegrationScreen, {
-                    returnToScreen: Screen.CreateEventScreen,
-                  });
+                  navigation.navigate(Screen.IntegrationScreen);
                 }}
               >
                 <LinearGradient
