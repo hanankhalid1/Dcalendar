@@ -2392,7 +2392,9 @@ const CreateEventScreen = () => {
                 style={styles.integrationModalContinueButton}
                 onPress={() => {
                   setShowIntegrationModal(false);
-                  navigation.navigate(Screen.IntegrationScreen);
+                  navigation.navigate(Screen.SettingsScreen, {
+                    expandIntegration: true,
+                  });
                 }}
               >
                 <LinearGradient

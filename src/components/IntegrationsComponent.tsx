@@ -50,8 +50,11 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
       offlineAccess: true,
       forceCodeForRefreshToken: true,
       scopes: [
-        'https://www.googleapis.com/auth/calendar',
         'https://www.googleapis.com/auth/calendar.events',
+        'https://www.googleapis.com/auth/calendar',
+        'openid',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile',
       ],
     });
   }, []);
@@ -79,12 +82,33 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
 
       setIsLoading(true);
 
+      // Check if Google Play Services are available (Android)
+      console.log("Checking for play services...");
       await GoogleSignin.hasPlayServices();
+
+      console.log("Initiating Google Sign-In...");
+      // Sign in with native Google Sign-In
       const signInResult = await GoogleSignin.signIn();
+      console.log("Google Sign-In Result:", safeStringify(signInResult));
+      
+      if (!signInResult.data) {
+        Alert.alert('Error', 'Failed to get sign-in data from Google');
+        setIsLoading(false);
+        return;
+      }
+      
       const user = signInResult.data.user;
+      const serverAuthCode = signInResult.data.serverAuthCode;
+      console.log('Google Sign-In User Info:', safeStringify(signInResult.data));
 
-      const tokens = await GoogleSignin.getTokens();
+      // Validate serverAuthCode
+      if (!serverAuthCode) {
+        Alert.alert('Error', 'Failed to get authorization code from Google');
+        setIsLoading(false);
+        return;
+      }
 
+      // Get username from activeAccount
       const userName = account?.userName ||
         account?.user_name ||
         account?.username ||
@@ -96,15 +120,42 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
         return;
       }
 
-      connectGoogle({
-        accessToken: tokens.accessToken,
-        refreshToken: undefined,
-        email: user.email,
-        fullName: user.name,
-        photo: user.photo,
+      console.log("User email:", user.email);
+      console.log("Calling Android callback API...");
+
+      // Call the new Android-specific API endpoint
+      const response = await api('POST', '/google/android/callback', {
+        code: serverAuthCode,
+        username: userName,
       });
 
-      Alert.alert("Success", "Connected successfully");
+      console.log('API Response:', safeStringify(response.data));
+
+      // Check if the response was successful
+      if (response.data.status && response.data.data) {
+        const { access_token, refresh_token, expires_at } = response.data.data;
+
+        // Store tokens in your context/state
+        connectGoogle({
+          accessToken: access_token,
+          refreshToken: refresh_token,
+          email: user.email,
+          fullName: user.name || undefined,
+          photo: user.photo || undefined,
+        });
+
+        Alert.alert('Success', 'Google account connected successfully!', [
+          {
+            text: 'OK',
+          },
+        ]);
+
+        return true;
+      } else {
+        Alert.alert('Failed', 'Could not connect Google account');
+        return false;
+      }
+
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
 
@@ -118,8 +169,13 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
           'Please install or update Google Play Services to use this feature'
         );
       } else {
-        Alert.alert('Sign-In Failed', error.message || 'Failed to sign in with Google');
+        // Handle API errors
+        const errorMessage = error.response?.data?.message ||
+          error.message ||
+          'Failed to connect Google account';
+        Alert.alert('Connection Failed', errorMessage);
       }
+      return false;
     } finally {
       setIsLoading(false);
     }
@@ -129,21 +185,25 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
     try {
       setIsLoading(true);
 
+      // Get username
       const userName = account?.userName ||
         account?.user_name ||
         account?.username ||
         account?.name;
 
+      // Sign out from Google
       await GoogleSignin.signOut();
 
+      // Disconnect from backend
       if (userName) {
         try {
-          await api('PUT', '/google/disconnect', { user_name: userName });
+          await api('POST', '/google/disconnect', { user_name: userName });
         } catch (error) {
           console.error('Backend disconnect error:', error);
         }
       }
 
+      // Update local state
       disconnectGoogle();
       Alert.alert('Disconnected', 'Google account disconnected successfully');
     } catch (error) {

@@ -15,7 +15,6 @@ import WalletScreen from '../screens/wallet/WalletScreen';
 import AccountSelection from '../screens/wallet/AccountSelection';
 import HelpScreen from '../screens/HelpScreen';
 import DeletedEventsScreen from '../screens/DeletedEventsScreen';
-import IntegrationScreen from '../screens/IntegrationScreen';
 
 const Stack = createNativeStackNavigator();
 
@@ -56,11 +55,6 @@ const StackNavigator = () => {
       <Stack.Screen
         name="ScheduleScreen"
         component={HomeScreen}
-        options={{ headerShown: false }}
-      />
-      <Stack.Screen
-        name="IntegrationScreen"
-        component={IntegrationScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

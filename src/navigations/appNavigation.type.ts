@@ -15,7 +15,6 @@ export enum Screen {
   CreateOutOfOfficeScreen = 'CreateOutOfOfficeScreen',
   SettingsScreen = 'SettingsScreen',
   DeletedEventsScreen = 'DeletedEventsScreen',
-  IntegrationScreen = 'IntegrationScreen',
 }
 
 export type RootStackParamList = {
@@ -31,7 +30,6 @@ export type RootStackParamList = {
   [Screen.CreateOutOfOfficeScreen]: undefined;
   [Screen.SettingsScreen]: { expandIntegration?: boolean } | undefined;
   [Screen.DeletedEventsScreen]: undefined;
-  [Screen.IntegrationScreen]: { returnToScreen?: Screen } | undefined;
 };
 
 export type AppNavigationProp = NativeStackNavigationProp<RootStackParamList>;
