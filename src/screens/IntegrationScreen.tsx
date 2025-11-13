@@ -17,7 +17,7 @@ import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-si
 import { useAuthStore } from '../stores/useAuthStore';
 import { useApiClient } from '../hooks/useApi';
 import { useActiveAccount } from '../stores/useActiveAccount';
-import GoogleOAuthWebView from '../components/GoogleOAuthWebView';
+import GoogleOAuthWebView from '../components/GoogleOAuthWebFlow';
 import { colors, fontSize, spacing, borderRadius, shadows } from '../utils/LightTheme';
 import { scaleWidth } from '../utils/dimensions';
 import { useRoute, RouteProp } from '@react-navigation/native';
@@ -47,9 +47,12 @@ const IntegrationScreen = () => {
       offlineAccess: true, // To get refresh token
       forceCodeForRefreshToken: true,
       scopes: [
-        'https://www.googleapis.com/auth/calendar',
         'https://www.googleapis.com/auth/calendar.events',
-      ],
+        'https://www.googleapis.com/auth/calendar',
+        'openid',
+        'https://www.googleapis.com/auth/userinfo.email',
+        'https://www.googleapis.com/auth/userinfo.profile',
+      ]
     });
   }, []);
 
@@ -78,14 +81,17 @@ const IntegrationScreen = () => {
       console.log("Initiating Google Sign-In...");
       // Sign in with native Google Sign-In
       const signInResult = await GoogleSignin.signIn();
+      console.log("Google Sign-In Result:", safeStringify(signInResult));
       const user = signInResult.data.user;
       const serverAuthCode = signInResult.data.serverAuthCode;
       console.log('Google Sign-In User Info:', safeStringify(signInResult.data));
 
-      // Get tokens
-      const tokens = await GoogleSignin.getTokens();
-      console.log('Google Sign-In Tokens:', safeStringify(tokens));
-
+      // Validate serverAuthCode
+      if (!serverAuthCode) {
+        Alert.alert('Error', 'Failed to get authorization code from Google');
+        setIsLoading(false);
+        return;
+      }
 
       // Get username from activeAccount
       const userName = activeAccount?.userName ||
@@ -99,68 +105,51 @@ const IntegrationScreen = () => {
         return;
       }
 
-      // Send tokens to your backend
+      console.log("User email:", user.email);
+      console.log("Calling Android callback API...");
 
-      console.log("email here:", user.email);
-
-      // const response = await api('POST', '/google/connect', {
-      //   user_name: userName,
-      //   server_auth_code: serverAuthCode, // ✅ Send this separately
-      //   id_token: tokens.idToken,
-      //   email: user.email,
-      //   name: user.name,
-      //   photo: user.photo,
-      // });
-
-      // // ✅ Backend should return actual tokens after exchange
-      // const { access_token, refresh_token } = response.data;
-
-      // ✅ Store correct tokens from backend response
-      // connectGoogle({
-      //   accessToken: access_token,
-      //   refreshToken: refresh_token, // ✅ Real refresh token from backend
-      //   email: user.email,
-      //   fullName: user.name,
-      //   photo: user.photo,
-      // });
-
-      connectGoogle({
-        accessToken: tokens.accessToken, // ✅ From GoogleSignin.getTokens()
-        refreshToken: undefined, // Google Sign-In SDK doesn’t return refreshToken
-        email: user.email,
-        fullName: user.name,
-        photo: user.photo,
+      // Call the new Android-specific API endpoint
+      const response = await api('POST', '/google/android/callback', {
+        code: serverAuthCode,
+        username: userName,
       });
 
-      Alert.alert("Success","Connected successfully");
-      return true;
-      // if (response.data.success) {
-      //   Alert.alert('✅ Connected', 'Google account connected successfully!', [
-      //     {
-      //       text: 'OK',
-      //       onPress: () => {
-      //         const returnTo = route.params?.returnToScreen;
-      //         if (returnTo) {
-      //           // 🔁 Go back to the screen that requested integration
-      //           navigation.navigate(returnTo);
-      //         } else {
-      //           // 🟢 Stay here if opened directly
-      //           // Optionally, you can refresh UI or show connected state
-      //           setIsConnected(true);
-      //         }
-      //       },
-      //     },
-      //   ]);
-      // } else {
-      //   Alert.alert('❌ Failed', 'Could not connect Google account');
-      // }
+      console.log('API Response:', safeStringify(response.data));
 
+      // Check if the response was successful
+      if (response.data.status && response.data.data) {
+        const { access_token, refresh_token, expires_at } = response.data.data;
+
+        // Store tokens in your context/state
+        connectGoogle({
+          accessToken: access_token,
+          refreshToken: refresh_token,
+          email: user.email,
+          fullName: user.name,
+          photo: user.photo,
+          expiresAt: expires_at, // Optional: store expiry time if needed
+        });
+
+        Alert.alert('Success', 'Google account connected successfully!', [
+          {
+            text: 'OK',
+            onPress: () => {
+              // Simply go back - the CreateEventScreen will detect the change
+              navigation.goBack();
+            },
+          },
+        ]);
+
+        return true;
+      } else {
+        Alert.alert('Failed', 'Could not connect Google account');
+        return false;
+      }
 
     } catch (error: any) {
       console.error('Google Sign-In Error:', error);
 
       if (error.code === statusCodes.SIGN_IN_CANCELLED) {
-        // User cancelled the sign-in
         console.log('User cancelled sign-in');
       } else if (error.code === statusCodes.IN_PROGRESS) {
         Alert.alert('In Progress', 'Sign-in is already in progress');
@@ -170,14 +159,18 @@ const IntegrationScreen = () => {
           'Please install or update Google Play Services to use this feature'
         );
       } else {
-        Alert.alert('Sign-In Failed', error.message || 'Failed to sign in with Google');
+        // Handle API errors
+        const errorMessage = error.response?.data?.message ||
+          error.message ||
+          'Failed to connect Google account';
+        Alert.alert('Connection Failed', errorMessage);
       }
+      return false;
     } finally {
       setIsLoading(false);
     }
   };
 
-  
 
   const handleGoogleDisconnect = async () => {
     try {
@@ -195,7 +188,7 @@ const IntegrationScreen = () => {
       // Disconnect from backend
       if (userName) {
         try {
-          await api('PUT', '/google/disconnect', { user_name: userName });
+          await api('POST', '/google/disconnect', { user_name: userName });
         } catch (error) {
           console.error('Backend disconnect error:', error);
         }
