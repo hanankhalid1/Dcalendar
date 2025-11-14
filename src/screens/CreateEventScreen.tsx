@@ -993,6 +993,8 @@ const CreateEventScreen = () => {
       if (!selectedEndDate) {
         setSelectedEndDate(date);
       }
+      // Clear end date error since end date is automatically set when start date is selected
+      setEndDateError('');
 
       // Always update end time to 30 minutes after start time when start time is selected
       if (time && time.trim() !== '') {
@@ -1209,7 +1211,7 @@ const CreateEventScreen = () => {
   // Form validation
   const validateForm = () => {
     let isValid = true;
-    let firstErrorField: 'title' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | null = null;
+    let firstErrorField: 'title' | 'startDate' | 'startTime' | 'endDate' | null = null;
     
     // Clear previous errors
     setTitleError('');
@@ -1250,11 +1252,7 @@ const CreateEventScreen = () => {
         isValid = false;
         if (!firstErrorField) firstErrorField = 'startTime';
       }
-      if (!selectedEndTime) {
-        setEndTimeError('End time is required');
-        isValid = false;
-        if (!firstErrorField) firstErrorField = 'endTime';
-      }
+      // End time is automatically set when start time is selected, so no need to validate it as required
 
       // Validate that end date/time is after start date/time
       const startDateTime = new Date(selectedStartDate);
@@ -1285,7 +1283,8 @@ const CreateEventScreen = () => {
       const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
       
       if (!endTimeMatch) {
-        setEndTimeError('Invalid end time format');
+        // End time format validation - only if end time exists (should always exist if start time exists)
+        // But we don't show error since it's auto-generated
         isValid = false;
       }
       
@@ -1386,7 +1385,6 @@ const CreateEventScreen = () => {
           case 'startDate':
           case 'startTime':
           case 'endDate':
-          case 'endTime':
             scrollToField(dateTimeSectionRef);
             break;
         }
@@ -2116,9 +2114,9 @@ const CreateEventScreen = () => {
                     )}
                   </Text>
                 </TouchableOpacity>
-                {(endDateError || endTimeError) && (
+                {endDateError && (
                   <Text style={styles.fieldErrorText}>
-                    {endDateError || endTimeError}
+                    {endDateError}
                   </Text>
                 )}
               </View>
