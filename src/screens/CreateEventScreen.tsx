@@ -1,5 +1,5 @@
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
   FlatList,
@@ -119,6 +119,7 @@ const CreateEventScreen = () => {
   const [locationSuggestions, setLocationSuggestions] = React.useState<any[]>([]);
   const [showLocationModal, setShowLocationModal] = React.useState(false);
   const [isLoadingLocations, setIsLoadingLocations] = React.useState(false);
+  const locationModalInputRef = useRef<TextInput>(null);
   const { api } = useApiClient();
   const [isAllDayEvent, setIsAllDayEvent] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
@@ -595,7 +596,7 @@ const CreateEventScreen = () => {
   const fetchSuggestions = async (query: string) => {
     if (!query || query.length < 2) {
       setLocationSuggestions([]);
-      setShowLocationModal(false);
+      // Don't close modal - let user continue typing
       return;
     }
 
@@ -652,6 +653,22 @@ const CreateEventScreen = () => {
     [],
   );
 
+  // Maintain TextInput focus when modal opens
+  useEffect(() => {
+    if (showLocationModal && locationModalInputRef.current) {
+      // Small delay to ensure modal is fully rendered
+      const focusTimer = setTimeout(() => {
+        if (locationModalInputRef.current) {
+          locationModalInputRef.current.focus();
+        }
+      }, 200);
+      return () => clearTimeout(focusTimer);
+    } else if (!showLocationModal && locationModalInputRef.current) {
+      // Blur the input when modal closes to prevent focus issues
+      locationModalInputRef.current.blur();
+    }
+  }, [showLocationModal]);
+
   const getRecurrenceOptions = (selectedStartDate: Date) => {
     const d = dayjs(selectedStartDate);
     const weekday = d.format("dddd");
@@ -694,6 +711,15 @@ const CreateEventScreen = () => {
     setLocation(selectedLocation.label);
     setShowLocationModal(false);
     setLocationSuggestions([]);
+  };
+
+  // Handle opening location modal - ensures it opens even if TextInput is already focused
+  const handleOpenLocationModal = () => {
+    setShowLocationModal(true);
+    // If there's existing location text, fetch suggestions
+    if (location && location.length >= 2) {
+      debouncedFetchSuggestions(location);
+    }
   };
 
   // Handle location input focus - allow continued typing
@@ -2189,19 +2215,26 @@ const CreateEventScreen = () => {
         >
           <FeatherIcon name="map-pin" size={20} color="#6C6C6C" />
 
-          <TextInput
-            style={[
-              styles.selectorText,
-              { flex: 1, marginHorizontal: spacing.sm },
-            ]}
-            placeholder="Add location"
-            placeholderTextColor={colors.grey400}
-            value={location}
-            onFocus={() => setShowLocationModal(true)} // 👈 open modal on focus
-            editable={true}
-          />
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+            onPress={handleOpenLocationModal}
+            activeOpacity={1}
+          >
+            <TextInput
+              style={[
+                styles.selectorText,
+                { flex: 1, marginHorizontal: spacing.sm },
+              ]}
+              placeholder="Add location"
+              placeholderTextColor={colors.grey400}
+              value={location}
+              onFocus={handleOpenLocationModal}
+              editable={false}
+              pointerEvents="none"
+            />
+          </TouchableOpacity>
 
-          <TouchableOpacity onPress={() => setShowLocationModal(true)}>  {/* 👈 also open on + icon click */}
+          <TouchableOpacity onPress={handleOpenLocationModal}>
             <Image
               style={{
                 marginLeft: scaleWidth(10),
@@ -2660,17 +2693,25 @@ const CreateEventScreen = () => {
             <View style={styles.locationInputRow}>
               <FeatherIcon name="map-pin" size={20} color="#6C6C6C" />
               <TextInput
+                ref={locationModalInputRef}
                 style={styles.locationModalInput}
                 placeholder="Add location"
                 placeholderTextColor={colors.grey400}
                 value={location}
                 onChangeText={text => {
                   setLocation(text);
-                  debouncedFetchSuggestions(text);
+                  if (text.length >= 2) {
+                    debouncedFetchSuggestions(text);
+                  } else {
+                    setLocationSuggestions([]);
+                  }
                 }}
                 autoCorrect={false}
                 autoCapitalize="none"
                 autoFocus={true}
+                blurOnSubmit={false}
+                returnKeyType="search"
+                editable={true}
               />
               <TouchableOpacity
                 onPress={() => setShowLocationModal(false)}
@@ -2687,6 +2728,12 @@ const CreateEventScreen = () => {
               <View style={styles.loadingContainer}>
                 <Text style={styles.loadingText}>Searching locations...</Text>
               </View>
+            ) : locationSuggestions.length === 0 ? (
+              <View style={styles.emptyContainer}>
+                <Text style={styles.emptyText}>
+                  {location.length >= 2 ? 'No locations found' : 'Start typing to search locations...'}
+                </Text>
+              </View>
             ) : (
               <FlatList
                 data={locationSuggestions}
@@ -2695,6 +2742,7 @@ const CreateEventScreen = () => {
                   <TouchableOpacity
                     style={styles.locationItem}
                     onPress={() => handleLocationSelect(item)}
+                    activeOpacity={0.7}
                   >
                     <FeatherIcon
                       name="map-pin"
@@ -2705,8 +2753,12 @@ const CreateEventScreen = () => {
                   </TouchableOpacity>
                 )}
                 style={styles.locationList}
+                contentContainerStyle={styles.locationListContent}
                 showsVerticalScrollIndicator={false}
-                keyboardShouldPersistTaps="handled"
+                keyboardShouldPersistTaps="always"
+                keyboardDismissMode="none"
+                nestedScrollEnabled={true}
+                removeClippedSubviews={false}
               />
             )}
           </View>
@@ -3753,11 +3805,14 @@ const styles = StyleSheet.create({
   locationSuggestionsContainer: {
     backgroundColor: colors.white,
     maxHeight: scaleHeight(400),
-    minHeight: scaleHeight(200),
+    flex: 1,
   },
   locationList: {
     flex: 1,
+  },
+  locationListContent: {
     paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
   },
   locationItem: {
     flexDirection: 'row',
