@@ -80,6 +80,7 @@ export const convertToISO8601Duration = (
   timeOptions: any,
   seconds: number,
 ): string => {
+  console.log("converting time with tiemOptions:", timeOptions, "and seconds:", seconds);
   const timeOption = timeOptions?.value || 'Minutes';
   switch (timeOption) {
     case 'Minutes':
@@ -103,12 +104,14 @@ export const buildEventMetadata = (
 
   console.log("Building metadata for event:", eventData);
   // Location information
-  if (conferencingData) {
-    metadata.push({ key: 'location', value: conferencingData.join_url });
-    metadata.push({ key: 'locationType', value: conferencingData.type });
-    metadata.push({ key: 'meetingEventId', value: conferencingData.id });
-  } else if (eventData.location) {
+  if (eventData.location) {
     metadata.push({ key: 'location', value: eventData.location });
+
+  }
+  if (eventData.locationType == "google") {
+    metadata.push({ key: 'locationType', value: eventData.locationType });
+    metadata.push({ key: 'meetingEventId', value: eventData.meetingEventId });
+  } else if (eventData.locationType == "inperson") {
     metadata.push({ key: 'locationType', value: 'inperson' });
   }
 
@@ -180,10 +183,7 @@ export const buildEventMetadata = (
     metadata.push({ key: 'seconds', value: eventData.seconds.toString() });
     metadata.push({
       key: 'trigger',
-      value: convertToISO8601Duration(
-        (eventData as any).timeOptions,
-        eventData.seconds,
-      ),
+      value: eventData.trigger,
     });
   }
 
