@@ -78,6 +78,7 @@ const CreateEventScreen = () => {
   const [selectedStartTime, setSelectedStartTime] = useState(editEventData?.selectedStartTime || '');
   const [selectedEndTime, setSelectedEndTime] = useState(editEventData?.selectedEndTime || '');
   const [showDetailedDateTime, setShowDetailedDateTime] = useState(!!editEventData);
+  const [dateTimeError, setDateTimeError] = useState<string>('');
   const [calendarMode, setCalendarMode] = useState<'from' | 'to'>('from');
   const [showEventTypeDropdown, setShowEventTypeDropdown] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState(editEventData?.selectedEventType || 'Event');
@@ -557,6 +558,11 @@ const CreateEventScreen = () => {
     }
   }, [editEventData, mode]);
 
+  // Validate date/time whenever dates, times, or all-day status changes
+  useEffect(() => {
+    validateDateTime();
+  }, [validateDateTime]);
+
   useFocusEffect(
     React.useCallback(() => {
       // Just show the video conferencing options when Google is connected
@@ -824,6 +830,108 @@ const CreateEventScreen = () => {
     setShowGuestDropdown(false);
   };
 
+  // Validate date/time and set error message
+  const validateDateTime = React.useCallback(() => {
+    setDateTimeError('');
+    
+    if (!selectedStartDate || !selectedEndDate) {
+      return; // Don't show error if dates aren't selected yet
+    }
+
+    if (isAllDayEvent) {
+      // For all-day events, just validate dates
+      const startDateTime = new Date(selectedStartDate);
+      startDateTime.setHours(0, 0, 0, 0);
+      const endDateTime = new Date(selectedEndDate);
+      endDateTime.setHours(0, 0, 0, 0);
+
+      if (endDateTime < startDateTime) {
+        setDateTimeError('End date must be on or after start date');
+        console.log('DEBUG - Setting all-day error:', 'End date must be on or after start date');
+        return;
+      }
+    } else {
+      // For timed events, validate both date and time
+      if (!selectedStartTime || !selectedEndTime) {
+        return; // Don't show error if times aren't selected yet
+      }
+
+      const startDateTime = new Date(selectedStartDate);
+      const endDateTime = new Date(selectedEndDate);
+
+      // Parse start time (handle non-breaking spaces)
+      const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      
+      if (!startTimeMatch) {
+        console.log('DEBUG - Invalid start time format:', normalizedStartTime);
+        return; // Invalid format, but don't show error here
+      }
+      
+      const startHours = parseInt(startTimeMatch[1], 10);
+      const startMinutes = parseInt(startTimeMatch[2], 10);
+      const startPeriod = startTimeMatch[3].toUpperCase();
+      let finalStartHours = startHours;
+      if (startPeriod === 'PM' && startHours !== 12) {
+        finalStartHours = startHours + 12;
+      } else if (startPeriod === 'AM' && startHours === 12) {
+        finalStartHours = 0;
+      }
+      startDateTime.setHours(finalStartHours, startMinutes, 0, 0);
+
+      // Parse end time (handle non-breaking spaces)
+      const normalizedEndTime = selectedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      
+      if (!endTimeMatch) {
+        console.log('DEBUG - Invalid end time format:', normalizedEndTime);
+        return; // Invalid format, but don't show error here
+      }
+      
+      const endHours = parseInt(endTimeMatch[1], 10);
+      const endMinutes = parseInt(endTimeMatch[2], 10);
+      const endPeriod = endTimeMatch[3].toUpperCase();
+      let finalEndHours = endHours;
+      if (endPeriod === 'PM' && endHours !== 12) {
+        finalEndHours = endHours + 12;
+      } else if (endPeriod === 'AM' && endHours === 12) {
+        finalEndHours = 0;
+      }
+      endDateTime.setHours(finalEndHours, endMinutes, 0, 0);
+
+      console.log('DEBUG - DateTime Validation:', {
+        startDateTime: startDateTime.toISOString(),
+        endDateTime: endDateTime.toISOString(),
+        startTime: selectedStartTime,
+        endTime: selectedEndTime,
+        isValid: endDateTime > startDateTime
+      });
+
+      // Validate that end date/time is strictly after start date/time
+      if (endDateTime <= startDateTime) {
+        // Check if it's a date issue or time issue
+        const startDateOnly = new Date(selectedStartDate);
+        startDateOnly.setHours(0, 0, 0, 0);
+        const endDateOnly = new Date(selectedEndDate);
+        endDateOnly.setHours(0, 0, 0, 0);
+        
+        let errorMessage = '';
+        if (endDateOnly < startDateOnly) {
+          errorMessage = 'End date must be on or after start date';
+        } else if (endDateOnly.getTime() === startDateOnly.getTime()) {
+          // Same date, but end time is before or equal to start time
+          errorMessage = 'End time must be after start time';
+        } else {
+          errorMessage = 'End date and time must be after start date and time';
+        }
+        
+        console.log('DEBUG - Setting error message:', errorMessage);
+        setDateTimeError(errorMessage);
+        return;
+      }
+    }
+  }, [selectedStartDate, selectedEndDate, selectedStartTime, selectedEndTime, isAllDayEvent]);
+
   const handleDateTimeSelect = (date: Date, time: string) => {
     console.log('>>>>>>>> DATE SELECTED <<<<<<<<', {
       date: date.toISOString(),
@@ -864,6 +972,114 @@ const CreateEventScreen = () => {
     if ((calendarMode === 'from' && selectedEndDate && selectedEndTime) ||
       (calendarMode === 'to' && selectedStartDate && selectedStartTime)) {
       setShowDetailedDateTime(true);
+    }
+
+    // Validate immediately with new values (don't wait for state to update)
+    const newStartDate = calendarMode === 'from' ? date : selectedStartDate;
+    const newEndDate = calendarMode === 'to' ? date : (selectedEndDate || date);
+    const newStartTime = calendarMode === 'from' ? time : selectedStartTime;
+    let newEndTime = calendarMode === 'to' ? time : selectedEndTime;
+    
+    // If setting start time, calculate end time
+    if (calendarMode === 'from' && time && time.trim() !== '') {
+      newEndTime = addMinutesToTime(time, 30);
+    }
+
+    // Validate immediately
+    setTimeout(() => {
+      validateDateTimeWithValues(newStartDate, newEndDate, newStartTime || '', newEndTime || '');
+    }, 0);
+  };
+
+  // Helper function to validate with specific values (for immediate validation)
+  const validateDateTimeWithValues = (
+    startDate: Date | null,
+    endDate: Date | null,
+    startTime: string,
+    endTime: string
+  ) => {
+    setDateTimeError('');
+    
+    if (!startDate || !endDate) {
+      return;
+    }
+
+    if (isAllDayEvent) {
+      const startDateTime = new Date(startDate);
+      startDateTime.setHours(0, 0, 0, 0);
+      const endDateTime = new Date(endDate);
+      endDateTime.setHours(0, 0, 0, 0);
+
+      if (endDateTime < startDateTime) {
+        setDateTimeError('End date must be on or after start date');
+        return;
+      }
+    } else {
+      if (!startTime || !endTime) {
+        return;
+      }
+
+      const startDateTime = new Date(startDate);
+      const endDateTime = new Date(endDate);
+
+      // Parse start time
+      const normalizedStartTime = startTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      
+      if (!startTimeMatch) {
+        return;
+      }
+      
+      const startHours = parseInt(startTimeMatch[1], 10);
+      const startMinutes = parseInt(startTimeMatch[2], 10);
+      const startPeriod = startTimeMatch[3].toUpperCase();
+      let finalStartHours = startHours;
+      if (startPeriod === 'PM' && startHours !== 12) {
+        finalStartHours = startHours + 12;
+      } else if (startPeriod === 'AM' && startHours === 12) {
+        finalStartHours = 0;
+      }
+      startDateTime.setHours(finalStartHours, startMinutes, 0, 0);
+
+      // Parse end time
+      const normalizedEndTime = endTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      
+      if (!endTimeMatch) {
+        return;
+      }
+      
+      const endHours = parseInt(endTimeMatch[1], 10);
+      const endMinutes = parseInt(endTimeMatch[2], 10);
+      const endPeriod = endTimeMatch[3].toUpperCase();
+      let finalEndHours = endHours;
+      if (endPeriod === 'PM' && endHours !== 12) {
+        finalEndHours = endHours + 12;
+      } else if (endPeriod === 'AM' && endHours === 12) {
+        finalEndHours = 0;
+      }
+      endDateTime.setHours(finalEndHours, endMinutes, 0, 0);
+
+      // Validate that end date/time is strictly after start date/time
+      if (endDateTime <= startDateTime) {
+        const startDateOnly = new Date(startDate);
+        startDateOnly.setHours(0, 0, 0, 0);
+        const endDateOnly = new Date(endDate);
+        endDateOnly.setHours(0, 0, 0, 0);
+        
+        let errorMessage = '';
+        if (endDateOnly < startDateOnly) {
+          errorMessage = 'End date must be on or after start date';
+        } else if (endDateOnly.getTime() === startDateOnly.getTime()) {
+          errorMessage = 'End time must be after start time';
+        } else {
+          errorMessage = 'End date and time must be after start date and time';
+        }
+        
+        console.log('DEBUG - Setting error message immediately:', errorMessage);
+        setDateTimeError(errorMessage);
+        return;
+      }
     }
   };
 
@@ -972,8 +1188,18 @@ const CreateEventScreen = () => {
       const startDateTime = new Date(selectedStartDate);
       const endDateTime = new Date(selectedEndDate);
 
-      const [startTime, startPeriod] = selectedStartTime.split(' ');
-      const [startHours, startMinutes] = startTime.split(':').map(Number);
+      // Parse start time (handle non-breaking spaces)
+      const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      
+      if (!startTimeMatch) {
+        Alert.alert('Error', 'Invalid start time format');
+        return false;
+      }
+      
+      const startHours = parseInt(startTimeMatch[1], 10);
+      const startMinutes = parseInt(startTimeMatch[2], 10);
+      const startPeriod = startTimeMatch[3].toUpperCase();
       let finalStartHours = startHours;
       if (startPeriod === 'PM' && startHours !== 12) {
         finalStartHours = startHours + 12;
@@ -982,8 +1208,18 @@ const CreateEventScreen = () => {
       }
       startDateTime.setHours(finalStartHours, startMinutes, 0, 0);
 
-      const [endTime, endPeriod] = selectedEndTime.split(' ');
-      const [endHours, endMinutes] = endTime.split(':').map(Number);
+      // Parse end time (handle non-breaking spaces)
+      const normalizedEndTime = selectedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      
+      if (!endTimeMatch) {
+        Alert.alert('Error', 'Invalid end time format');
+        return false;
+      }
+      
+      const endHours = parseInt(endTimeMatch[1], 10);
+      const endMinutes = parseInt(endTimeMatch[2], 10);
+      const endPeriod = endTimeMatch[3].toUpperCase();
       let finalEndHours = endHours;
       if (endPeriod === 'PM' && endHours !== 12) {
         finalEndHours = endHours + 12;
@@ -992,17 +1228,28 @@ const CreateEventScreen = () => {
       }
       endDateTime.setHours(finalEndHours, endMinutes, 0, 0);
 
+      // Validate that end date/time is strictly after start date/time
+      console.log('DEBUG - Date/Time Validation:', {
+        startDateTime: startDateTime.toISOString(),
+        endDateTime: endDateTime.toISOString(),
+        startTime: selectedStartTime,
+        endTime: selectedEndTime,
+        isValid: endDateTime > startDateTime
+      });
+      
       if (endDateTime <= startDateTime) {
-        Alert.alert('Error', 'End date and time must be after start date and time');
+        // Error is already shown inline, just return false
         return false;
       }
     } else {
       // ✅ For all-day events, just validate that end date is not before start date
       const startDateTime = new Date(selectedStartDate);
+      startDateTime.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
       const endDateTime = new Date(selectedEndDate);
+      endDateTime.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
 
       if (endDateTime < startDateTime) {
-        Alert.alert('Error', 'End date must be on or after start date for all-day events');
+        // Error is already shown inline, just return false
         return false;
       }
     }
@@ -1011,6 +1258,7 @@ const CreateEventScreen = () => {
       Alert.alert('Error', 'No active account found. Please log in again.');
       return false;
     }
+
     return true;
   };
 
@@ -1685,6 +1933,12 @@ const CreateEventScreen = () => {
                 </Text>
               </TouchableOpacity>
             </View>
+            {/* Date/Time Validation Error - Show directly under the date-time pickers */}
+            {dateTimeError ? (
+              <View style={styles.dateTimeErrorContainer}>
+                <Text style={styles.dateTimeErrorText}>{dateTimeError}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -2676,6 +2930,18 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing.md,
+  },
+  dateTimeErrorContainer: {
+    marginTop: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: spacing.xs,
+    width: '100%',
+  },
+  dateTimeErrorText: {
+    fontSize: fontSize.textSize12,
+    color: '#FF3B30',
+    fontWeight: '400',
+    lineHeight: 18,
   },
   timeSlot: {
     flex: 1,
