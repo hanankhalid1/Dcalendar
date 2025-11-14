@@ -842,10 +842,18 @@ const CreateEventScreen = () => {
         setSelectedEndDate(date);
       }
 
-      // If no end time is set, suggest 1 hour later
-      if (!selectedEndTime) {
-        const suggestedEndTime = addMinutesToTime(time, 60);
+      // Always update end time to 30 minutes after start time when start time is selected
+      if (time && time.trim() !== '') {
+        const suggestedEndTime = addMinutesToTime(time, 30);
+        console.log('>>>>>>>> CALCULATING END TIME IN handleDateTimeSelect <<<<<<<<', {
+          startTime: time,
+          calculatedEndTime: suggestedEndTime,
+          previousEndTime: selectedEndTime
+        });
         setSelectedEndTime(suggestedEndTime);
+      } else {
+        // If time is empty, clear end time too
+        setSelectedEndTime('');
       }
     } else {
       setSelectedEndDate(date);
@@ -861,18 +869,62 @@ const CreateEventScreen = () => {
 
 
   const addMinutesToTime = (timeString: string, minutesToAdd: number): string => {
-    const [timePart, period] = timeString.split(' ');
-    let [hours, minutes] = timePart.split(':').map(Number);
+    // Validate input
+    if (!timeString || timeString.trim() === '') {
+      return '12:00 AM';
+    }
+
+    // Normalize the string: replace any non-breaking spaces or special spaces with regular space
+    const normalized = timeString.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+    
+    // Try to extract time and period using regex to handle various formats
+    const timeMatch = normalized.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+    
+    if (!timeMatch) {
+      // Fallback: try to split by space
+      const parts = normalized.split(/\s+/);
+      if (parts.length >= 2) {
+        const timePart = parts[0];
+        const period = parts[parts.length - 1].toUpperCase();
+        const [hours, minutes] = timePart.split(':').map(Number);
+        
+        if (!isNaN(hours) && !isNaN(minutes) && (period === 'AM' || period === 'PM')) {
+          // Valid format found
+          let hours24 = hours;
+          if (period === 'PM' && hours < 12) {
+            hours24 = hours + 12;
+          } else if (period === 'AM' && hours === 12) {
+            hours24 = 0;
+          }
+          
+          let totalMinutes = hours24 * 60 + minutes + minutesToAdd;
+          totalMinutes = totalMinutes % (24 * 60);
+          const newHours24 = Math.floor(totalMinutes / 60);
+          const newMinutes = totalMinutes % 60;
+          let displayHours = newHours24 % 12;
+          if (displayHours === 0) displayHours = 12;
+          const newPeriod = newHours24 >= 12 ? 'PM' : 'AM';
+          return `${displayHours}:${newMinutes.toString().padStart(2, '0')} ${newPeriod}`;
+        }
+      }
+      return '12:00 AM';
+    }
+
+    // Extract from regex match
+    const hours = parseInt(timeMatch[1], 10);
+    const minutes = parseInt(timeMatch[2], 10);
+    const period = timeMatch[3].toUpperCase();
 
     // Convert 12-hour to 24-hour
+    let hours24 = hours;
     if (period === 'PM' && hours < 12) {
-      hours += 12;
+      hours24 = hours + 12;
     } else if (period === 'AM' && hours === 12) {
-      hours = 0;
+      hours24 = 0;
     }
 
     // Total minutes
-    let totalMinutes = hours * 60 + minutes + minutesToAdd;
+    let totalMinutes = hours24 * 60 + minutes + minutesToAdd;
 
     // Handle overflow past 24 hours
     totalMinutes = totalMinutes % (24 * 60);
@@ -886,7 +938,6 @@ const CreateEventScreen = () => {
     if (displayHours === 0) displayHours = 12;
 
     const newPeriod = newHours24 >= 12 ? 'PM' : 'AM';
-
     return `${displayHours}:${newMinutes.toString().padStart(2, '0')} ${newPeriod}`;
   };
 
@@ -1251,34 +1302,81 @@ const CreateEventScreen = () => {
           console.error('DEBUG - Time required for non-all-day event');
           return '';
         }
-        // Handle AM/PM format properly - normalize whitespace first
-        const normalizedTime = time.replace(/\s+/g, ' ').trim();
+        // Handle AM/PM format properly - normalize whitespace first (including non-breaking spaces)
+        const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
         console.log('DEBUG - Original time:', JSON.stringify(time));
         console.log('DEBUG - Normalized time:', JSON.stringify(normalizedTime));
 
-        const timeParts = normalizedTime.split(' ');
-        console.log('DEBUG - Split result:', timeParts);
+        // Use regex to extract time components (more robust than split)
+        const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        
+        if (!timeMatch) {
+          // Fallback: try splitting by whitespace
+          const timeParts = normalizedTime.split(/\s+/);
+          console.log('DEBUG - Split result (fallback):', timeParts);
 
-        if (timeParts.length !== 2) {
-          console.error('DEBUG - Time format should be "HH:MM AM/PM", got:', normalizedTime);
-          return '';
+          if (timeParts.length < 2) {
+            console.error('DEBUG - Time format should be "HH:MM AM/PM", got:', normalizedTime);
+            return '';
+          }
+
+          const timePart = timeParts[0];
+          const period = timeParts[timeParts.length - 1].toUpperCase();
+          console.log('DEBUG - timePart:', timePart, 'period:', period);
+
+          if (!timePart || !period || (period !== 'AM' && period !== 'PM')) {
+            console.error('DEBUG - Invalid time format:', time);
+            return '';
+          }
+
+          const [hours, minutes] = timePart.split(':').map(Number);
+          console.log('DEBUG - hours:', hours, 'minutes:', minutes);
+
+          if (isNaN(hours) || isNaN(minutes)) {
+            console.error('DEBUG - Invalid hours/minutes:', { hours, minutes });
+            return '';
+          }
+
+          // Use the parsed values
+          let finalHours = hours;
+          if (period === 'PM' && hours !== 12) {
+            finalHours = hours + 12;
+          } else if (period === 'AM' && hours === 12) {
+            finalHours = 0;
+          }
+
+          console.log('DEBUG - finalHours:', finalHours);
+
+          const newDate = new Date(date);
+          newDate.setHours(finalHours, minutes, 0, 0);
+
+          console.log('DEBUG - newDate after setHours:', newDate);
+
+          // Format as YYYYMMDDTHHMMSS
+          const year = newDate.getFullYear();
+          const month = String(newDate.getMonth() + 1).padStart(2, '0');
+          const day = String(newDate.getDate()).padStart(2, '0');
+          const hour = String(newDate.getHours()).padStart(2, '0');
+          const minute = String(newDate.getMinutes()).padStart(2, '0');
+          const second = String(newDate.getSeconds()).padStart(2, '0');
+
+          const result = `${year}${month}${day}T${hour}${minute}${second}`;
+          console.log('DEBUG - Final result (fallback):', result);
+
+          // Validate the result
+          if (result.includes('NaN') || result.length !== 15) {
+            console.error('DEBUG - Invalid result generated:', result);
+            return '';
+          }
+
+          return result;
         }
 
-        const [timePart, period] = timeParts;
-        console.log('DEBUG - timePart:', timePart, 'period:', period);
-
-        if (!timePart || !period) {
-          console.error('DEBUG - Invalid time format:', time);
-          return '';
-        }
-
-        const [hours, minutes] = timePart.split(':').map(Number);
-        console.log('DEBUG - hours:', hours, 'minutes:', minutes);
-
-        if (isNaN(hours) || isNaN(minutes)) {
-          console.error('DEBUG - Invalid hours/minutes:', { hours, minutes });
-          return '';
-        }
+        // Extract from regex match
+        const hours = parseInt(timeMatch[1], 10);
+        const minutes = parseInt(timeMatch[2], 10);
+        const period = timeMatch[3].toUpperCase();
+        console.log('DEBUG - Regex match - hours:', hours, 'minutes:', minutes, 'period:', period);
 
         let finalHours = hours;
 
