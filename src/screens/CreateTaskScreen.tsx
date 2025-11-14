@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -81,6 +81,16 @@ const CreateTaskScreen = () => {
   const [showDetailedDateTime, setShowDetailedDateTime] = useState(
     !!editEventData,
   );
+  
+  // Error states
+  const [titleError, setTitleError] = useState<string>('');
+  const [dateError, setDateError] = useState<string>('');
+  const [timeError, setTimeError] = useState<string>('');
+  
+  // Refs for scrolling
+  const scrollViewRef = useRef<ScrollView>(null);
+  const titleInputRef = useRef<View>(null);
+  const dateTimeSectionRef = useRef<View>(null);
   const [showEventTypeDropdown, setShowEventTypeDropdown] =
     useState(false);
   const [selectedEventType, setSelectedEventType] = useState(
@@ -189,6 +199,9 @@ const CreateTaskScreen = () => {
     setSelectedDate(date);
     setSelectedStartTime(startTime);
     setShowDetailedDateTime(true);
+    // Clear errors when date/time is selected
+    setDateError('');
+    setTimeError('');
   };
   const handleEventTypeSelect = (eventType: string) => {
     setSelectedEventType(eventType);
@@ -211,24 +224,99 @@ const CreateTaskScreen = () => {
   };
 
   const validateForm = () => {
+    let isValid = true;
+    let firstErrorField: 'title' | 'date' | 'time' | null = null;
+    
+    // Clear previous errors
+    setTitleError('');
+    setDateError('');
+    setTimeError('');
+
+    // Validate title
     if (!title || title.trim() === '') {
-      Alert.alert('Error', 'Please enter a title for the event');
-      return false;
+      setTitleError('Title is required');
+      isValid = false;
+      if (!firstErrorField) firstErrorField = 'title';
     }
+
+    // Validate date
     if (!selectedDate) {
-      Alert.alert('Error', 'Please select a date for the event');
-      return false;
+      setDateError('Date is required');
+      isValid = false;
+      if (!firstErrorField) firstErrorField = 'date';
     }
+
+    // Validate time
     if (!selectedStartTime) {
-      Alert.alert('Error', 'Please select a start time for the event');
-      return false;
+      setTimeError('Time is required');
+      isValid = false;
+      if (!firstErrorField) firstErrorField = 'time';
     }
 
     if (!activeAccount) {
+      // Authentication error - this is a system error, not a validation error
       Alert.alert('Error', 'No active account found. Please log in again.');
+      return false;
     }
 
-    return true;
+    // Scroll to first error field if validation failed
+    if (!isValid && firstErrorField && scrollViewRef.current) {
+      setTimeout(() => {
+        const scrollToField = (ref: React.RefObject<View>) => {
+          if (!ref.current || !scrollViewRef.current) {
+            setTimeout(() => scrollToField(ref), 100);
+            return;
+          }
+          
+          try {
+            ref.current.measureLayout(
+              scrollViewRef.current as any,
+              (x, y) => {
+                if (scrollViewRef.current) {
+                  scrollViewRef.current.scrollTo({ 
+                    y: Math.max(0, y - 40), 
+                    animated: true 
+                  });
+                }
+              },
+              () => {
+                // Fallback: try again after delay
+                setTimeout(() => {
+                  if (ref.current && scrollViewRef.current) {
+                    ref.current.measureLayout(
+                      scrollViewRef.current as any,
+                      (x, y) => {
+                        if (scrollViewRef.current) {
+                          scrollViewRef.current.scrollTo({ 
+                            y: Math.max(0, y - 40), 
+                            animated: true 
+                          });
+                        }
+                      },
+                      () => {}
+                    );
+                  }
+                }, 300);
+              }
+            );
+          } catch (error) {
+            console.log('Error scrolling to field:', error);
+          }
+        };
+
+        switch (firstErrorField) {
+          case 'title':
+            scrollToField(titleInputRef);
+            break;
+          case 'date':
+          case 'time':
+            scrollToField(dateTimeSectionRef);
+            break;
+        }
+      }, 300);
+    }
+
+    return isValid;
   };
 
   const createTask = async () => {
@@ -450,42 +538,65 @@ const CreateTaskScreen = () => {
         </View>
       )}
 
-      <ScrollView style={styles.scrollView}>
+      <ScrollView 
+        ref={scrollViewRef}
+        style={styles.scrollView}
+      >
         <View style={styles.formContainer}>
-          <View style={styles.inputSection}>
+          <View 
+            ref={titleInputRef}
+            style={styles.inputSection}
+            collapsable={false}
+          >
             <TextInput
               style={styles.titleInput}
               placeholder="Add title"
               placeholderTextColor={colors.grey400}
               value={title}
-              onChangeText={setTitle}
+              onChangeText={(text) => {
+                setTitle(text);
+                if (titleError) setTitleError('');
+              }}
               editable={!isLoading}
             />
             <View style={styles.inputUnderline} />
+            {titleError ? (
+              <Text style={styles.fieldErrorText}>{titleError}</Text>
+            ) : null}
           </View>
 
           {/* Pick date and time */}
-          <TouchableOpacity
-            style={styles.datePicker}
-            onPress={() => {
-              if (!isLoading) {
-                setShowCalendarModal(true);
-              }
-            }}
-            disabled={isLoading}
+          <View 
+            ref={dateTimeSectionRef}
+            collapsable={false}
           >
-            <FeatherIcon name="calendar" size={20} color="#6C6C6C" />
+            <TouchableOpacity
+              style={styles.datePicker}
+              onPress={() => {
+                if (!isLoading) {
+                  setShowCalendarModal(true);
+                }
+              }}
+              disabled={isLoading}
+            >
+              <FeatherIcon name="calendar" size={20} color="#6C6C6C" />
 
-            <Text style={styles.selectorText}>
-              {selectedDate
-                ? selectedDate.toLocaleDateString() + ' ' + selectedStartTime
-                : "Pick date and time"}
-            </Text>
-            <Image
-              style={{ marginLeft: scaleWidth(10) }}
-              source={require('../assets/images/CreateEventImages/smallArrowDropdown.png')}
-            />
-          </TouchableOpacity>
+              <Text style={styles.selectorText}>
+                {selectedDate
+                  ? selectedDate.toLocaleDateString() + ' ' + selectedStartTime
+                  : "Pick date and time"}
+              </Text>
+              <Image
+                style={{ marginLeft: scaleWidth(10) }}
+                source={require('../assets/images/CreateEventImages/smallArrowDropdown.png')}
+              />
+            </TouchableOpacity>
+            {(dateError || timeError) && (
+              <Text style={styles.fieldErrorText}>
+                {dateError || timeError}
+              </Text>
+            )}
+          </View>
           {/* Recurrence Dropdown - Only show when date and time are selected */}
           {showDetailedDateTime && (
             <View
@@ -981,6 +1092,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'flex-start',
     marginBottom: spacing.md
+  },
+  fieldErrorText: {
+    fontSize: fontSize.textSize12,
+    color: '#FF3B30',
+    fontWeight: '400',
+    marginTop: spacing.xs,
+    marginLeft: spacing.xs,
   },
   descriptionInput: {
     backgroundColor: "#F6F7F9",

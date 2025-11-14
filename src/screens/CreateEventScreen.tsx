@@ -5,13 +5,16 @@ import {
   FlatList,
   Image,
   Modal,
+  Platform,
   ScrollView,
   StatusBar,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  UIManager,
   View,
+  findNodeHandle,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import FeatherIcon from 'react-native-vector-icons/Feather';
@@ -79,6 +82,12 @@ const CreateEventScreen = () => {
   const [selectedEndTime, setSelectedEndTime] = useState(editEventData?.selectedEndTime || '');
   const [showDetailedDateTime, setShowDetailedDateTime] = useState(!!editEventData);
   const [dateTimeError, setDateTimeError] = useState<string>('');
+  const [titleError, setTitleError] = useState<string>('');
+  const [locationError, setLocationError] = useState<string>('');
+  const [startDateError, setStartDateError] = useState<string>('');
+  const [startTimeError, setStartTimeError] = useState<string>('');
+  const [endDateError, setEndDateError] = useState<string>('');
+  const [endTimeError, setEndTimeError] = useState<string>('');
   const [calendarMode, setCalendarMode] = useState<'from' | 'to'>('from');
   const [showEventTypeDropdown, setShowEventTypeDropdown] = useState(false);
   const [selectedEventType, setSelectedEventType] = useState(editEventData?.selectedEventType || 'Event');
@@ -120,6 +129,10 @@ const CreateEventScreen = () => {
   const [showLocationModal, setShowLocationModal] = React.useState(false);
   const [isLoadingLocations, setIsLoadingLocations] = React.useState(false);
   const locationModalInputRef = useRef<TextInput>(null);
+  const scrollViewRef = useRef<ScrollView>(null);
+  const titleInputRef = useRef<View>(null);
+  const dateTimeSectionRef = useRef<View>(null);
+  const locationSectionRef = useRef<View>(null);
   const { api } = useApiClient();
   const [isAllDayEvent, setIsAllDayEvent] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
@@ -711,6 +724,7 @@ const CreateEventScreen = () => {
     setLocation(selectedLocation.label);
     setShowLocationModal(false);
     setLocationSuggestions([]);
+    if (locationError) setLocationError('');
   };
 
   // Handle opening location modal - ensures it opens even if TextInput is already focused
@@ -970,6 +984,10 @@ const CreateEventScreen = () => {
       setSelectedStartDate(date);
       setSelectedStartTime(time);
       setSelectedRecurrence("Does not repeat");
+      // Clear errors when date/time is selected
+      setStartDateError('');
+      setStartTimeError('');
+      setDateTimeError('');
 
       // If no end date is set, set it to the same date
       if (!selectedEndDate) {
@@ -992,6 +1010,10 @@ const CreateEventScreen = () => {
     } else {
       setSelectedEndDate(date);
       setSelectedEndTime(time);
+      // Clear errors when date/time is selected
+      setEndDateError('');
+      setEndTimeError('');
+      setDateTimeError('');
     }
 
     // Show detailed date time section if we have both dates and times
@@ -1186,28 +1208,52 @@ const CreateEventScreen = () => {
 
   // Form validation
   const validateForm = () => {
+    let isValid = true;
+    let firstErrorField: 'title' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | null = null;
+    
+    // Clear previous errors
+    setTitleError('');
+    setLocationError('');
+    setStartDateError('');
+    setStartTimeError('');
+    setEndDateError('');
+    setEndTimeError('');
+    setDateTimeError('');
+
+    // Validate title
     if (!title.trim()) {
-      Alert.alert('Error', 'Please enter a title for the event');
-      return false;
+      setTitleError('Title is required');
+      isValid = false;
+      if (!firstErrorField) firstErrorField = 'title';
     }
+
+    // Validate start date
     if (!selectedStartDate) {
-      Alert.alert('Error', 'Please select a start date for the event');
-      return false;
+      setStartDateError('Start date is required');
+      isValid = false;
+      if (!firstErrorField) firstErrorField = 'startDate';
     }
+
+    // Validate end date
     if (!selectedEndDate) {
-      Alert.alert('Error', 'Please select an end date for the event');
-      return false;
+      setEndDateError('End date is required');
+      isValid = false;
+      if (!firstErrorField) firstErrorField = 'endDate';
     }
+
+    // Location is optional - no validation needed
 
     // ✅ Only validate times if NOT an all-day event
     if (!isAllDayEvent) {
       if (!selectedStartTime) {
-        Alert.alert('Error', 'Please select a start time for the event');
-        return false;
+        setStartTimeError('Start time is required');
+        isValid = false;
+        if (!firstErrorField) firstErrorField = 'startTime';
       }
       if (!selectedEndTime) {
-        Alert.alert('Error', 'Please select an end time for the event');
-        return false;
+        setEndTimeError('End time is required');
+        isValid = false;
+        if (!firstErrorField) firstErrorField = 'endTime';
       }
 
       // Validate that end date/time is after start date/time
@@ -1219,8 +1265,8 @@ const CreateEventScreen = () => {
       const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
       
       if (!startTimeMatch) {
-        Alert.alert('Error', 'Invalid start time format');
-        return false;
+        setStartTimeError('Invalid start time format');
+        isValid = false;
       }
       
       const startHours = parseInt(startTimeMatch[1], 10);
@@ -1239,8 +1285,8 @@ const CreateEventScreen = () => {
       const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
       
       if (!endTimeMatch) {
-        Alert.alert('Error', 'Invalid end time format');
-        return false;
+        setEndTimeError('Invalid end time format');
+        isValid = false;
       }
       
       const endHours = parseInt(endTimeMatch[1], 10);
@@ -1275,17 +1321,86 @@ const CreateEventScreen = () => {
       endDateTime.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
 
       if (endDateTime < startDateTime) {
-        // Error is already shown inline, just return false
-        return false;
+        setDateTimeError('End date must be on or after start date');
+        isValid = false;
+        if (!firstErrorField) firstErrorField = 'endDate';
       }
     }
 
+    // Scroll to first error field if validation failed
+    if (!isValid && firstErrorField && scrollViewRef.current) {
+      // Wait for error messages to render, then scroll
+      setTimeout(() => {
+        const scrollToField = (ref: React.RefObject<View>) => {
+          if (!ref.current || !scrollViewRef.current) {
+            // Retry after a delay if refs aren't ready
+            setTimeout(() => scrollToField(ref), 100);
+            return;
+          }
+          
+          try {
+            // Use measureLayout which measures relative to the ScrollView
+            ref.current.measureLayout(
+              scrollViewRef.current as any,
+              (x, y) => {
+                if (scrollViewRef.current) {
+                  scrollViewRef.current.scrollTo({ 
+                    y: Math.max(0, y - 40), 
+                    animated: true 
+                  });
+                }
+              },
+              (error) => {
+                // If measureLayout fails, try UIManager approach
+                const scrollViewHandle = findNodeHandle(scrollViewRef.current);
+                const fieldHandle = findNodeHandle(ref.current);
+                
+                if (scrollViewHandle && fieldHandle) {
+                  UIManager.measureLayout(
+                    fieldHandle,
+                    scrollViewHandle,
+                    () => {
+                      console.log('Failed to measure layout for scroll');
+                    },
+                    (x, y, width, height) => {
+                      if (scrollViewRef.current) {
+                        scrollViewRef.current.scrollTo({ 
+                          y: Math.max(0, y - 40), 
+                          animated: true 
+                        });
+                      }
+                    }
+                  );
+                }
+              }
+            );
+          } catch (error) {
+            console.log('Error scrolling to field:', error);
+          }
+        };
+
+        switch (firstErrorField) {
+          case 'title':
+            scrollToField(titleInputRef);
+            break;
+          case 'startDate':
+          case 'startTime':
+          case 'endDate':
+          case 'endTime':
+            scrollToField(dateTimeSectionRef);
+            break;
+        }
+      }, 300);
+    }
+
     if (!activeAccount) {
+      // Authentication error - this is a system error, not a validation error
+      // Keep the alert for this as it's not a field validation issue
       Alert.alert('Error', 'No active account found. Please log in again.');
       return false;
     }
 
-    return true;
+    return isValid;
   };
 
   const handleEditEvent = async (eventData: any, activeAccount: any) => {
@@ -1887,101 +2002,133 @@ const CreateEventScreen = () => {
         </View>
       )}
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        ref={scrollViewRef}
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+      >
         {/* Title Input */}
-        <View style={styles.inputSection}>
+        <View 
+          ref={titleInputRef}
+          style={styles.inputSection}
+          collapsable={false}
+        >
           <TextInput
             style={styles.titleInput}
             placeholder="Add title"
             placeholderTextColor={colors.grey400}
             value={title}
-            onChangeText={setTitle}
+            onChangeText={(text) => {
+              setTitle(text);
+              if (titleError) setTitleError('');
+            }}
             editable={!isLoading}
           />
           <View style={styles.inputUnderline} />
+          {titleError ? (
+            <Text style={styles.fieldErrorText}>{titleError}</Text>
+          ) : null}
         </View>
 
         {/* Pick date and time */}
-        <View style={styles.dateTimeSection}>
+        <View 
+          ref={dateTimeSectionRef}
+          style={styles.dateTimeSection}
+          collapsable={false}
+        >
           <View style={styles.dateTimeDisplay}>
             <Text style={styles.dateTimeLabel}>Date & Time</Text>
             <View style={styles.dateTimeRow}>
-              <TouchableOpacity
-                style={styles.timeSlot}
-                onPress={() => {
-                  if (!isLoading) {
-                    setCalendarMode('from');
-                    setShowCalendarModal(true);
-                  }
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.timeSlotLabel}>From</Text>
-                <Text style={styles.timeSlotValue}>
-                  {selectedStartDate ? (
-                    isAllDayEvent ? (
-                      // ✅ All-day: Show only date
-                      selectedStartDate.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })
-                    ) : selectedStartTime ? (
-                      // ✅ Timed: Show date and time
-                      `${selectedStartDate.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })} ${selectedStartTime}`
+              <View style={styles.timeSlotContainer}>
+                <TouchableOpacity
+                  style={styles.timeSlot}
+                  onPress={() => {
+                    if (!isLoading) {
+                      setCalendarMode('from');
+                      setShowCalendarModal(true);
+                    }
+                  }}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.timeSlotLabel}>From</Text>
+                  <Text style={styles.timeSlotValue}>
+                    {selectedStartDate ? (
+                      isAllDayEvent ? (
+                        // ✅ All-day: Show only date
+                        selectedStartDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })
+                      ) : selectedStartTime ? (
+                        // ✅ Timed: Show date and time
+                        `${selectedStartDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })} ${selectedStartTime}`
+                      ) : (
+                        'Select start time'
+                      )
                     ) : (
-                      'Select start time'
-                    )
-                  ) : (
-                    'Select start date'
-                  )}
-                </Text>
-              </TouchableOpacity>
+                      'Select start date'
+                    )}
+                  </Text>
+                </TouchableOpacity>
+                {(startDateError || startTimeError) && (
+                  <Text style={styles.fieldErrorText}>
+                    {startDateError || startTimeError}
+                  </Text>
+                )}
+              </View>
 
-              <TouchableOpacity
-                style={styles.timeSlot}
-                onPress={() => {
-                  if (!isLoading) {
-                    setCalendarMode('to');
-                    setShowCalendarModal(true);
-                  }
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.timeSlotLabel}>To</Text>
-                <Text style={styles.timeSlotValue}>
-                  {selectedEndDate ? (
-                    isAllDayEvent ? (
-                      // ✅ All-day: Show only date
-                      selectedEndDate.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric'
-                      })
-                    ) : selectedEndTime ? (
-                      // ✅ Timed: Show date and time
-                      `${selectedEndDate.toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                      })} ${selectedEndTime}`
+              <View style={styles.timeSlotContainer}>
+                <TouchableOpacity
+                  style={styles.timeSlot}
+                  onPress={() => {
+                    if (!isLoading) {
+                      setCalendarMode('to');
+                      setShowCalendarModal(true);
+                    }
+                  }}
+                  disabled={isLoading}
+                >
+                  <Text style={styles.timeSlotLabel}>To</Text>
+                  <Text style={styles.timeSlotValue}>
+                    {selectedEndDate ? (
+                      isAllDayEvent ? (
+                        // ✅ All-day: Show only date
+                        selectedEndDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric'
+                        })
+                      ) : selectedEndTime ? (
+                        // ✅ Timed: Show date and time
+                        `${selectedEndDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })} ${selectedEndTime}`
+                      ) : (
+                        'Select end time'
+                      )
                     ) : (
-                      'Select end time'
-                    )
-                  ) : (
-                    'Select end date'
-                  )}
-                </Text>
-              </TouchableOpacity>
+                      'Select end date'
+                    )}
+                  </Text>
+                </TouchableOpacity>
+                {(endDateError || endTimeError) && (
+                  <Text style={styles.fieldErrorText}>
+                    {endDateError || endTimeError}
+                  </Text>
+                )}
+              </View>
             </View>
-            {/* Date/Time Validation Error - Show directly under the date-time pickers */}
-            {dateTimeError ? (
+            {/* Date/Time relationship validation error - shown below both fields */}
+            {dateTimeError && (
               <View style={styles.dateTimeErrorContainer}>
                 <Text style={styles.dateTimeErrorText}>{dateTimeError}</Text>
               </View>
-            ) : null}
+            )}
           </View>
         </View>
 
@@ -2260,45 +2407,53 @@ const CreateEventScreen = () => {
         )}
 
         {/* Add location */}
-        <View
-          style={{
-            flexDirection: 'row',
-            alignItems: 'center',
-            marginBottom: spacing.lg,
-          }}
+        <View 
+          ref={locationSectionRef}
+          collapsable={false}
         >
-          <FeatherIcon name="map-pin" size={20} color="#6C6C6C" />
-
-          <TouchableOpacity
-            style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
-            onPress={handleOpenLocationModal}
-            activeOpacity={1}
-            disabled={isLoading}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              marginBottom: spacing.lg,
+            }}
           >
-            <TextInput
-              style={[
-                styles.selectorText,
-                { flex: 1, marginHorizontal: spacing.sm },
-              ]}
-              placeholder="Add location"
-              placeholderTextColor={colors.grey400}
-              value={location}
-              onFocus={handleOpenLocationModal}
-              editable={false}
-              pointerEvents="none"
-            />
-          </TouchableOpacity>
+            <FeatherIcon name="map-pin" size={20} color="#6C6C6C" />
 
-          <TouchableOpacity onPress={handleOpenLocationModal}>
-            <Image
-              style={{
-                marginLeft: scaleWidth(10),
-                height: scaleHeight(12.87),
-                width: scaleWidth(12.87),
-              }}
-              source={require('../assets/images/addIcon.png')}
-            />
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
+              onPress={handleOpenLocationModal}
+              activeOpacity={1}
+              disabled={isLoading}
+            >
+              <TextInput
+                style={[
+                  styles.selectorText,
+                  { flex: 1, marginHorizontal: spacing.sm },
+                ]}
+                placeholder="Add location"
+                placeholderTextColor={colors.grey400}
+                value={location}
+                onFocus={handleOpenLocationModal}
+                editable={false}
+                pointerEvents="none"
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity onPress={handleOpenLocationModal}>
+              <Image
+                style={{
+                  marginLeft: scaleWidth(10),
+                  height: scaleHeight(12.87),
+                  width: scaleWidth(12.87),
+                }}
+                source={require('../assets/images/addIcon.png')}
+              />
+            </TouchableOpacity>
+          </View>
+          {locationError ? (
+            <Text style={styles.fieldErrorText}>{locationError}</Text>
+          ) : null}
         </View>
 
 
@@ -2761,6 +2916,7 @@ const CreateEventScreen = () => {
                 value={location}
                 onChangeText={text => {
                   setLocation(text);
+                  if (locationError) setLocationError('');
                   if (text.length >= 2) {
                     debouncedFetchSuggestions(text);
                   } else {
@@ -3043,6 +3199,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     gap: spacing.md,
+    alignItems: 'flex-start',
+  },
+  timeSlotContainer: {
+    flex: 1,
+    minHeight: scaleHeight(80),
   },
   dateTimeErrorContainer: {
     marginTop: spacing.xs,
@@ -3055,9 +3216,17 @@ const styles = StyleSheet.create({
     color: '#FF3B30',
     fontWeight: '400',
     lineHeight: 18,
+    marginBottom: spacing.xs / 2,
+  },
+  fieldErrorText: {
+    fontSize: fontSize.textSize12,
+    color: '#FF3B30',
+    fontWeight: '400',
+    marginTop: spacing.xs,
+    marginLeft: 0,
+    paddingLeft: spacing.xs,
   },
   timeSlot: {
-    flex: 1,
     backgroundColor: '#F6F7F9',
     borderRadius: borderRadius.sm,
     padding: spacing.sm,
