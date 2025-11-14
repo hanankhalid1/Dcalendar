@@ -401,7 +401,12 @@ const CreateTaskScreen = () => {
           </Text>
           <TouchableOpacity
             style={styles.eventTypeContainer}
-            onPress={() => setShowEventTypeDropdown(!showEventTypeDropdown)}
+            onPress={() => {
+              if (!isLoading) {
+                setShowEventTypeDropdown(!showEventTypeDropdown);
+              }
+            }}
+            disabled={isLoading}
           >
             <GradientText
               style={styles.eventTypeText}
@@ -422,7 +427,12 @@ const CreateTaskScreen = () => {
             <TouchableOpacity
               key={eventType.id}
               style={styles.eventTypeItem}
-              onPress={() => handleEventTypeSelect(eventType.name)}
+              onPress={() => {
+                if (!isLoading) {
+                  handleEventTypeSelect(eventType.name);
+                }
+              }}
+              disabled={isLoading}
             >
               <Text style={styles.eventTypeItemText}>{eventType.name}</Text>
               {selectedEventType === eventType.name && (
@@ -449,6 +459,7 @@ const CreateTaskScreen = () => {
               placeholderTextColor={colors.grey400}
               value={title}
               onChangeText={setTitle}
+              editable={!isLoading}
             />
             <View style={styles.inputUnderline} />
           </View>
@@ -456,7 +467,12 @@ const CreateTaskScreen = () => {
           {/* Pick date and time */}
           <TouchableOpacity
             style={styles.datePicker}
-            onPress={() => setShowCalendarModal(true)}
+            onPress={() => {
+              if (!isLoading) {
+                setShowCalendarModal(true);
+              }
+            }}
+            disabled={isLoading}
           >
             <FeatherIcon name="calendar" size={20} color="#6C6C6C" />
 
@@ -482,7 +498,12 @@ const CreateTaskScreen = () => {
               <FeatherIcon name="repeat" size={20} color="#6C6C6C" />
               <TouchableOpacity
                 style={styles.recurrenceContainer}
-                onPress={() => setShowRecurrenceDropdown(!showRecurrenceDropdown)}
+                onPress={() => {
+                  if (!isLoading) {
+                    setShowRecurrenceDropdown(!showRecurrenceDropdown);
+                  }
+                }}
+                disabled={isLoading}
               >
                 <Text style={styles.selectorText}>{selectedRecurrence}</Text>
                 <Image
@@ -516,7 +537,12 @@ const CreateTaskScreen = () => {
                         selectedRecurrence === option &&
                         styles.recurrenceItemSelected,
                       ]}
-                      onPress={() => handleRecurrenceSelect(option)}
+                      onPress={() => {
+                        if (!isLoading) {
+                          handleRecurrenceSelect(option);
+                        }
+                      }}
+                      disabled={isLoading}
                     >
                       <Text
                         style={[
@@ -550,6 +576,7 @@ const CreateTaskScreen = () => {
             onChangeText={setDescription}
             multiline
             placeholderTextColor="#888"
+            editable={!isLoading}
           />
         </View>
       </ScrollView>
@@ -593,6 +620,7 @@ const CreateTaskScreen = () => {
                     }
                     keyboardType="numeric"
                     maxLength={2}
+                    editable={!isLoading}
                   />
                   <View style={styles.customRepeatUnitDropdown}>
                     <Text style={styles.customRepeatUnitText}>
@@ -622,7 +650,12 @@ const CreateTaskScreen = () => {
                           customRecurrence.repeatOn.includes(dayNames[index]) &&
                           styles.customDayButtonSelected,
                         ]}
-                        onPress={() => handleDayToggle(dayNames[index])}
+                        onPress={() => {
+                          if (!isLoading) {
+                            handleDayToggle(dayNames[index]);
+                          }
+                        }}
+                        disabled={isLoading}
                       >
                         <Text
                           style={[
@@ -646,12 +679,15 @@ const CreateTaskScreen = () => {
 
                 <TouchableOpacity
                   style={styles.customEndsOption}
-                  onPress={() =>
-                    setCustomRecurrence(prev => ({
-                      ...prev,
-                      endsType: endsOptions[0],
-                    }))
-                  }
+                  onPress={() => {
+                    if (!isLoading) {
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsType: endsOptions[0],
+                      }));
+                    }
+                  }}
+                  disabled={isLoading}
                 >
                   <View style={styles.customRadioButton}>
                     {customRecurrence.endsType === endsOptions[0] && (
@@ -665,12 +701,15 @@ const CreateTaskScreen = () => {
 
                 <TouchableOpacity
                   style={styles.customEndsOption}
-                  onPress={() =>
-                    setCustomRecurrence(prev => ({
-                      ...prev,
-                      endsType: endsOptions[1],
-                    }))
-                  }
+                  onPress={() => {
+                    if (!isLoading) {
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsType: endsOptions[1],
+                      }));
+                    }
+                  }}
+                  disabled={isLoading}
                 >
                   <View style={styles.customRadioButton}>
                     {customRecurrence.endsType === endsOptions[1] && (
@@ -692,18 +731,21 @@ const CreateTaskScreen = () => {
                     }
                     placeholder="04/09/2025"
                     placeholderTextColor="#9E9E9E"
-                    editable={customRecurrence.endsType === endsOptions[1]}
+                    editable={customRecurrence.endsType === endsOptions[1] && !isLoading}
                   />
                 </TouchableOpacity>
 
                 <TouchableOpacity
                   style={styles.customEndsOption}
-                  onPress={() =>
-                    setCustomRecurrence(prev => ({
-                      ...prev,
-                      endsType: endsOptions[2],
-                    }))
-                  }
+                  onPress={() => {
+                    if (!isLoading) {
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsType: endsOptions[2],
+                      }));
+                    }
+                  }}
+                  disabled={isLoading}
                 >
                   <View style={styles.customRadioButton}>
                     {customRecurrence.endsType === endsOptions[2] && (
@@ -727,7 +769,7 @@ const CreateTaskScreen = () => {
                       }))
                     }
                     keyboardType="numeric"
-                    editable={customRecurrence.endsType === endsOptions[2]}
+                    editable={customRecurrence.endsType === endsOptions[2] && !isLoading}
                   />
                   <Text style={styles.customEndsOccurrencesText}>
                     occurrences
@@ -740,14 +782,24 @@ const CreateTaskScreen = () => {
             <View style={styles.customModalActions}>
               <TouchableOpacity
                 style={styles.customCancelButton}
-                onPress={() => setShowCustomRecurrenceModal(false)}
+                onPress={() => {
+                  if (!isLoading) {
+                    setShowCustomRecurrenceModal(false);
+                  }
+                }}
+                disabled={isLoading}
               >
                 <Text style={styles.customCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.customDoneButton}
-                onPress={handleCustomRecurrenceDone}
+                onPress={() => {
+                  if (!isLoading) {
+                    handleCustomRecurrenceDone();
+                  }
+                }}
+                disabled={isLoading}
               >
                 <LinearGradient
                   colors={['#18F06E', '#0B6DE0']}

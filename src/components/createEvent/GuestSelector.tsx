@@ -32,6 +32,7 @@ interface GuestSelectorProps {
   onToggleGuestModal: () => void;
   searchQuery: string;
   onSearchQueryChange: (query: string) => void;
+  disabled?: boolean;
 }
 
 const GuestSelector: React.FC<GuestSelectorProps> = ({
@@ -43,6 +44,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   onToggleGuestModal,
   searchQuery,
   onSearchQueryChange,
+  disabled = false,
 }) => {
   const [guests, setGuests] = useState<DynamicGuest[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -103,6 +105,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
       <TouchableOpacity
         style={styles.guestInputContainer}
         onPress={onToggleGuestModal}
+        disabled={disabled}
       >
         <MaterialIcons name="person-add" size={24} color="#6C6C6C" />
         <Text style={styles.guestInput}>
@@ -140,6 +143,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                 placeholderTextColor="#9E9E9E"
                 value={searchQuery}
                 onChangeText={onSearchQueryChange}
+                editable={!disabled}
               />
             </View>
 

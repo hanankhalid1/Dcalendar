@@ -1836,7 +1836,12 @@ const CreateEventScreen = () => {
           </Text>
           <TouchableOpacity
             style={styles.eventTypeContainer}
-            onPress={() => setShowEventTypeDropdown(!showEventTypeDropdown)}
+            onPress={() => {
+              if (!isLoading) {
+                setShowEventTypeDropdown(!showEventTypeDropdown);
+              }
+            }}
+            disabled={isLoading}
           >
             <GradientText
               style={styles.eventTypeText}
@@ -1859,7 +1864,12 @@ const CreateEventScreen = () => {
             <TouchableOpacity
               key={eventType.id}
               style={styles.eventTypeItem}
-              onPress={() => handleEventTypeSelect(eventType.name)}
+              onPress={() => {
+                if (!isLoading) {
+                  handleEventTypeSelect(eventType.name);
+                }
+              }}
+              disabled={isLoading}
             >
               <Text style={styles.eventTypeItemText}>{eventType.name}</Text>
               {selectedEventType === eventType.name && (
@@ -1886,6 +1896,7 @@ const CreateEventScreen = () => {
             placeholderTextColor={colors.grey400}
             value={title}
             onChangeText={setTitle}
+            editable={!isLoading}
           />
           <View style={styles.inputUnderline} />
         </View>
@@ -1898,9 +1909,12 @@ const CreateEventScreen = () => {
               <TouchableOpacity
                 style={styles.timeSlot}
                 onPress={() => {
-                  setCalendarMode('from');
-                  setShowCalendarModal(true);
+                  if (!isLoading) {
+                    setCalendarMode('from');
+                    setShowCalendarModal(true);
+                  }
                 }}
+                disabled={isLoading}
               >
                 <Text style={styles.timeSlotLabel}>From</Text>
                 <Text style={styles.timeSlotValue}>
@@ -1930,9 +1944,12 @@ const CreateEventScreen = () => {
               <TouchableOpacity
                 style={styles.timeSlot}
                 onPress={() => {
-                  setCalendarMode('to');
-                  setShowCalendarModal(true);
+                  if (!isLoading) {
+                    setCalendarMode('to');
+                    setShowCalendarModal(true);
+                  }
                 }}
+                disabled={isLoading}
               >
                 <Text style={styles.timeSlotLabel}>To</Text>
                 <Text style={styles.timeSlotValue}>
@@ -1971,6 +1988,7 @@ const CreateEventScreen = () => {
         <TouchableOpacity
           style={styles.allDayToggle}
           onPress={() => {
+            if (isLoading) return;
             const newIsAllDay = !isAllDayEvent;
             setIsAllDayEvent(newIsAllDay);
 
@@ -1995,6 +2013,7 @@ const CreateEventScreen = () => {
               setSelectedEndTime('');
             }
           }}
+          disabled={isLoading}
         >
           <View style={[
             styles.checkbox,
@@ -2010,7 +2029,12 @@ const CreateEventScreen = () => {
         {/* Timezone Tag */}
         <TouchableOpacity
           style={styles.timezoneTag}
-          onPress={() => setShowTimezoneModal(true)}
+          onPress={() => {
+            if (!isLoading) {
+              setShowTimezoneModal(true);
+            }
+          }}
+          disabled={isLoading}
         >
           <Text style={styles.timezoneTagText}>
             {getSelectedTimezoneData().name}
@@ -2031,7 +2055,12 @@ const CreateEventScreen = () => {
             <FeatherIcon name="repeat" size={20} color="#6C6C6C" />
             <TouchableOpacity
               style={styles.recurrenceContainer}
-              onPress={() => setShowRecurrenceDropdown(!showRecurrenceDropdown)}
+              onPress={() => {
+                if (!isLoading) {
+                  setShowRecurrenceDropdown(!showRecurrenceDropdown);
+                }
+              }}
+              disabled={isLoading}
             >
               <Text style={styles.selectorText}>{selectedRecurrence}</Text>
               <Image
@@ -2065,7 +2094,12 @@ const CreateEventScreen = () => {
                       selectedRecurrence === option &&
                       styles.recurrenceItemSelected,
                     ]}
-                    onPress={() => handleRecurrenceSelect(option)}
+                    onPress={() => {
+                      if (!isLoading) {
+                        handleRecurrenceSelect(option);
+                      }
+                    }}
+                    disabled={isLoading}
                   >
                     <Text
                       style={[
@@ -2100,11 +2134,20 @@ const CreateEventScreen = () => {
           isVisible={showGuestDropdown}
           selectedGuests={selectedGuests}
           onGuestSelect={handleGuestSelect}
-          onToggleDropdown={() => setShowGuestDropdown(!showGuestDropdown)}
+          onToggleDropdown={() => {
+            if (!isLoading) {
+              setShowGuestDropdown(!showGuestDropdown);
+            }
+          }}
           showGuestModal={showGuestModal}
-          onToggleGuestModal={() => setShowGuestModal(!showGuestModal)}
+          onToggleGuestModal={() => {
+            if (!isLoading) {
+              setShowGuestModal(!showGuestModal);
+            }
+          }}
           searchQuery={guestSearchQuery}
           onSearchQueryChange={setGuestSearchQuery}
+          disabled={isLoading}
         />
 
         <View style={styles.divider} />
@@ -2112,9 +2155,12 @@ const CreateEventScreen = () => {
         <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.lg }}>
           <TouchableOpacity
             style={{ flexDirection: 'row', alignItems: 'center' }}
-            onPress={() =>
-              setShowVideoConferencingOptions(!showVideoConferencingOptions)
-            }
+            onPress={() => {
+              if (!isLoading) {
+                setShowVideoConferencingOptions(!showVideoConferencingOptions);
+              }
+            }}
+            disabled={isLoading}
           >
             <Text style={styles.selectorText}>Add video conferencing</Text>
             <Image
@@ -2139,11 +2185,14 @@ const CreateEventScreen = () => {
                 selectedVideoConferencing === 'inperson' &&
                 styles.videoConferencingButtonSelected,
               ]}
-              onPress={() =>
-                setSelectedVideoConferencing(
-                  selectedVideoConferencing === 'inperson' ? null : 'inperson'
-                )
-              }
+              onPress={() => {
+                if (!isLoading) {
+                  setSelectedVideoConferencing(
+                    selectedVideoConferencing === 'inperson' ? null : 'inperson'
+                  );
+                }
+              }}
+              disabled={isLoading}
             >
               <View style={styles.videoConferencingIconContainer}>
                 <FeatherIcon name="map-pin" size={16} color="#6C6C6C" />
@@ -2187,7 +2236,12 @@ const CreateEventScreen = () => {
                 selectedVideoConferencing === 'google' &&
                 styles.videoConferencingButtonSelected,
               ]}
-              onPress={handleGoogleMeetClick}
+              onPress={() => {
+                if (!isLoading) {
+                  handleGoogleMeetClick();
+                }
+              }}
+              disabled={isLoading}
             >
               <View style={styles.videoConferencingIconContainer}>
                 <FeatherIcon name="video" size={16} color="#34A853" />
@@ -2219,6 +2273,7 @@ const CreateEventScreen = () => {
             style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
             onPress={handleOpenLocationModal}
             activeOpacity={1}
+            disabled={isLoading}
           >
             <TextInput
               style={[
@@ -2321,6 +2376,7 @@ const CreateEventScreen = () => {
             numberOfLines={4}
             value={description}
             onChangeText={setDescription}
+            editable={!isLoading}
           />
         </View>
 
@@ -2328,7 +2384,12 @@ const CreateEventScreen = () => {
         <View style={styles.bottomActionBar}>
           <TouchableOpacity
             style={styles.advanceOptionsButton}
-            onPress={() => setShowAdvanced(!showAdvanced)}
+            onPress={() => {
+              if (!isLoading) {
+                setShowAdvanced(!showAdvanced);
+              }
+            }}
+            disabled={isLoading}
           >
             <Text style={styles.advanceOptionsText}>Advanced options</Text>
           </TouchableOpacity>
