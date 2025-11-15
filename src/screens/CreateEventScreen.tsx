@@ -2613,6 +2613,7 @@ const CreateEventScreen = () => {
               data={getFilteredTimezones()}
               keyExtractor={item => item.id}
               style={styles.timezoneList}
+              contentContainerStyle={styles.timezoneListContent}
               showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <TouchableOpacity
@@ -2638,32 +2639,34 @@ const CreateEventScreen = () => {
             {/* Modal Footer */}
             <View style={styles.timezoneModalFooter}>
               <TouchableOpacity
-                style={styles.timezoneModalButton}
+                style={styles.timezoneModalUseCurrentButton}
                 onPress={handleUseCurrentTimezone}
               >
-                <Text style={styles.timezoneModalButtonText}>
+                <Text style={styles.timezoneModalUseCurrentText}>
                   Use current time zone
                 </Text>
               </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.timezoneModalButton}
-                onPress={() => setShowTimezoneModal(false)}
-              >
-                <Text style={styles.timezoneModalButtonText}>Cancel</Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={styles.timezoneModalOkButton}
-                onPress={() => setShowTimezoneModal(false)}
-              >
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.timezoneModalOkGradient}
+              <View style={styles.timezoneModalActionButtons}>
+                <TouchableOpacity
+                  style={styles.timezoneModalButton}
+                  onPress={() => setShowTimezoneModal(false)}
                 >
-                  <Text style={styles.timezoneModalOkText}>Ok</Text>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <Text style={styles.timezoneModalButtonText}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.timezoneModalOkButton}
+                  onPress={() => setShowTimezoneModal(false)}
+                >
+                  <LinearGradient
+                    colors={['#18F06E', '#0B6DE0']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.timezoneModalOkGradient}
+                  >
+                    <Text style={styles.timezoneModalOkText}>Ok</Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
         </View>
@@ -3896,6 +3899,8 @@ const styles = StyleSheet.create({
   timezoneList: {
     maxHeight: scaleHeight(250),
     marginBottom: spacing.lg,
+    paddingHorizontal: 0,
+    marginHorizontal: 0,
   },
   timezoneItem: {
     paddingVertical: spacing.sm,
@@ -3915,7 +3920,29 @@ const styles = StyleSheet.create({
     color: '#0B6DE0',
     fontWeight: '500',
   },
+  timezoneListContent: {
+    paddingHorizontal: 0,
+  },
   timezoneModalFooter: {
+    flexDirection: 'column',
+    gap: spacing.md,
+    marginTop: 0,
+    paddingTop: 0,
+    marginHorizontal: 0,
+    paddingHorizontal: 0,
+  },
+  timezoneModalUseCurrentButton: {
+    paddingVertical: spacing.sm,
+    paddingLeft: spacing.md,
+    paddingRight: 0,
+    alignItems: 'flex-start',
+  },
+  timezoneModalUseCurrentText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '400',
+  },
+  timezoneModalActionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
