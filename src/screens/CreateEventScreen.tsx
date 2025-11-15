@@ -133,6 +133,7 @@ const CreateEventScreen = () => {
   const titleInputRef = useRef<View>(null);
   const dateTimeSectionRef = useRef<View>(null);
   const locationSectionRef = useRef<View>(null);
+  const timezoneListRef = useRef<FlatList>(null);
   const { api } = useApiClient();
   const [isAllDayEvent, setIsAllDayEvent] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
@@ -681,6 +682,26 @@ const CreateEventScreen = () => {
       locationModalInputRef.current.blur();
     }
   }, [showLocationModal]);
+
+  // Trigger scrollbar visibility when timezone modal opens
+  useEffect(() => {
+    if (showTimezoneModal && timezoneListRef.current && getFilteredTimezones().length > 0) {
+      // Small delay to ensure modal and list are fully rendered
+      const scrollTimer = setTimeout(() => {
+        if (timezoneListRef.current) {
+          // Trigger a tiny scroll to show the scrollbar
+          timezoneListRef.current.scrollToOffset({ offset: 1, animated: false });
+          // Immediately scroll back to top to keep scrollbar visible
+          setTimeout(() => {
+            if (timezoneListRef.current) {
+              timezoneListRef.current.scrollToOffset({ offset: 0, animated: false });
+            }
+          }, 50);
+        }
+      }, 200);
+      return () => clearTimeout(scrollTimer);
+    }
+  }, [showTimezoneModal, timezoneSearchQuery]);
 
   const getRecurrenceOptions = (selectedStartDate: Date) => {
     const d = dayjs(selectedStartDate);
@@ -2610,11 +2631,14 @@ const CreateEventScreen = () => {
 
             {/* Timezone List */}
             <FlatList
+              ref={timezoneListRef}
               data={getFilteredTimezones()}
               keyExtractor={item => item.id}
               style={styles.timezoneList}
               contentContainerStyle={styles.timezoneListContent}
-              showsVerticalScrollIndicator={false}
+              showsVerticalScrollIndicator={true}
+              indicatorStyle="default"
+              scrollEventThrottle={16}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
@@ -3901,6 +3925,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
     paddingHorizontal: 0,
     marginHorizontal: 0,
+    paddingRight: spacing.xs, // Add padding to make scrollbar more visible
   },
   timezoneItem: {
     paddingVertical: spacing.sm,
