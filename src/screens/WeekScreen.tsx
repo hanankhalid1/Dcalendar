@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import { useState } from 'react';
+import { useState, useMemo } from 'react';
 import { StyleProp, StyleSheet, Text, TextStyle, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import WeekView from 'react-native-week-view';
@@ -9,6 +9,7 @@ import FloatingActionButton from '../components/FloatingActionButton';
 import WeekHeader from '../components/WeekHeader';
 import { Screen } from '../navigations/appNavigation.type';
 import { useCalendarStore } from '../stores/useCalendarStore';
+import { useSettingsStore } from '../stores/useSetting';
 import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST } from '../utils';
 import { colors } from '../utils/LightTheme';
@@ -70,6 +71,25 @@ const WeekScreen = () => {
     const { userEvents, userEventsLoading, userEventsError } = useEventsStore();
     const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
     const { selectedDate, setSelectedDate } = useCalendarStore();
+    // ✅ Get start of week setting from store
+    const { selectedDay } = useSettingsStore();
+    
+    // ✅ Helper function to convert day name to numeric value for WeekView
+    // WeekView uses: 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday, 7=Sunday
+    const getWeekdayNumber = (dayName: string): number => {
+        const dayMap: { [key: string]: number } = {
+            'Monday': 1,
+            'Tuesday': 2,
+            'Wednesday': 3,
+            'Thursday': 4,
+            'Friday': 5,
+            'Saturday': 6,
+            'Sunday': 7,
+        };
+        return dayMap[dayName] || 1;
+    };
+    
+    const weekdayNumber = getWeekdayNumber(selectedDay);
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [isPaging, setIsPaging] = useState(false);
     const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -154,13 +174,37 @@ const WeekScreen = () => {
         updateMonthDisplay(newDate);
     };
 
-    // Helper function to get the start of the week (Monday) for a given date
+    // ✅ Helper to convert day name to numeric (0=Sunday, 1=Monday, etc.)
+    const getDayNumber = (dayName: string): number => {
+        const dayMap: { [key: string]: number } = {
+            'Sunday': 0,
+            'Monday': 1,
+            'Tuesday': 2,
+            'Wednesday': 3,
+            'Thursday': 4,
+            'Friday': 5,
+            'Saturday': 6,
+        };
+        return dayMap[dayName] || 0;
+    };
+    
+    // ✅ Helper function to get the start of the week based on setting
     const getStartOfWeek = (date: Date) => {
         const d = new Date(date);
-        const day = d.getDay();
-        const diff = d.getDate() - day + (day === 0 ? -6 : 1); // Adjust when day is Sunday
-        return new Date(d.setDate(diff));
+        const day = d.getDay(); // 0 = Sunday, 1 = Monday, etc.
+        // Convert selectedDay to numeric (0=Sunday, 1=Monday, etc.)
+        const startDayNumber = getDayNumber(selectedDay);
+        // Calculate difference to get to the start of week
+        let diff = day - startDayNumber;
+        if (diff < 0) diff += 7; // If negative, add 7 to go back to previous week
+        d.setDate(d.getDate() - diff);
+        return d;
     };
+    
+    // ✅ Adjust selectedDate to align with start of week
+    const adjustedSelectedDate = useMemo(() => {
+        return getStartOfWeek(selectedDate);
+    }, [selectedDate, selectedDay]);
 
     const handleSwipeNext = (date: Date) => {
         console.log('Swiped to next:', date);
@@ -245,11 +289,11 @@ const WeekScreen = () => {
             )}
 
             <WeekView
-                key={`weekview-${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`}
+                key={`weekview-${adjustedSelectedDate.getFullYear()}-${adjustedSelectedDate.getMonth()}-${adjustedSelectedDate.getDate()}-${weekdayNumber}`}
                 events={myEvents}
-                selectedDate={selectedDate}
+                selectedDate={adjustedSelectedDate}
                 numberOfDays={7}
-                pageStartAt={{ left: 0, weekday: 1 }}
+                pageStartAt={{ weekday: weekdayNumber }}
                 formatDateHeader="ddd D"
                 showTitle={false} // Hide the default title
                 headerStyle={styles.headerStyle}

@@ -10,6 +10,7 @@ import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
+import { useSettingsStore } from '../stores/useSetting';
 import EventDetailsModal from '../components/EventDetailsModal';
 import { colors, spacing } from '../utils/LightTheme';
 import { BlockchainService } from '../services/BlockChainService';
@@ -42,6 +43,25 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const { account } = useActiveAccount();
   const { userEvents, userEventsLoading, getUserEvents } = useEventsStore();
   const { selectedDate, setSelectedDate } = useCalendarStore();
+  // ✅ Get start of week setting from store
+  const { selectedDay } = useSettingsStore();
+  
+  // ✅ Helper function to convert day name to numeric value for react-native-calendars
+  // react-native-calendars uses: 0=Sunday, 1=Monday, 2=Tuesday, etc.
+  const getFirstDayNumber = (dayName: string): number => {
+    const dayMap: { [key: string]: number } = {
+      'Sunday': 0,
+      'Monday': 1,
+      'Tuesday': 2,
+      'Wednesday': 3,
+      'Thursday': 4,
+      'Friday': 5,
+      'Saturday': 6,
+    };
+    return dayMap[dayName] || 0;
+  };
+  
+  const firstDayNumber = getFirstDayNumber(selectedDay);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isEventModalVisible, setIsEventModalVisible] = useState(false);
@@ -539,7 +559,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
             markedDates={markedDates}
             markingType="multi-period"
             onDayPress={handleDayPress}
-            firstDay={1}
+            firstDay={firstDayNumber}
             theme={{
               backgroundColor: '#ffffff',
               calendarBackground: '#ffffff',

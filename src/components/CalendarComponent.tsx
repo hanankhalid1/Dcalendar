@@ -2,6 +2,7 @@ import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
 import React, { useState } from 'react';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
+import { useSettingsStore } from '../stores/useSetting';
 
 interface CalendarComponentProps {
   onDateSelect?: (date: Date) => void;
@@ -14,6 +15,26 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
   currentDate: propCurrentDate,
   selectedDate: propSelectedDate,
 }) => {
+  // ✅ Get start of week setting from store
+  const { selectedDay } = useSettingsStore();
+  
+  // ✅ Helper function to convert day name to numeric value (0=Sunday, 1=Monday, etc.)
+  const getDayNumber = (dayName: string): number => {
+    const dayMap: { [key: string]: number } = {
+      'Sunday': 0,
+      'Monday': 1,
+      'Tuesday': 2,
+      'Wednesday': 3,
+      'Thursday': 4,
+      'Friday': 5,
+      'Saturday': 6,
+    };
+    return dayMap[dayName] || 0;
+  };
+  
+  // ✅ Get the numeric value for the start of week
+  const startOfWeekNumber = getDayNumber(selectedDay);
+  
   const [currentDate, setCurrentDate] = useState(() => {
     const date = propCurrentDate || new Date();
     // Normalize to noon to avoid timezone issues
@@ -87,7 +108,12 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
     'December',
   ];
 
-  const weekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  // ✅ Reorder weekDays array based on start of week setting
+  const baseWeekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
+  const weekDays = [
+    ...baseWeekDays.slice(startOfWeekNumber),
+    ...baseWeekDays.slice(0, startOfWeekNumber)
+  ];
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -109,6 +135,7 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
       )} (day ${startingDayOfWeek})`,
     );
     console.log(`CalendarComponent - Days in month: ${daysInMonth}`);
+    console.log(`CalendarComponent - Start of week setting: ${selectedDay} (numeric: ${startOfWeekNumber})`);
 
     const days = [];
 
@@ -116,12 +143,13 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
     const prevMonth = new Date(year, month - 1, 0, 12, 0, 0, 0);
     const prevMonthDays = prevMonth.getDate();
 
+    // ✅ Calculate offset based on start of week setting
+    // Adjust startingDayOfWeek relative to the custom start of week
+    let adjustedStartingDay = (startingDayOfWeek - startOfWeekNumber + 7) % 7;
+
     // Fill in the days from the previous month that appear in the first week
-    // startingDayOfWeek tells us which day of the week the 1st falls on
-    // If it's 1 (Monday), we need 0 previous days
-    // If it's 2 (Tuesday), we need 1 previous day (Monday)
-    // If it's 0 (Sunday), we need 6 previous days (Mon-Sat)
-    for (let i = startingDayOfWeek - 1; i >= 0; i--) {
+    // adjustedStartingDay tells us how many previous month days we need
+    for (let i = adjustedStartingDay - 1; i >= 0; i--) {
       days.push({
         day: prevMonthDays - i,
         isCurrentMonth: false,

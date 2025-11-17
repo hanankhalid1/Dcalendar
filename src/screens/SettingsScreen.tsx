@@ -37,7 +37,14 @@ import { pick } from '@react-native-documents/picker';
 import RNBlobUtil from 'react-native-blob-util';
 import { apiClient, useApiClient } from '../hooks/useApi';
 import IntegrationsComponent from '../components/IntegrationsComponent';
+import { spacing, fontSize } from '../utils/LightTheme';
+import * as DimensionsUtils from '../utils/dimensions';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+// Extract scaling functions
+const moderateScale = DimensionsUtils.moderateScale;
+const scaleHeight = DimensionsUtils.scaleHeight;
+const scaleWidth = DimensionsUtils.scaleWidth;
 
 const blockchainService = new BlockchainService();
 
@@ -171,6 +178,7 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
             key={day}
             style={styles.radioOption}
             onPress={() => onSelectDay(day)}
+            activeOpacity={0.7}
           >
             <View style={styles.radioButton}>
               {selectedDay === day && (
@@ -188,15 +196,23 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
       </View>
 
       <View style={styles.modalButtons}>
-        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+        <TouchableOpacity 
+          style={styles.cancelButton} 
+          onPress={onClose}
+          activeOpacity={0.7}
+        >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1 }} onPress={handleConfirm}>
+        <TouchableOpacity 
+          style={styles.confirmButtonWrapper} 
+          onPress={handleConfirm}
+          activeOpacity={0.8}
+        >
           <LinearGradient
-            colors={['#18F06E', '#0B6DE0']} // Your gradient colors
+            colors={['#18F06E', '#0B6DE0']}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
-            style={styles.confirmButton} // Apply inner padding/alignment here
+            style={styles.confirmButton}
           >
             <Text style={styles.confirmButtonText}>Confirm</Text>
           </LinearGradient>
@@ -725,64 +741,95 @@ const styles = StyleSheet.create({
   },
   bottomSheetContent: {
     backgroundColor: '#fff',
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
+    borderTopLeftRadius: moderateScale(16),
+    borderTopRightRadius: moderateScale(16),
     maxHeight: SCREEN_HEIGHT * 0.7,
+    paddingBottom: Platform.OS === 'ios' ? scaleHeight(20) : 0,
+    width: '100%',
+    alignSelf: 'center',
   },
   modalHeader: {
-    padding: 20,
+    paddingHorizontal: moderateScale(20),
+    paddingTop: scaleHeight(20),
+    paddingBottom: scaleHeight(16),
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
   modalTitle: {
-    fontSize: 18,
+    fontSize: fontSize.textSize18,
     fontWeight: '600',
     color: '#333',
   },
   modalBody: {
-    paddingVertical: 8,
-    maxHeight: SCREEN_HEIGHT * 0.4,
+    paddingVertical: scaleHeight(8),
   },
   radioOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 20,
-    paddingVertical: 12,
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: scaleHeight(14),
+    minHeight: scaleHeight(48), // Minimum touch target size
   },
   radioButton: {
-    width: 20,
-    height: 20,
-    borderRadius: 10,
+    width: moderateScale(22),
+    height: moderateScale(22),
+    borderRadius: moderateScale(11),
     borderWidth: 2,
     borderColor: '#00BCD4',
-    marginRight: 12,
+    marginRight: moderateScale(14),
     alignItems: 'center',
     justifyContent: 'center',
   },
   radioButtonSelected: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: '#00BCD4',
+    width: moderateScale(12),
+    height: moderateScale(12),
+    borderRadius: moderateScale(6),
   },
   radioText: {
-    fontSize: 16,
+    fontSize: fontSize.textSize16,
     color: '#333',
+    flex: 1,
   },
   modalButtons: {
     flexDirection: 'row',
     borderTopWidth: 1,
     borderTopColor: '#f0f0f0',
+    minHeight: scaleHeight(56),
+    width: '100%',
   },
   cancelButton: {
     flex: 1,
-    paddingVertical: 16,
+    paddingVertical: scaleHeight(18),
     alignItems: 'center',
+    justifyContent: 'center',
     borderRightWidth: 1,
     borderRightColor: '#f0f0f0',
+    minHeight: scaleHeight(56),
+    backgroundColor: '#fff',
   },
-
-
+  confirmButtonWrapper: {
+    flex: 1,
+    minHeight: scaleHeight(56),
+    overflow: 'hidden',
+  },
+  confirmButton: {
+    flex: 1,
+    paddingVertical: scaleHeight(18),
+    alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: scaleHeight(56),
+    borderRadius: 0,
+  },
+  cancelButtonText: {
+    fontSize: fontSize.textSize16,
+    color: '#333',
+    fontWeight: '600',
+  },
+  confirmButtonText: {
+    fontSize: fontSize.textSize16,
+    color: '#fff',
+    fontWeight: '600',
+  },
   containerStyle: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -800,22 +847,6 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: Colors.white,
     textAlignVertical: 'center',
-  },
-  confirmButton: {
-    flex: 1,
-    paddingVertical: 16,
-    alignItems: 'center',
-    backgroundColor: '#00BCD4',
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    color: '#666',
-    fontWeight: '500',
-  },
-  confirmButtonText: {
-    fontSize: 16,
-    color: '#fff',
-    fontWeight: '600',
   },
 });
 
