@@ -204,6 +204,40 @@ export class BlockchainService {
     }
   }
 
+  async updateSettings(username: string, key: string, options: Array<{ key: string; value: string }>) {
+    try {
+      console.log('🔧 Updating settings for username:', username, 'key:', key);
+      console.log('📤 Settings options:', options);
+
+      const helperContract = new Contract(
+        CONTRACT_ADDRESSES.HELPER,
+        HELPER_CONTRACT_ABI,
+        this.provider,
+      );
+
+      const walletAddress = await this.getWalletAddress(Config.NECJSPK);
+      const wallet = this.provider.getSigner(walletAddress);
+
+      const gasEstimate = await helperContract
+        .connect(wallet)
+        .methods.updateSettings(username, key, options)
+        .estimateGas();
+
+      console.log('⛽ Gas estimate:', gasEstimate.toString());
+
+      const tx = await helperContract
+        .connect(wallet)
+        .methods.updateSettings(username, key, options)
+        .send({ gasLimit: gasEstimate });
+
+      console.log('✅ Settings updated successfully. Transaction:', tx);
+      return tx;
+    } catch (error: any) {
+      console.error('❌ Failed to update settings:', error.message);
+      throw error;
+    }
+  }
+
   async verifyContractDeployments(): Promise<void> {
     console.log('🔍 Verifying contract deployments...');
 

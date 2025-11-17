@@ -17,7 +17,6 @@ import { useApiClient } from '../hooks/useApi';
 import { Screen } from '../navigations/appNavigation.type';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useCalendarStore } from '../stores/useCalendarStore';
-import { useSettingsStore } from '../stores/useSetting';
 import { useEventsStore } from '../stores/useEventsStore';
 import { useToken } from '../stores/useTokenStore';
 import { parseTimeToPST } from '../utils';
@@ -97,25 +96,6 @@ const DailyCalendarScreen = () => {
   const { userEvents, userEventsLoading, userEventsError } = useEventsStore();
   const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
   const { selectedDate, setSelectedDate } = useCalendarStore();
-  // ✅ Get start of week setting from store
-  const { selectedDay } = useSettingsStore();
-  
-  // ✅ Helper function to convert day name to numeric value for WeekView
-  // WeekView uses: 1=Monday, 2=Tuesday, 3=Wednesday, 4=Thursday, 5=Friday, 6=Saturday, 7=Sunday
-  const getWeekdayNumber = (dayName: string): number => {
-    const dayMap: { [key: string]: number } = {
-      'Monday': 1,
-      'Tuesday': 2,
-      'Wednesday': 3,
-      'Thursday': 4,
-      'Friday': 5,
-      'Saturday': 6,
-      'Sunday': 7,
-    };
-    return dayMap[dayName] || 1;
-  };
-  
-  const weekdayNumber = getWeekdayNumber(selectedDay);
   const [isPaging, setIsPaging] = useState(false);
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
@@ -291,11 +271,11 @@ const DailyCalendarScreen = () => {
       )}
 
       <WeekView
-        key={`dailyview-${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}-${weekdayNumber}`}
+        key={`dailyview-${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`}
         events={myEvents}
         selectedDate={selectedDate}
         numberOfDays={1}
-        pageStartAt={{ left: 0, weekday: weekdayNumber }}
+        pageStartAt={{ left: 0, weekday: 1 }}
         formatDateHeader="ddd D"
         showTitle={false} // Hide the default title
         headerStyle={styles.headerStyle}

@@ -161,6 +161,33 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
     'Saturday',
     'Sunday'
   ];
+  
+  const { account } = useActiveAccount();
+  const blockchainService = new BlockchainService();
+  const [isSaving, setIsSaving] = useState(false);
+
+  const handleDaySelect = async (day: string) => {
+    // ✅ Update local store immediately (Zustand persist will save to AsyncStorage automatically)
+    onSelectDay(day);
+    
+    // ✅ Save to blockchain as background sync (don't block UI or show errors)
+    if (account?.userName) {
+      setIsSaving(true);
+      // Don't await - let it run in background
+      blockchainService.updateSettings(
+        account.userName,
+        'startOfWeek',
+        [{ key: 'value', value: day }]
+      ).then(() => {
+        console.log('✅ Start of week synced to blockchain:', day);
+        setIsSaving(false);
+      }).catch((error) => {
+        console.error('❌ Failed to sync start of week to blockchain (non-critical):', error);
+        // Don't show error to user - local storage is working
+        setIsSaving(false);
+      });
+    }
+  };
 
   const handleConfirm = () => {
     onClose();
@@ -177,8 +204,9 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
           <TouchableOpacity
             key={day}
             style={styles.radioOption}
-            onPress={() => onSelectDay(day)}
+            onPress={() => handleDaySelect(day)}
             activeOpacity={0.7}
+            disabled={isSaving}
           >
             <View style={styles.radioButton}>
               {selectedDay === day && (
@@ -348,7 +376,6 @@ const SettingsScreen = () => {
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [showTimeZoneModal, setShowTimeZoneModal] = useState(false);
   const [settings, setSettings] = useState<any[]>([]);
-  const username = 'arati';
   const { userEvents: events } = useEventsStore();
   const { account } = useActiveAccount();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
@@ -362,16 +389,19 @@ const SettingsScreen = () => {
     const fetchSettings = async () => {
       try {
         console.log('🚀 Fetching blockchain settings...');
-        const result = await blockchainService.getSettings(username);
+        const result = await blockchainService.getSettings(account?.userName || '');
         console.log('✅ Blockchain settings received:', result);
         setSettings(result); // store in state
+        // Don't sync from blockchain - Zustand persist handles everything
       } catch (error) {
         console.error('❌ Error fetching blockchain settings:', error);
       }
     };
 
-    fetchSettings();
-  }, [username]);
+    if (account?.userName) {
+      fetchSettings();
+    }
+  }, [account?.userName]);
 
 
   const {

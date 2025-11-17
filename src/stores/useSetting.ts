@@ -1,5 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 // ✅ Define Type for State and Actions
 export type SettingsStore = {
@@ -60,6 +61,22 @@ export const useSettingsStore = create<SettingsStore>()(
     }),
     {
       name: 'settings-storage', // Key in AsyncStorage
+      storage: {
+        getItem: async name => {
+          const value = await AsyncStorage.getItem(name);
+          return value ? JSON.parse(value) : null;
+        },
+        setItem: async (name, value) => {
+          if (value === null || value === undefined) {
+            await AsyncStorage.removeItem(name);
+          } else {
+            await AsyncStorage.setItem(name, JSON.stringify(value));
+          }
+        },
+        removeItem: async name => {
+          await AsyncStorage.removeItem(name);
+        },
+      },
     }
   )
 );
