@@ -161,7 +161,7 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
     'Saturday',
     'Sunday'
   ];
-  
+
   const { account } = useActiveAccount();
   const blockchainService = new BlockchainService();
   const [isSaving, setIsSaving] = useState(false);
@@ -169,7 +169,7 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
   const handleDaySelect = async (day: string) => {
     // ✅ Update local store immediately (Zustand persist will save to AsyncStorage automatically)
     onSelectDay(day);
-    
+
     // ✅ Save to blockchain as background sync (don't block UI or show errors)
     if (account?.userName) {
       setIsSaving(true);
@@ -224,15 +224,15 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
       </View>
 
       <View style={styles.modalButtons}>
-        <TouchableOpacity 
-          style={styles.cancelButton} 
+        <TouchableOpacity
+          style={styles.cancelButton}
           onPress={onClose}
           activeOpacity={0.7}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.confirmButtonWrapper} 
+        <TouchableOpacity
+          style={styles.confirmButtonWrapper}
           onPress={handleConfirm}
           activeOpacity={0.8}
         >
@@ -468,22 +468,23 @@ const SettingsScreen = () => {
 
       // 3️⃣ Handle iOS & Android separately
       if (Platform.OS === 'android') {
-        const dirs = RNBlobUtil.fs.dirs;
-        filePath = `${dirs.DownloadDir}/${filename}`;
+        const dirs = RNBlobUtil.fs.dirs;  // Write to cache first
+        const tempPath = `${dirs.CacheDir}/${filename}`;
+        await RNBlobUtil.fs.writeFile(tempPath, combinedICS, 'utf8');
 
-        // Write the file
-        await RNBlobUtil.fs.writeFile(filePath, combinedICS, 'utf8');
-        console.log('✅ File written to:', filePath);
+        // Use MediaStore to save to Downloads
+        await RNBlobUtil.MediaCollection.copyToMediaStore(
+          {
+            name: filename,
+            parentFolder: 'Download', // or '' for root Downloads
+            mimeType: 'text/calendar',
+          },
+          'Download',
+          tempPath
+        );
 
-        // Add as complete download to make it visible + show notification
-        await RNBlobUtil.android.addCompleteDownload({
-          title: filename,
-          description: 'Exported calendar file',
-          mime: 'text/calendar',
-          path: filePath,
-          showNotification: true,
-        });
-
+        // Clean up temp file
+        await RNBlobUtil.fs.unlink(tempPath);
         Alert.alert('✅ Export Successful', `Saved to Downloads as:\n${filename}`);
       } else {
         // iOS path
@@ -556,18 +557,27 @@ const SettingsScreen = () => {
 
         console.log("Parsed events", parsed);
 
+
         if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          blockchainService.saveImportedEvents(parsed, account.userName, token, api);
-          console.log("Successfully imported events in settings screen");
+          await blockchainService.saveImportedEvents(parsed, account.userName, token, api);
+
+          // ✅ Success alert here
+          Alert.alert(
+            "Success",
+            "Events have been imported successfully!",
+            [{ text: "OK" }]
+          );
+        } else {
+          Alert.alert("No Events Found", "The selected file did not contain any valid events.");
         }
       } catch (err) {
         console.error('Error selecting file:', err);
-        Alert.alert('Error', 'Failed to pick file. Check console for details.');
+        Alert.alert('Error', 'Failed to pick file');
       }
     }
     catch (err) {
       console.error('Error selecting file:', err);
-      Alert.alert('Error', 'Failed to pick file. Check console for details.');
+      Alert.alert('Error', 'Failed to pick file');
     }
   }
 
@@ -653,14 +663,13 @@ const SettingsScreen = () => {
           hasButton={true}
           onButtonPress={handleExportEvents}
         />
-{/* 
         <SettingRow
           title="Import Events"
-          subtitle="bjdnwjd"
+          subtitle="You can import all events from a single .ical/.ics file."
           buttonText="Import"
           hasButton={true}
           onButtonPress={handleImportEvents}
-        /> */}
+        />
 
         {/* Integration Component */}
         <IntegrationsComponent initialExpanded={expandIntegration || false} />
