@@ -107,7 +107,7 @@ const WeekScreen = () => {
                     return null;
                 }
   let colour = '#337E891A'; // Default color for standard events
-        if(event.list?.some((item: any) => item.key === 'task' && item.value === 'true')) {
+                if (event.list?.some((item: any) => item.key === 'task' && item.value === 'true')) {
           console.log('Event is a task:', event);
           colour = colors.figmaPurpleOpacity20; // Color for tasks
         }
@@ -314,7 +314,6 @@ const WeekScreen = () => {
                 hoursInDisplay={12}
                 timeStep={60}
                 formatTimeLabel="h A"
-                locale="en-US"
                 rightToLeft={false}
                 showNowLine={true}
                 timesColumnWidth={0.15}

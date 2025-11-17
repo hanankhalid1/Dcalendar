@@ -23,6 +23,8 @@ import CalendarIcon from '../assets/svgs/calendar.svg';
 import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import LinearGradient from 'react-native-linear-gradient';
+import { Fonts } from '../constants/Fonts';
+
 
 interface MonthlyCalendarProps {
   onDateSelect?: (date: string) => void;
@@ -404,10 +406,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     setCurrentMonthByIndex(newDate.getMonth());
   };
 
-  const handleMonthChange = (month: any) => {
-    const newDate = new Date(month.timestamp);
-    setCurrentMonthByIndex(newDate.getMonth());
-  };
 
   const handleEventPress = (event: any) => {
     console.log('Event pressed:', event);
@@ -576,18 +574,15 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
               selectedDayBackgroundColor: '#000',
               selectedDayTextColor: '#ffffff',
               todayTextColor: colors.figmaLightBlue || '#2196F3',
-              dayTextColor: '#2d4150',
-              textDisabledColor: '#d9e1e8',
+              dayTextColor: '#202020',
+              textDisabledColor: '#A8A8AA',
               dotColor: '#337E89',
               selectedDotColor: '#ffffff',
               arrowColor: colors.figmaLightBlue || '#2196F3',
-              monthTextColor: '#2d4150',
-              textDayFontFamily: 'DM Sans',
-              textMonthFontFamily: 'DM Sans',
-              textDayHeaderFontFamily: 'DM Sans',
-              textDayFontSize: 14,
-              textMonthFontSize: 16,
-              textDayHeaderFontSize: 12,
+              textDayFontFamily: Fonts.bold,
+              textDayHeaderFontFamily: Fonts.black,
+              textDayFontSize: 12,
+              textDayHeaderFontSize: 14,
             }}
             renderHeader={() => null}
             hideArrows={true}
@@ -619,7 +614,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                     onPress={() => handleEventPress(event)}
                   >
                     <View style={styles.eventContent}>
-                      <Text style={styles.eventTitle} numberOfLines={1}>
+                      <Text style={styles.eventTitle}>
                         {event.title}
                       </Text>
 
@@ -651,7 +646,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                         <View style={[styles.badge, {
                           borderColor: event.isTask ? '#8DC63F' : '#00AEEF',
                         }]}>
-                          {event.isTask? <TaskIcon height={14} width={14}/> : <EventIcon height={14} width={14}/>}
+                          {event.isTask ? <TaskIcon height={14} width={14} /> : <EventIcon height={14} width={14} />}
                           <Text style={styles.badgeText}>
                             {event.isTask ? 'Task' : 'Event'}
                           </Text>
@@ -841,12 +836,11 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
     paddingHorizontal: 4,
   },
-  eventsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'DM Sans',
+ eventsTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bold,
     marginBottom: spacing.md,
-    color: '#2d4150',
+    color: '#202020',
   },
   eventsList: {
     flexGrow: 1,
@@ -867,15 +861,15 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'DM Sans',
-    color: '#1a1a1a',
+    fontFamily: Fonts.bold,
+    color: '#000',
     marginBottom: 0,
   },
-  eventTime: {
+ eventTime: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: Fonts.bold,
     textAlign: 'left',
+    color: '#717680'
   },
   eventStartTime: {
     fontSize: 10,
@@ -899,10 +893,10 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
   },
-  badgeText: {
-    fontSize: 12,
-    fontFamily: 'DM Sans',
-    color: '#666',
+ badgeText: {
+    fontSize: 10,
+    fontFamily: Fonts.bold,
+    color: '#717680',
     fontWeight: '500',
   },
   noEventsText: {
