@@ -64,15 +64,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
   
   const firstDayNumber = getFirstDayNumber(selectedDay);
-  
-  // ✅ Reset to today's date when start of week setting changes
-  useEffect(() => {
-    // When selectedDay changes, reset to today's date
-    const today = new Date();
-    today.setHours(12, 0, 0, 0); // Normalize to noon
-    setSelectedDate(today);
-  }, [selectedDay]);
-  
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isEventModalVisible, setIsEventModalVisible] = useState(false);

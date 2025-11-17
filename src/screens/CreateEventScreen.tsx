@@ -133,7 +133,6 @@ const CreateEventScreen = () => {
   const titleInputRef = useRef<View>(null);
   const dateTimeSectionRef = useRef<View>(null);
   const locationSectionRef = useRef<View>(null);
-  const timezoneListRef = useRef<FlatList>(null);
   const { api } = useApiClient();
   const [isAllDayEvent, setIsAllDayEvent] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
@@ -683,26 +682,6 @@ const CreateEventScreen = () => {
     }
   }, [showLocationModal]);
 
-  // Trigger scrollbar visibility when timezone modal opens
-  useEffect(() => {
-    if (showTimezoneModal && timezoneListRef.current && getFilteredTimezones().length > 0) {
-      // Small delay to ensure modal and list are fully rendered
-      const scrollTimer = setTimeout(() => {
-        if (timezoneListRef.current) {
-          // Trigger a tiny scroll to show the scrollbar
-          timezoneListRef.current.scrollToOffset({ offset: 1, animated: false });
-          // Immediately scroll back to top to keep scrollbar visible
-          setTimeout(() => {
-            if (timezoneListRef.current) {
-              timezoneListRef.current.scrollToOffset({ offset: 0, animated: false });
-            }
-          }, 50);
-        }
-      }, 200);
-      return () => clearTimeout(scrollTimer);
-    }
-  }, [showTimezoneModal, timezoneSearchQuery]);
-
   const getRecurrenceOptions = (selectedStartDate: Date) => {
     const d = dayjs(selectedStartDate);
     const weekday = d.format("dddd");
@@ -894,7 +873,7 @@ const CreateEventScreen = () => {
   // Validate date/time and set error message
   const validateDateTime = React.useCallback(() => {
     setDateTimeError('');
-    
+
     if (!selectedStartDate || !selectedEndDate) {
       return; // Don't show error if dates aren't selected yet
     }
@@ -923,12 +902,12 @@ const CreateEventScreen = () => {
       // Parse start time (handle non-breaking spaces)
       const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
       const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      
+
       if (!startTimeMatch) {
         console.log('DEBUG - Invalid start time format:', normalizedStartTime);
         return; // Invalid format, but don't show error here
       }
-      
+
       const startHours = parseInt(startTimeMatch[1], 10);
       const startMinutes = parseInt(startTimeMatch[2], 10);
       const startPeriod = startTimeMatch[3].toUpperCase();
@@ -943,12 +922,12 @@ const CreateEventScreen = () => {
       // Parse end time (handle non-breaking spaces)
       const normalizedEndTime = selectedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
       const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      
+
       if (!endTimeMatch) {
         console.log('DEBUG - Invalid end time format:', normalizedEndTime);
         return; // Invalid format, but don't show error here
       }
-      
+
       const endHours = parseInt(endTimeMatch[1], 10);
       const endMinutes = parseInt(endTimeMatch[2], 10);
       const endPeriod = endTimeMatch[3].toUpperCase();
@@ -975,7 +954,7 @@ const CreateEventScreen = () => {
         startDateOnly.setHours(0, 0, 0, 0);
         const endDateOnly = new Date(selectedEndDate);
         endDateOnly.setHours(0, 0, 0, 0);
-        
+
         let errorMessage = '';
         if (endDateOnly < startDateOnly) {
           errorMessage = 'End date must be on or after start date';
@@ -985,7 +964,7 @@ const CreateEventScreen = () => {
         } else {
           errorMessage = 'End date and time must be after start date and time';
         }
-        
+
         console.log('DEBUG - Setting error message:', errorMessage);
         setDateTimeError(errorMessage);
         return;
@@ -1014,8 +993,6 @@ const CreateEventScreen = () => {
       if (!selectedEndDate) {
         setSelectedEndDate(date);
       }
-      // Clear end date error since end date is automatically set when start date is selected
-      setEndDateError('');
 
       // Always update end time to 30 minutes after start time when start time is selected
       if (time && time.trim() !== '') {
@@ -1050,7 +1027,7 @@ const CreateEventScreen = () => {
     const newEndDate = calendarMode === 'to' ? date : (selectedEndDate || date);
     const newStartTime = calendarMode === 'from' ? time : selectedStartTime;
     let newEndTime = calendarMode === 'to' ? time : selectedEndTime;
-    
+
     // If setting start time, calculate end time
     if (calendarMode === 'from' && time && time.trim() !== '') {
       newEndTime = addMinutesToTime(time, 30);
@@ -1070,7 +1047,7 @@ const CreateEventScreen = () => {
     endTime: string
   ) => {
     setDateTimeError('');
-    
+
     if (!startDate || !endDate) {
       return;
     }
@@ -1096,11 +1073,11 @@ const CreateEventScreen = () => {
       // Parse start time
       const normalizedStartTime = startTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
       const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      
+
       if (!startTimeMatch) {
         return;
       }
-      
+
       const startHours = parseInt(startTimeMatch[1], 10);
       const startMinutes = parseInt(startTimeMatch[2], 10);
       const startPeriod = startTimeMatch[3].toUpperCase();
@@ -1115,11 +1092,11 @@ const CreateEventScreen = () => {
       // Parse end time
       const normalizedEndTime = endTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
       const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      
+
       if (!endTimeMatch) {
         return;
       }
-      
+
       const endHours = parseInt(endTimeMatch[1], 10);
       const endMinutes = parseInt(endTimeMatch[2], 10);
       const endPeriod = endTimeMatch[3].toUpperCase();
@@ -1137,7 +1114,7 @@ const CreateEventScreen = () => {
         startDateOnly.setHours(0, 0, 0, 0);
         const endDateOnly = new Date(endDate);
         endDateOnly.setHours(0, 0, 0, 0);
-        
+
         let errorMessage = '';
         if (endDateOnly < startDateOnly) {
           errorMessage = 'End date must be on or after start date';
@@ -1146,7 +1123,7 @@ const CreateEventScreen = () => {
         } else {
           errorMessage = 'End date and time must be after start date and time';
         }
-        
+
         console.log('DEBUG - Setting error message immediately:', errorMessage);
         setDateTimeError(errorMessage);
         return;
@@ -1163,10 +1140,10 @@ const CreateEventScreen = () => {
 
     // Normalize the string: replace any non-breaking spaces or special spaces with regular space
     const normalized = timeString.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-    
+
     // Try to extract time and period using regex to handle various formats
     const timeMatch = normalized.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-    
+
     if (!timeMatch) {
       // Fallback: try to split by space
       const parts = normalized.split(/\s+/);
@@ -1174,7 +1151,7 @@ const CreateEventScreen = () => {
         const timePart = parts[0];
         const period = parts[parts.length - 1].toUpperCase();
         const [hours, minutes] = timePart.split(':').map(Number);
-        
+
         if (!isNaN(hours) && !isNaN(minutes) && (period === 'AM' || period === 'PM')) {
           // Valid format found
           let hours24 = hours;
@@ -1183,7 +1160,7 @@ const CreateEventScreen = () => {
           } else if (period === 'AM' && hours === 12) {
             hours24 = 0;
           }
-          
+
           let totalMinutes = hours24 * 60 + minutes + minutesToAdd;
           totalMinutes = totalMinutes % (24 * 60);
           const newHours24 = Math.floor(totalMinutes / 60);
@@ -1232,8 +1209,8 @@ const CreateEventScreen = () => {
   // Form validation
   const validateForm = () => {
     let isValid = true;
-    let firstErrorField: 'title' | 'startDate' | 'startTime' | 'endDate' | null = null;
-    
+    let firstErrorField: 'title' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | null = null;
+
     // Clear previous errors
     setTitleError('');
     setLocationError('');
@@ -1273,7 +1250,11 @@ const CreateEventScreen = () => {
         isValid = false;
         if (!firstErrorField) firstErrorField = 'startTime';
       }
-      // End time is automatically set when start time is selected, so no need to validate it as required
+      if (!selectedEndTime) {
+        setEndTimeError('End time is required');
+        isValid = false;
+        if (!firstErrorField) firstErrorField = 'endTime';
+      }
 
       // Validate that end date/time is after start date/time
       const startDateTime = new Date(selectedStartDate);
@@ -1282,12 +1263,12 @@ const CreateEventScreen = () => {
       // Parse start time (handle non-breaking spaces)
       const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
       const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      
+
       if (!startTimeMatch) {
         setStartTimeError('Invalid start time format');
         isValid = false;
       }
-      
+
       const startHours = parseInt(startTimeMatch[1], 10);
       const startMinutes = parseInt(startTimeMatch[2], 10);
       const startPeriod = startTimeMatch[3].toUpperCase();
@@ -1302,13 +1283,12 @@ const CreateEventScreen = () => {
       // Parse end time (handle non-breaking spaces)
       const normalizedEndTime = selectedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
       const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      
+
       if (!endTimeMatch) {
-        // End time format validation - only if end time exists (should always exist if start time exists)
-        // But we don't show error since it's auto-generated
+        setEndTimeError('Invalid end time format');
         isValid = false;
       }
-      
+
       const endHours = parseInt(endTimeMatch[1], 10);
       const endMinutes = parseInt(endTimeMatch[2], 10);
       const endPeriod = endTimeMatch[3].toUpperCase();
@@ -1328,7 +1308,7 @@ const CreateEventScreen = () => {
         endTime: selectedEndTime,
         isValid: endDateTime > startDateTime
       });
-      
+
       if (endDateTime <= startDateTime) {
         // Error is already shown inline, just return false
         return false;
@@ -1357,16 +1337,16 @@ const CreateEventScreen = () => {
             setTimeout(() => scrollToField(ref), 100);
             return;
           }
-          
+
           try {
             // Use measureLayout which measures relative to the ScrollView
             ref.current.measureLayout(
               scrollViewRef.current as any,
               (x, y) => {
                 if (scrollViewRef.current) {
-                  scrollViewRef.current.scrollTo({ 
-                    y: Math.max(0, y - 40), 
-                    animated: true 
+                  scrollViewRef.current.scrollTo({
+                    y: Math.max(0, y - 40),
+                    animated: true
                   });
                 }
               },
@@ -1374,7 +1354,7 @@ const CreateEventScreen = () => {
                 // If measureLayout fails, try UIManager approach
                 const scrollViewHandle = findNodeHandle(scrollViewRef.current);
                 const fieldHandle = findNodeHandle(ref.current);
-                
+
                 if (scrollViewHandle && fieldHandle) {
                   UIManager.measureLayout(
                     fieldHandle,
@@ -1384,9 +1364,9 @@ const CreateEventScreen = () => {
                     },
                     (x, y, width, height) => {
                       if (scrollViewRef.current) {
-                        scrollViewRef.current.scrollTo({ 
-                          y: Math.max(0, y - 40), 
-                          animated: true 
+                        scrollViewRef.current.scrollTo({
+                          y: Math.max(0, y - 40),
+                          animated: true
                         });
                       }
                     }
@@ -1406,6 +1386,7 @@ const CreateEventScreen = () => {
           case 'startDate':
           case 'startTime':
           case 'endDate':
+          case 'endTime':
             scrollToField(dateTimeSectionRef);
             break;
         }
@@ -1717,7 +1698,7 @@ const CreateEventScreen = () => {
 
         // Use regex to extract time components (more robust than split)
         const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-        
+
         if (!timeMatch) {
           // Fallback: try splitting by whitespace
           const timeParts = normalizedTime.split(/\s+/);
@@ -2021,13 +2002,13 @@ const CreateEventScreen = () => {
         </View>
       )}
 
-      <ScrollView 
+      <ScrollView
         ref={scrollViewRef}
-        style={styles.content} 
+        style={styles.content}
         showsVerticalScrollIndicator={false}
       >
         {/* Title Input */}
-        <View 
+        <View
           ref={titleInputRef}
           style={styles.inputSection}
           collapsable={false}
@@ -2050,7 +2031,7 @@ const CreateEventScreen = () => {
         </View>
 
         {/* Pick date and time */}
-        <View 
+        <View
           ref={dateTimeSectionRef}
           style={styles.dateTimeSection}
           collapsable={false}
@@ -2135,9 +2116,9 @@ const CreateEventScreen = () => {
                     )}
                   </Text>
                 </TouchableOpacity>
-                {endDateError && (
+                {(endDateError || endTimeError) && (
                   <Text style={styles.fieldErrorText}>
-                    {endDateError}
+                    {endDateError || endTimeError}
                   </Text>
                 )}
               </View>
@@ -2426,7 +2407,7 @@ const CreateEventScreen = () => {
         )}
 
         {/* Add location */}
-        <View 
+        <View
           ref={locationSectionRef}
           collapsable={false}
         >
@@ -2631,14 +2612,10 @@ const CreateEventScreen = () => {
 
             {/* Timezone List */}
             <FlatList
-              ref={timezoneListRef}
               data={getFilteredTimezones()}
               keyExtractor={item => item.id}
               style={styles.timezoneList}
-              contentContainerStyle={styles.timezoneListContent}
-              showsVerticalScrollIndicator={true}
-              indicatorStyle="default"
-              scrollEventThrottle={16}
+              showsVerticalScrollIndicator={false}
               renderItem={({ item }) => (
                 <TouchableOpacity
                   style={[
@@ -2663,34 +2640,32 @@ const CreateEventScreen = () => {
             {/* Modal Footer */}
             <View style={styles.timezoneModalFooter}>
               <TouchableOpacity
-                style={styles.timezoneModalUseCurrentButton}
+                style={styles.timezoneModalButton}
                 onPress={handleUseCurrentTimezone}
               >
-                <Text style={styles.timezoneModalUseCurrentText}>
+                <Text style={styles.timezoneModalButtonText}>
                   Use current time zone
                 </Text>
               </TouchableOpacity>
-              <View style={styles.timezoneModalActionButtons}>
-                <TouchableOpacity
-                  style={styles.timezoneModalButton}
-                  onPress={() => setShowTimezoneModal(false)}
+              <TouchableOpacity
+                style={styles.timezoneModalButton}
+                onPress={() => setShowTimezoneModal(false)}
+              >
+                <Text style={styles.timezoneModalButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.timezoneModalOkButton}
+                onPress={() => setShowTimezoneModal(false)}
+              >
+                <LinearGradient
+                  colors={['#18F06E', '#0B6DE0']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={styles.timezoneModalOkGradient}
                 >
-                  <Text style={styles.timezoneModalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={styles.timezoneModalOkButton}
-                  onPress={() => setShowTimezoneModal(false)}
-                >
-                  <LinearGradient
-                    colors={['#18F06E', '#0B6DE0']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.timezoneModalOkGradient}
-                  >
-                    <Text style={styles.timezoneModalOkText}>Ok</Text>
-                  </LinearGradient>
-                </TouchableOpacity>
-              </View>
+                  <Text style={styles.timezoneModalOkText}>Ok</Text>
+                </LinearGradient>
+              </TouchableOpacity>
             </View>
           </View>
         </View>
@@ -2709,188 +2684,199 @@ const CreateEventScreen = () => {
             <View style={styles.customModalHeader}>
               <Text style={styles.customModalTitle}>Custom recurrence</Text>
             </View>
+            <ScrollView
+              style={{ flexGrow: 0 }}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: spacing.lg }}
+            >
+              <View style={styles.customRecurrenceContent}>
+                {/* Repeat every section */}
+                <View style={styles.customRecurrenceSection}>
+                  <Text style={styles.customRecurrenceSectionTitle}>
+                    Repeat every
+                  </Text>
+                  <View style={styles.customRepeatEveryRow}>
+                    <TextInput
+                      style={styles.customRepeatEveryInput}
+                      value={customRecurrence.repeatEvery}
+                      onChangeText={text =>
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          repeatEvery: text,
+                        }))
+                      }
+                      keyboardType="numeric"
+                      maxLength={2}
+                    />
+                    <TouchableOpacity
+                      style={styles.customRepeatUnitDropdown}
+                      onPress={() => setShowUnitDropdown(prev => !prev)}
+                    >
+                      <Text style={styles.customRepeatUnitText}>
+                        {customRecurrence.repeatUnit}
+                      </Text>
+                      <FeatherIcon
+                        name="chevron-down"
+                        size={14}
+                        color="#6C6C6C"
+                        style={{ paddingTop: 3 }}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
 
-            <View style={styles.customRecurrenceContent}>
-              {/* Repeat every section */}
-              <View style={styles.customRecurrenceSection}>
-                <Text style={styles.customRecurrenceSectionTitle}>
-                  Repeat every
-                </Text>
-                <View style={styles.customRepeatEveryRow}>
-                  <TextInput
-                    style={styles.customRepeatEveryInput}
-                    value={customRecurrence.repeatEvery}
-                    onChangeText={text =>
+
+
+                {/* Repeat on section */}
+                {customRecurrence.repeatUnit === repeatUnits[1] && (
+                  <View style={styles.customRecurrenceSection}>
+                    <Text style={styles.customRecurrenceSectionTitle}>
+                      Repeat on
+                    </Text>
+                    <ScrollView horizontal={true}
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ alignItems: 'center' }}
+                    >
+                      <View style={styles.customDaysRow}>
+                        {dayAbbreviations.map((day, index) => (
+                          <TouchableOpacity
+                            key={index}
+                            style={[
+                              styles.customDayButton,
+                              customRecurrence.repeatOn.includes(dayNames[index]) &&
+                              styles.customDayButtonSelected,
+                            ]}
+                            onPress={() => handleDayToggle(dayNames[index])}
+                          >
+                            <Text
+                              style={[
+                                styles.customDayButtonText,
+                                customRecurrence.repeatOn.includes(
+                                  dayNames[index],
+                                ) && styles.customDayButtonTextSelected,
+                              ]}
+                            >
+                              {day}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Ends section */}
+                <View style={styles.customRecurrenceSection}>
+                  <Text style={styles.customRecurrenceSectionTitle}>Ends</Text>
+
+                  <TouchableOpacity
+                    style={styles.customEndsOption}
+                    onPress={() =>
                       setCustomRecurrence(prev => ({
                         ...prev,
-                        repeatEvery: text,
+                        endsType: endsOptions[0],
                       }))
                     }
-                    keyboardType="numeric"
-                    maxLength={2}
-                  />
-                  <TouchableOpacity
-                    style={styles.customRepeatUnitDropdown}
-                    onPress={() => setShowUnitDropdown(prev => !prev)}
                   >
-                    <Text style={styles.customRepeatUnitText}>
-                      {customRecurrence.repeatUnit}
+                    <View style={styles.customRadioButton}>
+                      {customRecurrence.endsType === endsOptions[0] && (
+                        <View style={styles.customRadioButtonSelected} />
+                      )}
+                    </View>
+                    <Text style={styles.customEndsOptionText}>
+                      {endsOptions[0]}
                     </Text>
-                    <FeatherIcon
-                      name="chevron-down"
-                      size={14}
-                      color="#6C6C6C"
-                      style={{ paddingTop: 3 }}
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.customEndsOption}
+                    onPress={() =>
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsType: endsOptions[1],
+                      }))
+                    }
+                  >
+                    <View style={styles.customRadioButton}>
+                      {customRecurrence.endsType === endsOptions[1] && (
+                        <View style={styles.customRadioButtonSelected} />
+                      )}
+                    </View>
+                    <Text style={styles.customEndsOptionText}>
+                      {endsOptions[1]}
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.customEndsInput,
+                        customRecurrence.endsType !== endsOptions[1] &&
+                        styles.customEndsInputDisabled,
+                      ]}
+                      value={customRecurrence.endsDate}
+                      onChangeText={text =>
+                        setCustomRecurrence(prev => ({ ...prev, endsDate: text }))
+                      }
+                      placeholder="04/09/2025"
+                      placeholderTextColor="#9E9E9E"
+                      editable={customRecurrence.endsType === endsOptions[1]}
                     />
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.customEndsOption}
+                    onPress={() =>
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsType: endsOptions[2],
+                      }))
+                    }
+                  >
+                    <View style={styles.customRadioButton}>
+                      {customRecurrence.endsType === endsOptions[2] && (
+                        <View style={styles.customRadioButtonSelected} />
+                      )}
+                    </View>
+                    <Text style={styles.customEndsOptionText}>
+                      {endsOptions[2]}
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.customEndsInput,
+                        customRecurrence.endsType !== endsOptions[2] &&
+                        styles.customEndsInputDisabled,
+                      ]}
+                      value={customRecurrence.endsAfter}
+                      onChangeText={text =>
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          endsAfter: text,
+                        }))
+                      }
+                      keyboardType="numeric"
+                      editable={customRecurrence.endsType === endsOptions[2]}
+                    />
+                    <Text style={styles.customEndsOccurrencesText}>
+                      occurrences
+                    </Text>
                   </TouchableOpacity>
                 </View>
               </View>
-
-
-
-              {/* Repeat on section */}
-              {customRecurrence.repeatUnit === repeatUnits[1] && (
-                <View style={styles.customRecurrenceSection}>
-                  <Text style={styles.customRecurrenceSectionTitle}>
-                    Repeat on
-                  </Text>
-                  <View style={styles.customDaysRow}>
-                    {dayAbbreviations.map((day, index) => (
+              {showUnitDropdown && (
+                <View style={styles.dropdownOverlay}>
+                  <View style={styles.dropdownContainer}>
+                    {repeatUnits.map(unit => (
                       <TouchableOpacity
-                        key={index}
-                        style={[
-                          styles.customDayButton,
-                          customRecurrence.repeatOn.includes(dayNames[index]) &&
-                          styles.customDayButtonSelected,
-                        ]}
-                        onPress={() => handleDayToggle(dayNames[index])}
+                        key={unit}
+                        style={styles.dropdownItem}
+                        onPress={() => handleUnitSelect(unit)}
                       >
-                        <Text
-                          style={[
-                            styles.customDayButtonText,
-                            customRecurrence.repeatOn.includes(
-                              dayNames[index],
-                            ) && styles.customDayButtonTextSelected,
-                          ]}
-                        >
-                          {day}
-                        </Text>
+                        <Text style={styles.dropdownItemText}>{unit}</Text>
                       </TouchableOpacity>
                     ))}
                   </View>
                 </View>
               )}
 
-              {/* Ends section */}
-              <View style={styles.customRecurrenceSection}>
-                <Text style={styles.customRecurrenceSectionTitle}>Ends</Text>
-
-                <TouchableOpacity
-                  style={styles.customEndsOption}
-                  onPress={() =>
-                    setCustomRecurrence(prev => ({
-                      ...prev,
-                      endsType: endsOptions[0],
-                    }))
-                  }
-                >
-                  <View style={styles.customRadioButton}>
-                    {customRecurrence.endsType === endsOptions[0] && (
-                      <View style={styles.customRadioButtonSelected} />
-                    )}
-                  </View>
-                  <Text style={styles.customEndsOptionText}>
-                    {endsOptions[0]}
-                  </Text>
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.customEndsOption}
-                  onPress={() =>
-                    setCustomRecurrence(prev => ({
-                      ...prev,
-                      endsType: endsOptions[1],
-                    }))
-                  }
-                >
-                  <View style={styles.customRadioButton}>
-                    {customRecurrence.endsType === endsOptions[1] && (
-                      <View style={styles.customRadioButtonSelected} />
-                    )}
-                  </View>
-                  <Text style={styles.customEndsOptionText}>
-                    {endsOptions[1]}
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.customEndsInput,
-                      customRecurrence.endsType !== endsOptions[1] &&
-                      styles.customEndsInputDisabled,
-                    ]}
-                    value={customRecurrence.endsDate}
-                    onChangeText={text =>
-                      setCustomRecurrence(prev => ({ ...prev, endsDate: text }))
-                    }
-                    placeholder="04/09/2025"
-                    placeholderTextColor="#9E9E9E"
-                    editable={customRecurrence.endsType === endsOptions[1]}
-                  />
-                </TouchableOpacity>
-
-                <TouchableOpacity
-                  style={styles.customEndsOption}
-                  onPress={() =>
-                    setCustomRecurrence(prev => ({
-                      ...prev,
-                      endsType: endsOptions[2],
-                    }))
-                  }
-                >
-                  <View style={styles.customRadioButton}>
-                    {customRecurrence.endsType === endsOptions[2] && (
-                      <View style={styles.customRadioButtonSelected} />
-                    )}
-                  </View>
-                  <Text style={styles.customEndsOptionText}>
-                    {endsOptions[2]}
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.customEndsInput,
-                      customRecurrence.endsType !== endsOptions[2] &&
-                      styles.customEndsInputDisabled,
-                    ]}
-                    value={customRecurrence.endsAfter}
-                    onChangeText={text =>
-                      setCustomRecurrence(prev => ({
-                        ...prev,
-                        endsAfter: text,
-                      }))
-                    }
-                    keyboardType="numeric"
-                    editable={customRecurrence.endsType === endsOptions[2]}
-                  />
-                  <Text style={styles.customEndsOccurrencesText}>
-                    occurrences
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-            {showUnitDropdown && (
-              <View style={styles.dropdownOverlay}>
-                <View style={styles.dropdownContainer}>
-                  {repeatUnits.map(unit => (
-                    <TouchableOpacity
-                      key={unit}
-                      style={styles.dropdownItem}
-                      onPress={() => handleUnitSelect(unit)}
-                    >
-                      <Text style={styles.dropdownItemText}>{unit}</Text>
-                    </TouchableOpacity>
-                  ))}
-                </View>
-              </View>
-            )}
+            </ScrollView>
             {/* Action Buttons */}
             <View style={styles.customModalActions}>
               <TouchableOpacity
@@ -3717,14 +3703,11 @@ const styles = StyleSheet.create({
   },
   customRecurrenceModalContainer: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%', // Increased from 80%
-    minHeight: '70%',
-    overflow: 'visible',
-    width: '100%', // Takes full width minus overlay padding
-    alignSelf: 'stretch',
-    paddingVertical: spacing.lg,
+    borderRadius: 20,
+    width: '100%',
+    maxHeight: '75%',     // 👈 fixed height for smaller screens
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
   customModalHeader: {
     marginBottom: spacing.xl,
@@ -3923,9 +3906,6 @@ const styles = StyleSheet.create({
   timezoneList: {
     maxHeight: scaleHeight(250),
     marginBottom: spacing.lg,
-    paddingHorizontal: 0,
-    marginHorizontal: 0,
-    paddingRight: spacing.xs, // Add padding to make scrollbar more visible
   },
   timezoneItem: {
     paddingVertical: spacing.sm,
@@ -3945,29 +3925,7 @@ const styles = StyleSheet.create({
     color: '#0B6DE0',
     fontWeight: '500',
   },
-  timezoneListContent: {
-    paddingHorizontal: 0,
-  },
   timezoneModalFooter: {
-    flexDirection: 'column',
-    gap: spacing.md,
-    marginTop: 0,
-    paddingTop: 0,
-    marginHorizontal: 0,
-    paddingHorizontal: 0,
-  },
-  timezoneModalUseCurrentButton: {
-    paddingVertical: spacing.sm,
-    paddingLeft: spacing.md,
-    paddingRight: 0,
-    alignItems: 'flex-start',
-  },
-  timezoneModalUseCurrentText: {
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
-    fontWeight: '400',
-  },
-  timezoneModalActionButtons: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',

@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo } from 'react';
 import { StyleProp, StyleSheet, Text, TextStyle, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import WeekView from 'react-native-week-view';
@@ -200,14 +200,6 @@ const WeekScreen = () => {
         d.setDate(d.getDate() - diff);
         return d;
     };
-    
-    // ✅ Reset to today's date when start of week setting changes
-    useEffect(() => {
-        // When selectedDay changes, reset to today's date
-        const today = new Date();
-        today.setHours(12, 0, 0, 0); // Normalize to noon
-        setSelectedDate(today);
-    }, [selectedDay]);
     
     // ✅ Adjust selectedDate to align with start of week
     const adjustedSelectedDate = useMemo(() => {
