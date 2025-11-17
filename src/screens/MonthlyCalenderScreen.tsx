@@ -93,92 +93,333 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     return dateString;
   }, [selectedDate]);
 
-  const generateRecurringInstances = (
-    event: any,
-    viewStartDate: Date,
-    viewEndDate: Date
-  ): Array<{ date: Date; event: any }> => {
-    const instances: Array<{ date: Date; event: any }> = [];
+  // Define a map for day names to Date.prototype.getDay() values (0=Sunday, 6=Saturday)
+const DAY_MAP: { [key: string]: number } = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
 
-    const startDate = parseTimeToPST(event.fromTime);
-    const endDate = parseTimeToPST(event.toTime);
+// Define a map for month names to 0-indexed month numbers
+const MONTH_MAP: { [key: string]: number } = {
+  january: 0,
+  february: 1,
+  march: 2,
+  april: 3,
+  may: 4,
+  june: 5,
+  july: 6,
+  august: 7,
+  september: 8,
+  october: 9,
+  november: 10,
+  december: 11,
+};
 
-    if (!startDate || !endDate) return instances;
+// Define a map for week number text
+const WEEK_TEXT_MAP: { [key: string]: number } = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  last: -1, // Use -1 to denote the last occurrence of the day
+};
 
-    const repeatType = event.repeatEvent || event.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+/**
+ * Calculates the date of the Nth (or last) weekday of a specific month and year.
+ * @param year The year.
+ * @param monthIndex The 0-indexed month (0-11).
+ * @param dayOfWeek The 0-indexed day of the week (0=Sunday, 6=Saturday).
+ * @param occurrence The Nth occurrence (1-4, or -1 for last).
+ * @returns The Date object for the calculated occurrence, or null if invalid.
+ */
+const getNthWeekdayOfMonth = (
+  year: number,
+  monthIndex: number,
+  dayOfWeek: number,
+  occurrence: number
+): Date | null => {
+  const isLast = occurrence === -1;
+  const targetWeek = isLast ? 4 : occurrence; // Try up to the 4th week initially
 
-    if (!repeatType || repeatType === 'Does not repeat') {
+  let dayCount = 0;
+  let date = new Date(year, monthIndex, 1);
+  const lastDayOfMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+  for (let d = 1; d <= lastDayOfMonth; d++) {
+    date.setDate(d);
+    if (date.getDay() === dayOfWeek) {
+      dayCount++;
+
+      if (!isLast && dayCount === occurrence) {
+        return new Date(date);
+      }
+    }
+  }
+
+  // If we are looking for the 'last' occurrence, the dayCount will be the correct number.
+  if (isLast && dayCount > 0) {
+    // Find the date corresponding to the dayCount-th occurrence
+    let lastDate = new Date(year, monthIndex, 1);
+    let finalDayCount = 0;
+    for (let d = 1; d <= lastDayOfMonth; d++) {
+        lastDate.setDate(d);
+        if (lastDate.getDay() === dayOfWeek) {
+            finalDayCount++;
+            if (finalDayCount === dayCount) {
+                return new Date(lastDate);
+            }
+        }
+    }
+  }
+  
+  return null;
+};
+
+const generateRecurringInstances = (
+  event: any,
+  viewStartDate: Date,
+  viewEndDate: Date
+): Array<{ date: Date; event: any }> => {
+  const instances: Array<{ date: Date; event: any }> = [];
+
+  const startDate = parseTimeToPST(event.fromTime);
+  const endDate = parseTimeToPST(event.toTime);
+
+  if (!startDate || !endDate) return instances;
+
+  const repeatType =
+    event.repeatEvent ||
+    event.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+
+  if (!repeatType || repeatType === 'Does not repeat') {
+    // Standard non-recurring event check
+    if (startDate >= viewStartDate && startDate <= viewEndDate) {
       return [{ date: startDate, event }];
     }
+    return instances;
+  }
 
-    const eventDurationMs = endDate.getTime() - startDate.getTime();
+  const repeatTypeLower = repeatType.toLowerCase();
+  
+  // Start from the event's original start date
+  let currentDate = new Date(startDate);
+  currentDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
+  
+  // Adjust currentDate to the *start* of the view range if the event started before
+  if (currentDate < viewStartDate) {
+    currentDate = new Date(viewStartDate);
+    currentDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
+    // Move back to the start of the day for calculation to ensure we don't skip an instance
+    currentDate.setHours(0, 0, 0, 0); 
+  } else {
+    // Also move to the start of the day for consistent iteration
+    currentDate.setHours(0, 0, 0, 0); 
+  }
+  
+  const maxDate = new Date(viewEndDate);
+  maxDate.setHours(23, 59, 59, 999);
 
-    let currentDate = new Date(startDate);
-    currentDate.setHours(0, 0, 0, 0);
+  const oneYearFromNow = new Date();
+  oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
+  // Limit recurrence calculation to viewEndDate or 1 year, whichever comes first
+  const limitDate = maxDate < oneYearFromNow ? maxDate : oneYearFromNow; 
+  
+  // Original event day, date, and month for reference
+  const originalStartDay = startDate.getDay();
+  const originalStartDate = startDate.getDate();
+  const originalStartMonth = startDate.getMonth();
+  
+  // Function to add a valid instance
+  const addInstance = (date: Date) => {
+    // Only add if the instance falls within the view range
+    if (date >= viewStartDate && date <= viewEndDate) {
+      instances.push({
+        date: new Date(date),
+        event: {
+          ...event,
+          // Correctly set the time of the instance to match the event's time
+          displayDate: new Date(date), 
+        },
+      });
+    }
+  };
+  
+  // Handle the very first instance if it's within the view range
+  const startDayInstance = new Date(startDate);
+  startDayInstance.setHours(0, 0, 0, 0);
 
-    const maxDate = new Date(viewEndDate);
-    maxDate.setHours(23, 59, 59, 999);
+  if (startDayInstance >= viewStartDate && startDayInstance <= viewEndDate) {
+    addInstance(startDayInstance);
+  }
 
-    const oneYearFromNow = new Date();
-    oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
-    const limitDate = maxDate < oneYearFromNow ? maxDate : oneYearFromNow;
+  // Calculate the *next* date based on recurrence rule
+  let nextDate = new Date(startDate);
+  nextDate.setHours(0, 0, 0, 0);
+  
+  // This loop will calculate the *next* instance based on the rules, starting after the original start date.
+  let iteration = 0;
+  const maxIterations = 366 * 2; // Safety break for complex rules
+  
+  while (nextDate <= limitDate && iteration < maxIterations) {
+    iteration++;
+    let hasMoved = false;
 
-    while (currentDate <= limitDate) {
-      if (currentDate >= viewStartDate && currentDate <= viewEndDate) {
-        instances.push({
-          date: new Date(currentDate),
-          event: {
-            ...event,
-            displayDate: new Date(currentDate),
-          },
-        });
+    // --- Daily/Simple Weekly/Monthly/Yearly Cases ---
+    if (
+      repeatTypeLower === 'daily' ||
+      repeatTypeLower === 'every day'
+    ) {
+      nextDate.setDate(nextDate.getDate() + 1);
+      hasMoved = true;
+    } else if (
+      repeatTypeLower.startsWith('weekly on') || // Covers "Weekly on Thursday"
+      repeatTypeLower === 'weekly' ||
+      repeatTypeLower === 'every week'
+    ) {
+      nextDate.setDate(nextDate.getDate() + 7);
+      hasMoved = true;
+    } else if (repeatTypeLower === 'bi-weekly' || repeatTypeLower === 'every 2 weeks') {
+      nextDate.setDate(nextDate.getDate() + 14);
+      hasMoved = true;
+    } else if (repeatTypeLower === 'monthly' || repeatTypeLower === 'every month') {
+      // Handles monthly recurrence on the Nth day of the month (e.g., repeat on the 15th)
+      const currentDay = nextDate.getDate();
+      nextDate.setMonth(nextDate.getMonth() + 1);
+      // If the next month is shorter, set to the last day of that month
+      if (nextDate.getDate() < currentDay) {
+          nextDate.setDate(0); // This should correct for short months 
       }
-
-      switch (repeatType.toLowerCase()) {
-        case 'daily':
-        case 'every day':
-          currentDate.setDate(currentDate.getDate() + 1);
-          break;
-
-        case 'weekly':
-        case 'every week':
-          currentDate.setDate(currentDate.getDate() + 7);
-          break;
-
-        case 'bi-weekly':
-        case 'every 2 weeks':
-          currentDate.setDate(currentDate.getDate() + 14);
-          break;
-
-        case 'monthly':
-        case 'every month':
-          currentDate.setMonth(currentDate.getMonth() + 1);
-          break;
-
-        case 'yearly':
-        case 'every year':
-          currentDate.setFullYear(currentDate.getFullYear() + 1);
-          break;
-
-        case 'weekdays':
-        case 'every weekday':
-          do {
-            currentDate.setDate(currentDate.getDate() + 1);
-          } while (currentDate.getDay() === 0 || currentDate.getDay() === 6);
-          break;
-
-        default:
-          return instances;
+      hasMoved = true;
+    } else if (repeatTypeLower === 'yearly' || repeatTypeLower === 'every year') {
+      nextDate.setFullYear(nextDate.getFullYear() + 1);
+      hasMoved = true;
+    } else if (repeatTypeLower.includes('weekday') || repeatTypeLower.includes('monday to friday')) {
+      do {
+        nextDate.setDate(nextDate.getDate() + 1);
+      } while (nextDate.getDay() === 0 || nextDate.getDay() === 6);
+      hasMoved = true;
+    } 
+    
+    // --- Complex Recurrence Parsing ---
+    
+    // 1. Weekly on [Weekday]
+    const weeklyMatch = repeatType.match(/^Weekly on (\w+)$/i);
+    if (weeklyMatch) {
+        // This is handled by the simpler 'Weekly on' block above, 
+        // as the simple logic of adding 7 days keeps the day of the week consistent.
+    }
+    
+    // 2. Annually on [Month Name] [Day Number]
+    const annualMatch = repeatType.match(/^Annually on (\w+) (\d+)$/i);
+    if (annualMatch) {
+      const monthName = annualMatch[1].toLowerCase();
+      const dayNumber = parseInt(annualMatch[2]);
+      
+      let nextYear = nextDate.getFullYear();
+      let nextMonth = MONTH_MAP[monthName];
+      let nextDay = dayNumber;
+      
+      // If the current date is already past the annual date in the current year, move to the next year
+      if (nextDate.getMonth() > nextMonth || (nextDate.getMonth() === nextMonth && nextDate.getDate() >= nextDay)) {
+        nextYear++;
       }
-
-      if (instances.length > 366) {
-        console.warn('Too many recurring instances generated, stopping at 366');
-        break;
+      
+      nextDate.setFullYear(nextYear);
+      nextDate.setMonth(nextMonth);
+      nextDate.setDate(nextDay);
+      hasMoved = true;
+    }
+    
+    // 3. Monthly on the [First/Second/Third/Fourth/Last] [Weekday]
+    const monthlyWeekdayMatch = repeatType.match(
+      /^Monthly on the (\w+) (\w+)$/i
+    );
+    if (monthlyWeekdayMatch) {
+      const occurrenceText = monthlyWeekdayMatch[1].toLowerCase(); // e.g., 'first', 'last'
+      const weekdayName = monthlyWeekdayMatch[2].toLowerCase(); // e.g., 'thursday'
+      
+      const occurrence = WEEK_TEXT_MAP[occurrenceText]; // 1, 2, 3, 4, or -1
+      const dayOfWeek = DAY_MAP[weekdayName]; // 0-6
+      
+      let nextMonthDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 1);
+      let year = nextMonthDate.getFullYear();
+      let month = nextMonthDate.getMonth();
+      
+      let newDate = getNthWeekdayOfMonth(year, month, dayOfWeek, occurrence);
+      
+      // Keep moving to the next month until we find a date *after* the current instance date
+      while (!newDate || newDate.getTime() <= nextDate.getTime()) {
+        nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+        year = nextMonthDate.getFullYear();
+        month = nextMonthDate.getMonth();
+        newDate = getNthWeekdayOfMonth(year, month, dayOfWeek, occurrence);
+        
+        // Safety break if we are stuck in an infinite loop
+        if (nextMonthDate.getTime() > limitDate.getTime() + (31 * 24 * 60 * 60 * 1000) || iteration > maxIterations) {
+          break;
+        }
+      }
+      
+      if (newDate) {
+        nextDate = newDate;
+        hasMoved = true;
+      }
+    }
+    
+    // 4. Monthly on the last [Weekday]
+    const monthlyLastMatch = repeatType.match(/^Monthly on the last (\w+)$/i);
+    if (monthlyLastMatch && !monthlyWeekdayMatch) { // The other logic handles 'last', but ensure no duplicate logic
+      const weekdayName = monthlyLastMatch[1].toLowerCase(); // e.g., 'thursday'
+      const dayOfWeek = DAY_MAP[weekdayName]; // 0-6
+      
+      let nextMonthDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 1);
+      let year = nextMonthDate.getFullYear();
+      let month = nextMonthDate.getMonth();
+      
+      let newDate = getNthWeekdayOfMonth(year, month, dayOfWeek, -1); // -1 for last
+      
+      while (!newDate || newDate.getTime() <= nextDate.getTime()) {
+        nextMonthDate.setMonth(nextMonthDate.getMonth() + 1);
+        year = nextMonthDate.getFullYear();
+        month = nextMonthDate.getMonth();
+        newDate = getNthWeekdayOfMonth(year, month, dayOfWeek, -1);
+        
+        if (nextMonthDate.getTime() > limitDate.getTime() + (31 * 24 * 60 * 60 * 1000) || iteration > maxIterations) {
+          break;
+        }
+      }
+      
+      if (newDate) {
+        nextDate = newDate;
+        hasMoved = true;
       }
     }
 
-    return instances;
-  };
+
+    if (!hasMoved) {
+      // If the recurrence type is not recognized, stop.
+      console.warn('Unknown recurrence type, stopping:', repeatType);
+      break;
+    }
+
+    if (nextDate <= limitDate) {
+      addInstance(nextDate);
+    }
+    
+    // Safety check for too many instances
+    if (instances.length > 366) {
+      console.warn('Too many recurring instances generated, stopping at 366');
+      break;
+    }
+  }
+
+  return instances;
+};
 
   const { markedDates, eventsByDate } = useMemo(() => {
     const marked: any = {};

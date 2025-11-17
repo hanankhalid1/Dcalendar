@@ -688,34 +688,52 @@ const CreateEventScreen = () => {
     const dayNumber = d.date();
     const monthName = d.format("MMMM");
 
-    // Determine week position (first, second, last, etc.)
-    const weekOfMonth = Math.ceil(dayNumber / 7);
+    // 1. Determine the week position (first, second, third, fourth)
     const weekNames = ["first", "second", "third", "fourth"];
+    const weekOfMonth = Math.ceil(dayNumber / 7);
 
-    // Check if the next week falls into the next month to label the current one as "last"
-    const isLastWeekday = d.add(7, "day").month() !== d.month();
+    // 2. Check if the selected date is the ABSOLUTE last occurrence of this weekday in the month
+    const isSelectedDateTheLastWeekday = d.add(7, "day").month() !== d.month();
 
-    // Use 'last' if the date is in the last occurrence of that weekday for the month
-    const weekText = isLastWeekday ? "last" : weekNames[weekOfMonth - 1];
+    // 3. Determine the Nth Week Text to use for the first monthly option
+    let nthWeekText;
+    if (isSelectedDateTheLastWeekday) {
+      // Use "last" if it is the final occurrence of the day in the month
+      nthWeekText = "last";
+    } else {
+      // Otherwise, use the calculated "Nth" position (first, second, third, or fourth)
+      nthWeekText = weekNames[weekOfMonth - 1] || "first";
+    }
 
-    return [
+    let options = [
       "Does not repeat",
       "Daily",
-      // The day of the selected start date is used (Weekly on Thursday)
+      // 1. Weekly on [Weekday]
       `Weekly on ${weekday}`,
+    ];
 
-      // This is the option for the specific week number of that weekday (Monthly on the first Thursday)
-      `Monthly on the ${weekText} ${weekday}`,
+    // 2. Monthly on the [Nth] [Weekday] - Uses "last" when applicable
+    options.push(
+      `Monthly on the ${nthWeekText} ${weekday}`
+    );
 
-      // This calculates if the next week's same day falls in a new month (Monthly on the last Thursday)
-      `Monthly on the last ${weekday}`,
+    // 3. Monthly on the last [Weekday]
+    // We ONLY add this option if the calculated Nth option (step 2) is NOT "last".
+    // This prevents the redundant inclusion of the "last" option.
+    if (!isSelectedDateTheLastWeekday) {
+      options.push(
+        `Monthly on the last ${weekday}`
+      );
+    }
 
-      // Annually option matches the format in the image (Annually on October 2)
+    // 4. Annually and others
+    options.push(
       `Annually on ${monthName} ${dayNumber}`,
-
       "Every Weekday (Monday to Friday)",
       "Custom...",
-    ];
+    );
+
+    return options;
   };
   const recurrenceOptions = getRecurrenceOptions(selectedStartDate);
 
