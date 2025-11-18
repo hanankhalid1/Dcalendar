@@ -22,7 +22,7 @@ import { ScrollView } from 'react-native';
 import MenuIcon from '../assets/svgs/menu.svg';
 import Icon from 'react-native-vector-icons/AntDesign';
 import { Fonts } from '../constants/Fonts';
-import CalendarIconHeader from '../assets/svgs/calendarHeader.svg';
+// import CalendarIconHeader from '../assets/svgs/calendarHeader.svg';
 
 interface WeekHeaderProps {
   onMenuPress: () => void;
@@ -110,8 +110,17 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
   };
 
   const handleDateSelect = (date: Date) => {
-    setIsCalendarVisible(false);
+    // When a date is selected from the calendar, update both the date and month display
+    // This ensures the slider month stays synchronized with the calendar
+    console.log('WeekHeader: Date selected from calendar:', {
+      year: date.getFullYear(),
+      month: date.getMonth(),
+      formatted: `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`,
+    });
     onDateSelect?.(date);
+    // Also update the month display to keep slider synchronized
+    onMonthSelect?.(date.getMonth());
+    setIsCalendarVisible(false);
   };
 
 
@@ -212,7 +221,8 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
             style={styles.calendarButton}
             onPress={handleMonthPress}
           >
-           <CalendarIconHeader width={20} height={20} />
+           {/* <CalendarIconHeader width={20} height={20} /> */}
+           <Icon name="calendar" size={20} color={colors.black} />
           </TouchableOpacity>
         </View>
       </View>

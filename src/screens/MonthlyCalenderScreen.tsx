@@ -616,10 +616,12 @@ const generateRecurringInstances = (
   };
 
   const handleMonthSelect = (monthIndex: number) => {
+    
+    // monthly calendar update the month display
+    console.log('MonthlyCalenderScreen: handleMonthSelect called with monthIndex:', monthIndex);
+    console.log('MonthlyCalenderScreen: Current selectedDate:', selectedDate.toDateString());
     setCurrentMonthByIndex(monthIndex);
-    const newDate = new Date(selectedDate.getFullYear(), monthIndex, 1);
-    console.log('New Selected Date:', newDate.toDateString());
-    setSelectedDate(newDate);
+    // DO NOT update selectedDate here - it's already been set correctly by handleDateSelect
   };
 
   const handleDateSelect = (date: Date) => {
