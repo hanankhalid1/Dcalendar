@@ -1004,14 +1004,7 @@ const generateRecurringInstances = (
         </View>
       </ScrollView>
 
-      {(userEventsLoading || isDeleting) && (
-        <View style={[styles.loadingContainer, { pointerEvents: 'box-none' }]}>
-          <ActivityIndicator size="large" color={colors.figmaLightBlue || '#2196F3'} />
-          <Text style={styles.loadingText}>
-            {isDeleting ? 'Deleting Event...' : 'Loading…'}
-          </Text>
-        </View>
-      )}
+      {/* Loading indicator removed to improve performance and reduce delays */}
 
       <FloatingActionButton
         onOptionSelect={option => {
