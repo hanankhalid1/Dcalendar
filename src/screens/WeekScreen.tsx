@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { StyleProp, StyleSheet, Text, TextStyle, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import WeekView from 'react-native-week-view';
@@ -139,10 +139,47 @@ const WeekScreen = () => {
         console.log('Month selector pressed');
     };
 
-    // Helper function to update month display
-    const updateMonthDisplay = (date: Date) => {
-        setCurrentMonthByIndex(date.getMonth());
+    // Helper function to update month display based on the week being shown
+    const updateMonthDisplay = (date: Date, forceMonth?: number) => {
+        // If forceMonth is provided (from month selection), use it directly
+        if (forceMonth !== undefined) {
+            setCurrentMonthByIndex(forceMonth);
+            return;
+        }
+        
+        // For week view, show the month that contains the majority of the week
+        // or the month of the selected date if it's in the middle of the week
+        const weekStart = getStartOfWeek(date);
+        const weekEnd = new Date(weekStart);
+        weekEnd.setDate(weekEnd.getDate() + 6);
+        
+        // Count days in each month for the week
+        const daysInSelectedMonth = [];
+        const daysInOtherMonth = [];
+        
+        const currentDate = new Date(weekStart);
+        while (currentDate <= weekEnd) {
+            if (currentDate.getMonth() === date.getMonth() && 
+                currentDate.getFullYear() === date.getFullYear()) {
+                daysInSelectedMonth.push(new Date(currentDate));
+            } else {
+                daysInOtherMonth.push(new Date(currentDate));
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+        }
+        
+        // Use the month with more days, or the selected date's month if equal
+        if (daysInSelectedMonth.length >= daysInOtherMonth.length) {
+            setCurrentMonthByIndex(date.getMonth());
+        } else if (daysInOtherMonth.length > 0) {
+            setCurrentMonthByIndex(daysInOtherMonth[0].getMonth());
+        } else {
+            setCurrentMonthByIndex(date.getMonth());
+        }
     };
+
+    // Track if we're in the middle of a month selection to avoid overriding
+    const isSelectingMonth = React.useRef(false);
 
     const handleDateSelect = (date: Date) => {
         console.log('Date selected:', date);
@@ -171,7 +208,23 @@ const WeekScreen = () => {
         console.log('New date day of week:', newDate.getDay());
 
         setSelectedDate(newDate);
-        updateMonthDisplay(newDate);
+        
+        // Only update month display if not in the middle of a month selection
+        // (month selection will handle the month update)
+        if (!isSelectingMonth.current) {
+            updateMonthDisplay(newDate);
+        }
+    };
+
+    // Handle month selection from WeekHeader
+    const handleMonthSelect = (monthIndex: number) => {
+        // When a month is selected from dropdown, ensure the month display matches exactly
+        isSelectingMonth.current = true;
+        setCurrentMonthByIndex(monthIndex);
+        // Reset flag after a short delay to allow date selection to complete
+        setTimeout(() => {
+            isSelectingMonth.current = false;
+        }, 100);
     };
 
     // ✅ Helper to convert day name to numeric (0=Sunday, 1=Monday, etc.)
@@ -277,6 +330,7 @@ const WeekScreen = () => {
                 onMenuPress={handleMenuPress}
                 currentMonth={currentMonth}
                 onMonthPress={handleMonthPress}
+                onMonthSelect={handleMonthSelect}
                 onDateSelect={handleDateSelect}
                 currentDate={selectedDate}
                 selectedDate={selectedDate}

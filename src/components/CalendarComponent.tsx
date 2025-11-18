@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../stores/useSetting';
@@ -8,12 +8,14 @@ interface CalendarComponentProps {
   onDateSelect?: (date: Date) => void;
   currentDate?: Date;
   selectedDate?: Date | null;
+  isVisible?: boolean; // Add this to know when calendar becomes visible
 }
 
 const CalendarComponent: React.FC<CalendarComponentProps> = ({
   onDateSelect,
   currentDate: propCurrentDate,
   selectedDate: propSelectedDate,
+  isVisible,
 }) => {
   // ✅ Get start of week setting from store
   const { selectedDay } = useSettingsStore();
@@ -35,18 +37,31 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
   // ✅ Get the numeric value for the start of week
   const startOfWeekNumber = getDayNumber(selectedDay);
   
+  // Initialize with propCurrentDate if available, otherwise use today
+  // This ensures the calendar always starts with the correct date when it mounts
   const [currentDate, setCurrentDate] = useState(() => {
-    const date = propCurrentDate || new Date();
-    // Normalize to noon to avoid timezone issues
-    return new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      12,
-      0,
-      0,
-      0,
-    );
+    if (propCurrentDate) {
+      // Normalize to noon to avoid timezone issues
+      const normalized = new Date(
+        propCurrentDate.getFullYear(),
+        propCurrentDate.getMonth(),
+        propCurrentDate.getDate(),
+        12,
+        0,
+        0,
+        0,
+      );
+      console.log('CalendarComponent: Initializing with propCurrentDate:', {
+        date: `${normalized.getMonth() + 1}/${normalized.getDate()}/${normalized.getFullYear()}`,
+      });
+      return normalized;
+    }
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    console.log('CalendarComponent: Initializing with today (no prop):', {
+      date: `${today.getMonth() + 1}/${today.getDate()}/${today.getFullYear()}`,
+    });
+    return today;
   });
   const [selectedDate, setSelectedDate] = useState<Date | null>(() => {
     const date = propSelectedDate || new Date();
@@ -63,7 +78,9 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
   });
 
   // Update local state when props change
-  React.useEffect(() => {
+  // Use a more reliable dependency that checks year, month, and date
+  // This runs on mount and whenever the date prop changes
+  useEffect(() => {
     if (propCurrentDate) {
       const normalizedDate = new Date(
         propCurrentDate.getFullYear(),
@@ -74,11 +91,76 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
         0,
         0,
       );
+      // Always update to ensure sync with parent component
+      // This is especially important when the calendar is opened after a date change
+      setCurrentDate(prevDate => {
+        const shouldUpdate = 
+          !prevDate ||
+          prevDate.getFullYear() !== normalizedDate.getFullYear() ||
+          prevDate.getMonth() !== normalizedDate.getMonth() ||
+          prevDate.getDate() !== normalizedDate.getDate();
+        
+        if (shouldUpdate) {
+          console.log('CalendarComponent: Updating currentDate from prop:', {
+            old: prevDate ? `${prevDate.getMonth() + 1}/${prevDate.getDate()}/${prevDate.getFullYear()}` : 'none',
+            new: `${normalizedDate.getMonth() + 1}/${normalizedDate.getDate()}/${normalizedDate.getFullYear()}`,
+          });
+          return normalizedDate;
+        }
+        return prevDate;
+      });
+    } else {
+      // If propCurrentDate is not provided, use today's date
+      const today = new Date();
+      today.setHours(12, 0, 0, 0);
+      setCurrentDate(today);
+    }
+  }, [
+    propCurrentDate?.getFullYear(),
+    propCurrentDate?.getMonth(),
+    propCurrentDate?.getDate(),
+  ]);
+
+  // Force sync when calendar becomes visible
+  // This ensures the calendar always shows the correct date when opened
+  useEffect(() => {
+    if (isVisible && propCurrentDate) {
+      const normalizedDate = new Date(
+        propCurrentDate.getFullYear(),
+        propCurrentDate.getMonth(),
+        propCurrentDate.getDate(),
+        12,
+        0,
+        0,
+        0,
+      );
+      console.log('CalendarComponent: Force syncing when visible - DETAILED:', {
+        'Prop Year': propCurrentDate.getFullYear(),
+        'Prop Month': propCurrentDate.getMonth(),
+        'Prop Day': propCurrentDate.getDate(),
+        'Normalized Year': normalizedDate.getFullYear(),
+        'Normalized Month': normalizedDate.getMonth(),
+        'Normalized Day': normalizedDate.getDate(),
+        'Normalized Formatted': `${normalizedDate.getMonth() + 1}/${normalizedDate.getDate()}/${normalizedDate.getFullYear()}`,
+        'Date Match Check': normalizedDate.getFullYear() === propCurrentDate.getFullYear() && 
+                           normalizedDate.getMonth() === propCurrentDate.getMonth() ? '✅ MATCH' : '❌ MISMATCH',
+      });
+      
+      // Double-check: if there's a mismatch, log a warning
+      if (normalizedDate.getFullYear() !== propCurrentDate.getFullYear() || 
+          normalizedDate.getMonth() !== propCurrentDate.getMonth()) {
+        console.error('❌ CalendarComponent: Date normalization mismatch!', {
+          expected: `${propCurrentDate.getFullYear()}-${propCurrentDate.getMonth()}`,
+          actual: `${normalizedDate.getFullYear()}-${normalizedDate.getMonth()}`,
+        });
+      }
+      
       setCurrentDate(normalizedDate);
     }
-  }, [propCurrentDate]);
+  }, [isVisible, propCurrentDate?.getFullYear(), propCurrentDate?.getMonth(), propCurrentDate?.getDate()]);
 
-  React.useEffect(() => {
+
+  useEffect(() => {
     if (propSelectedDate) {
       const normalizedDate = new Date(
         propSelectedDate.getFullYear(),
@@ -89,9 +171,22 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
         0,
         0,
       );
-      setSelectedDate(normalizedDate);
+      setSelectedDate(prevDate => {
+        if (!prevDate ||
+          prevDate.getFullYear() !== normalizedDate.getFullYear() ||
+          prevDate.getMonth() !== normalizedDate.getMonth() ||
+          prevDate.getDate() !== normalizedDate.getDate()
+        ) {
+          return normalizedDate;
+        }
+        return prevDate;
+      });
     }
-  }, [propSelectedDate]);
+  }, [
+    propSelectedDate?.getFullYear(),
+    propSelectedDate?.getMonth(),
+    propSelectedDate?.getDate(),
+  ]);
 
   const monthNames = [
     'January',
@@ -235,6 +330,8 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
     } else {
       newDate.setMonth(newDate.getMonth() + 1);
     }
+    // Normalize to noon to avoid timezone issues
+    newDate.setHours(12, 0, 0, 0);
     console.log(
       'CalendarComponent - Navigated to:',
       newDate.toLocaleDateString('en-US', {
@@ -244,7 +341,15 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
         day: 'numeric',
       }),
     );
+    console.log('CalendarComponent - Notifying parent of month navigation:', {
+      year: newDate.getFullYear(),
+      month: newDate.getMonth(),
+      formatted: `${newDate.getMonth() + 1}/${newDate.getDate()}/${newDate.getFullYear()}`,
+    });
     setCurrentDate(newDate);
+    // IMPORTANT: Notify parent component so it can update selectedDate and currentMonth
+    // This ensures the header month display stays synchronized with the calendar
+    onDateSelect?.(newDate);
   };
 
   const handleDatePress = (day: number) => {

@@ -42,6 +42,7 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [isMonthDropdownVisible, setIsMonthDropdownVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  const calendarKeyRef = useRef(0);
 
   const monthNames = [
     'January',
@@ -74,11 +75,32 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
   ];
 
   const handleMonthPress = () => {
+    // When opening the calendar, ensure it uses the current date
+    // This ensures the calendar shows the same month/year as the slider
+    if (!isCalendarVisible && currentDate) {
+      console.log('WeekHeader: Opening calendar icon with currentDate:', {
+        year: currentDate.getFullYear(),
+        month: currentDate.getMonth(),
+        date: currentDate.toISOString(),
+        formatted: `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`,
+      });
+      // Increment the key to force CalendarComponent to remount with latest date
+      calendarKeyRef.current += 1;
+    }
     setIsCalendarVisible(!isCalendarVisible);
     onMonthPress();
   };
 
   const handleMonthNamePress = () => {
+    // When opening the slider, log the current date to ensure it's up to date
+    if (!isMonthDropdownVisible && currentDate) {
+      console.log('WeekHeader: Opening month slider with currentDate:', {
+        year: currentDate.getFullYear(),
+        month: currentDate.getMonth(),
+        date: currentDate.toISOString(),
+        formatted: `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`,
+      });
+    }
     setIsMonthDropdownVisible(!isMonthDropdownVisible);
     setIsCalendarVisible(false); // Close calendar if open
   };
@@ -91,6 +113,7 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
 
   const handleYearSelect = (year: number) => {
     if (currentDate) {
+      // When year is selected, keep the same month and day, just change the year
       const newDate = new Date(
         year,
         currentDate.getMonth(),
@@ -100,10 +123,34 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
         0,
         0,
       );
+      console.log('WeekHeader: Year selected:', {
+        oldYear: currentDate.getFullYear(),
+        newYear: year,
+        month: currentDate.getMonth(),
+        newDate: newDate.toISOString(),
+      });
       onDateSelect?.(newDate);
+      // Also trigger month select to ensure month display updates
+      onMonthSelect?.(currentDate.getMonth());
     }
     setIsMonthDropdownVisible(false);
   };
+
+  // Update calendar key when currentDate changes to ensure calendar always uses latest date
+  useEffect(() => {
+    if (currentDate) {
+      console.log('WeekHeader: currentDate prop changed:', {
+        year: currentDate.getFullYear(),
+        month: currentDate.getMonth(),
+        formatted: `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`,
+      });
+      // Increment key to force CalendarComponent remount if calendar is visible
+      if (isCalendarVisible) {
+        calendarKeyRef.current += 1;
+        console.log('WeekHeader: Updated calendar key because currentDate changed and calendar is visible');
+      }
+    }
+  }, [currentDate?.getFullYear(), currentDate?.getMonth(), currentDate?.getDate()]);
 
   // Auto-scroll to current month when dropdown opens
   // Auto-scroll to center the current month when dropdown opens
@@ -178,11 +225,12 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
         if (currentDate) {
           const currentMonthIndex = currentDate.getMonth();
           const currentYear = currentDate.getFullYear();
-          const previousYear = currentYear - 1;
-          const nextYear = currentYear + 1;
-
-          // Start from the same month in previous year (e.g., Nov 2024)
-          // Go through to the same month in next year (e.g., Nov 2026)
+          
+          console.log('WeekHeader: Generating month dropdown for:', {
+            currentMonthIndex,
+            currentYear,
+            currentDate: currentDate.toISOString(),
+          });
 
           let lastYearAdded: number | null = null;
 
@@ -192,6 +240,19 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
             const monthIndex = ((totalMonths % 12) + 12) % 12; // Handle negative modulo
             const year = currentYear + Math.floor(totalMonths / 12);
 
+            // Debug: Log the first few items to verify year calculation
+            if (i >= -2 && i <= 2) {
+              console.log(`WeekHeader: Generating slider item ${i}:`, {
+                currentMonthIndex,
+                currentYear,
+                totalMonths,
+                monthIndex,
+                calculatedYear: year,
+                monthName: monthNamesShort[monthIndex],
+                calculation: `currentYear(${currentYear}) + floor(${totalMonths}/12) = ${year}`,
+              });
+            }
+
             // Add year label when year changes
             if (lastYearAdded !== year) {
               dynamicItems.push({ type: 'year', year });
@@ -200,6 +261,10 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
 
             dynamicItems.push({ type: 'month', monthIndex, year });
           }
+          
+          console.log('WeekHeader: Generated items:', dynamicItems.slice(0, 5).map(item => 
+            item.type === 'month' ? `${monthNamesShort[item.monthIndex]} ${item.year}` : `Year ${item.year}`
+          ));
         }
 
         return (
@@ -228,16 +293,55 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
                         isSelected && styles.monthScrollItemSelected,
                       ]}
                       onPress={() => {
+                        // Create date with the selected year and month
+                        // IMPORTANT: JavaScript Date months are 0-indexed (0=Jan, 11=Dec)
+                        // item.monthIndex is already 0-indexed, so use it directly
                         const newDate = new Date(
-                          item.year,
-                          item.monthIndex,
-                          1,
-                          12,
-                          0,
-                          0,
-                          0,
+                          item.year,        // Year from slider item
+                          item.monthIndex,  // Month index (0-11)
+                          1,                // Day 1 of the month
+                          12,               // Hour 12 (noon) to avoid timezone issues
+                          0,                // Minutes
+                          0,                // Seconds
+                          0,                // Milliseconds
                         );
+                        
+                        // Verify the date was created correctly
+                        const createdYear = newDate.getFullYear();
+                        const createdMonth = newDate.getMonth();
+                        const createdDay = newDate.getDate();
+                        
+                        console.log('WeekHeader: Month selected from slider - DETAILED:', {
+                          'Slider Item Year': item.year,
+                          'Slider Item Month Index': item.monthIndex,
+                          'Slider Item Month Name': monthNamesShort[item.monthIndex],
+                          'Created Date Year': createdYear,
+                          'Created Date Month': createdMonth,
+                          'Created Date Day': createdDay,
+                          'Created Date Full': newDate.toISOString(),
+                          'Created Date Formatted': `${createdMonth + 1}/${createdDay}/${createdYear}`,
+                          'Date Match Check': createdYear === item.year && createdMonth === item.monthIndex ? '✅ MATCH' : '❌ MISMATCH',
+                          'Current Date Before': currentDate ? `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}` : 'none',
+                        });
+                        
+                        // Double-check: if there's a mismatch, log a warning
+                        if (createdYear !== item.year || createdMonth !== item.monthIndex) {
+                          console.error('❌ WeekHeader: Date creation mismatch!', {
+                            expected: `${item.year}-${item.monthIndex}`,
+                            actual: `${createdYear}-${createdMonth}`,
+                          });
+                        }
+                        
+                        // IMPORTANT: Call onDateSelect FIRST to update the date in the parent
+                        // This ensures both the slider and calendar icon stay synchronized
+                        console.log('WeekHeader: Calling onDateSelect with newDate:', {
+                          year: newDate.getFullYear(),
+                          month: newDate.getMonth(),
+                          formatted: `${newDate.getMonth() + 1}/${newDate.getDate()}/${newDate.getFullYear()}`,
+                        });
                         onDateSelect?.(newDate);
+                        // Update month display immediately (don't use setTimeout)
+                        // The date has already been set correctly by onDateSelect
                         onMonthSelect?.(item.monthIndex);
                         setIsMonthDropdownVisible(false);
                       }}
@@ -291,12 +395,14 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
       )}
 
       {/* Calendar Component */}
-      {isCalendarVisible && (
+      {isCalendarVisible && currentDate && (
         <View style={styles.calendarContainer}>
           <CalendarComponent
+            key={`calendar-${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}-${calendarKeyRef.current}-${isCalendarVisible}`}
             onDateSelect={handleDateSelect}
             currentDate={currentDate}
             selectedDate={selectedDate}
+            isVisible={isCalendarVisible}
           />
         </View>
       )}

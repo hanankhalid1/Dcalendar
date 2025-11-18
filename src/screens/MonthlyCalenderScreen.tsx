@@ -79,7 +79,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const { api } = useApiClient();
   const [isDeleting, setIsDeleting] = useState(false);
   const [exitModal, setExitModal] = useState(false);
-  const [navigationAction, setNavigationAction] = useState(null);
+  const [navigationAction, setNavigationAction] = useState<any>(null);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
   
@@ -114,8 +114,13 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
 
     const repeatType = event.repeatEvent || event.list?.find((item: any) => item.key === 'repeatEvent')?.value;
 
-    if (!repeatType || repeatType === 'Does not repeat') {
-      return [{ date: startDate, event }];
+    // Handle empty string, undefined, null, or 'Does not repeat' as non-recurring
+    if (!repeatType || repeatType === '' || repeatType === 'Does not repeat') {
+      // For non-recurring events, only add if within view range
+      if (startDate >= viewStartDate && startDate <= viewEndDate) {
+        return [{ date: startDate, event }];
+      }
+      return instances;
     }
 
     const eventDurationMs = endDate.getTime() - startDate.getTime();
@@ -130,6 +135,9 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
     const limitDate = maxDate < oneYearFromNow ? maxDate : oneYearFromNow;
 
+    // Normalize repeatType to lowercase for comparison
+    const normalizedRepeatType = repeatType.toLowerCase().trim();
+
     while (currentDate <= limitDate) {
       if (currentDate >= viewStartDate && currentDate <= viewEndDate) {
         instances.push({
@@ -141,41 +149,36 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         });
       }
 
-      switch (repeatType.toLowerCase()) {
-        case 'daily':
-        case 'every day':
+      // Handle different repeat type formats
+      if (normalizedRepeatType === 'daily' || normalizedRepeatType === 'every day') {
+        currentDate.setDate(currentDate.getDate() + 1);
+      } else if (normalizedRepeatType === 'weekdays' || normalizedRepeatType === 'every weekday') {
+        do {
           currentDate.setDate(currentDate.getDate() + 1);
-          break;
-
-        case 'weekly':
-        case 'every week':
-          currentDate.setDate(currentDate.getDate() + 7);
-          break;
-
-        case 'bi-weekly':
-        case 'every 2 weeks':
-          currentDate.setDate(currentDate.getDate() + 14);
-          break;
-
-        case 'monthly':
-        case 'every month':
-          currentDate.setMonth(currentDate.getMonth() + 1);
-          break;
-
-        case 'yearly':
-        case 'every year':
-          currentDate.setFullYear(currentDate.getFullYear() + 1);
-          break;
-
-        case 'weekdays':
-        case 'every weekday':
-          do {
-            currentDate.setDate(currentDate.getDate() + 1);
-          } while (currentDate.getDay() === 0 || currentDate.getDay() === 6);
-          break;
-
-        default:
-          return instances;
+        } while (currentDate.getDay() === 0 || currentDate.getDay() === 6);
+      } else if (normalizedRepeatType.startsWith('weekly')) {
+        // Handle formats like 'weekly_TH', 'weekly_MO', etc.
+        currentDate.setDate(currentDate.getDate() + 7);
+      } else if (normalizedRepeatType.startsWith('monthly')) {
+        // Handle formats like 'monthly_1TH', 'monthly_-1TH', 'monthly_2TH', etc.
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      } else if (normalizedRepeatType.startsWith('yearly')) {
+        // Handle formats like 'yearly_0904'
+        currentDate.setFullYear(currentDate.getFullYear() + 1);
+      } else if (normalizedRepeatType === 'bi-weekly' || normalizedRepeatType === 'every 2 weeks') {
+        currentDate.setDate(currentDate.getDate() + 14);
+      } else if (normalizedRepeatType === 'every month') {
+        currentDate.setMonth(currentDate.getMonth() + 1);
+      } else if (normalizedRepeatType === 'every year') {
+        currentDate.setFullYear(currentDate.getFullYear() + 1);
+      } else if (normalizedRepeatType.startsWith('custom_')) {
+        // Handle custom recurrence - for now, just increment by day
+        // This is a simplified approach; full custom recurrence parsing would be more complex
+        currentDate.setDate(currentDate.getDate() + 1);
+      } else {
+        // Unknown format - treat as non-recurring and return what we have
+        console.warn('Unknown repeat type:', repeatType);
+        break;
       }
 
       if (instances.length > 366) {
@@ -210,7 +213,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       }
 
       const isTask = ev.list?.some((item: any) => item.key === 'task' && item.value === 'true');
-      const repeatType = ev.repeatEvent || ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+      const repeatType = (ev as any).repeatEvent || ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
       const isRecurring = repeatType && repeatType !== 'Does not repeat';
 
       const eventColor = isTask ? '#8DC63F' : '#00AEEF';
@@ -382,16 +385,39 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
 
   const handleMonthSelect = (monthIndex: number) => {
+    console.log('handleMonthSelect called with monthIndex:', monthIndex);
+    console.log('Current selectedDate:', selectedDate.toDateString());
+    // IMPORTANT: Just update the month index in the store
+    // DO NOT update the date here - handleDateSelect from WeekHeader already set the correct date
+    // Updating the date here would use the old selectedDate value and lose the correct year
     setCurrentMonthByIndex(monthIndex);
-    const newDate = new Date(selectedDate.getFullYear(), monthIndex, 1);
-    console.log('New Selected Date:', newDate.toDateString());
-    setSelectedDate(newDate);
+    // DO NOT update selectedDate here - it's already been set correctly by handleDateSelect
+    // The handleDateSelect was called first with the correct year and month from the slider
   };
 
   const handleDateSelect = (date: Date) => {
-    console.log('Date selected:', date.toDateString());
-    setSelectedDate(date);
-    setCurrentMonthByIndex(date.getMonth());
+    console.log('MonthlyCalenderScreen: handleDateSelect called with date:', date.toDateString());
+    console.log('Date formatted:', formatDate(date));
+    // Normalize the date to avoid timezone issues
+    const normalizedDate = new Date(
+      date.getFullYear(),
+      date.getMonth(),
+      date.getDate(),
+      12,
+      0,
+      0,
+      0,
+    );
+    console.log('MonthlyCalenderScreen: Normalized date:', normalizedDate.toDateString());
+    console.log('MonthlyCalenderScreen: Setting selectedDate to:', {
+      year: normalizedDate.getFullYear(),
+      month: normalizedDate.getMonth(),
+      formatted: `${normalizedDate.getMonth() + 1}/${normalizedDate.getDate()}/${normalizedDate.getFullYear()}`,
+    });
+    // Update selectedDate - this will be passed as currentDate to WeekHeader
+    // This ensures both the slider and calendar icon stay synchronized
+    setSelectedDate(normalizedDate);
+    setCurrentMonthByIndex(normalizedDate.getMonth());
   };
 
   const handleDrawerClose = () => {
@@ -405,8 +431,30 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
 
   const handleMonthChange = (month: any) => {
-    const newDate = new Date(month.timestamp);
-    setCurrentMonthByIndex(newDate.getMonth());
+    console.log('MonthlyCalenderScreen: Calendar onMonthChange called:', month);
+    if (month && month.timestamp) {
+      const newDate = new Date(month.timestamp);
+      // Normalize to noon to avoid timezone issues
+      const normalizedDate = new Date(
+        newDate.getFullYear(),
+        newDate.getMonth(),
+        newDate.getDate(),
+        12,
+        0,
+        0,
+        0,
+      );
+      console.log('MonthlyCalenderScreen: Month changed to:', normalizedDate.toDateString());
+      console.log('MonthlyCalenderScreen: Updating selectedDate and month display:', {
+        year: normalizedDate.getFullYear(),
+        month: normalizedDate.getMonth(),
+        formatted: `${normalizedDate.getMonth() + 1}/${normalizedDate.getDate()}/${normalizedDate.getFullYear()}`,
+      });
+      // IMPORTANT: Update both selectedDate and currentMonth when calendar month changes
+      // This ensures the header month display stays synchronized with the calendar view
+      setSelectedDate(normalizedDate);
+      setCurrentMonthByIndex(normalizedDate.getMonth());
+    }
   };
 
   const handleEventPress = (event: any) => {
@@ -547,6 +595,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       />
 
       <WeekHeader
+        key={`weekheader-${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`}
         onMenuPress={handleMenuPress}
         currentMonth={currentMonth}
         onMonthPress={handleMonthPress}
@@ -563,11 +612,12 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       >
         <View style={styles.calendarWrapper}>
           <Calendar
-            key={selectedDateString}
+            key={`calendar-${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`}
             current={selectedDateString}
             markedDates={markedDates}
             markingType="multi-period"
             onDayPress={handleDayPress}
+            onMonthChange={handleMonthChange}
             firstDay={firstDayNumber}
             theme={{
               backgroundColor: '#ffffff',
@@ -591,6 +641,9 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
             }}
             renderHeader={() => null}
             hideArrows={true}
+            enableSwipeMonths={true}
+            minDate={undefined}
+            maxDate={undefined}
           />
         </View>
 
@@ -806,14 +859,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         onCancel={() => {
           setExitModal(false);
           setNavigationAction(null);
-        }}
-        onConfirm={() => {
-          setExitModal(false);
-          if (navigationAction) {
-            navigation.dispatch(navigationAction);
-          } else {
-            navigation.goBack();
-          }
         }}
       />
     </View>
