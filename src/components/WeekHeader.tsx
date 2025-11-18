@@ -20,6 +20,10 @@ import CalendarComponent from './CalendarComponent';
 // import MenuIcon from '../assets/svgs/menu.svg';
 import { ScrollView } from 'react-native';
 import MenuIcon from '../assets/svgs/menu.svg';
+import Icon from 'react-native-vector-icons/AntDesign';
+import { Fonts } from '../constants/Fonts';
+import CalendarIconHeader from '../assets/svgs/calendarHeader.svg';
+
 interface WeekHeaderProps {
   onMenuPress: () => void;
   currentMonth: string;
@@ -145,12 +149,11 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
               onPress={handleMonthNamePress}
             >
               <Text style={styles.monthText}>{currentMonth}</Text>
-              <Image
-                source={require('../assets/images/HeaderImages/arrowDropdown.png')}
-                style={[
-                  styles.dropdownArrow,
-                  isMonthDropdownVisible && styles.dropdownArrowRotated,
-                ]}
+                <Icon
+                name={isMonthDropdownVisible ? 'caretup' : 'caretdown'}
+                size={14}
+                color="black"
+                style={styles.dropdownArrow}
               />
             </TouchableOpacity>
           </View>
@@ -162,9 +165,7 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
             style={styles.calendarButton}
             onPress={handleMonthPress}
           >
-            <Image
-              source={require('../assets/images/HeaderImages/Calenderdaterange.png')}
-            />
+           <CalendarIconHeader width={20} height={20} />
           </TouchableOpacity>
         </View>
       </View>
@@ -349,16 +350,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
-  monthText: {
+ monthText: {
     fontSize: fontSize.textSize18,
-    fontWeight: '600',
-    color: colors.textPrimary,
+    fontFamily: Fonts.bold, 
+    color: '#181D27',
     marginRight: spacing.xs,
   },
-  dropdownArrow: {
-    width: 12,
-    height: 8,
-    marginTop: 4,
+ dropdownArrow: {
     marginLeft: 4,
   },
   dropdownArrowRotated: {
@@ -415,10 +413,10 @@ const styles = StyleSheet.create({
   monthDropdownText: {
     fontSize: fontSize.textSize16,
     color: colors.textPrimary,
-    fontWeight: '500',
+    fontFamily: Fonts.regular,
   },
   monthDropdownTextSelected: {
-    fontWeight: '600',
+    fontFamily: Fonts.bold,
     color: colors.primary,
   },
   calendarContainer: {
@@ -440,7 +438,7 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
   },
   monthScrollItem: {
-    backgroundColor: colors.lightGrayishBlue,
+      backgroundColor: '#F9F9F9', 
     borderRadius: 20,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
@@ -472,7 +470,6 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     fontWeight: '700',
   },
-  // --- ADD THIS TO styles = StyleSheet.create({...}) ---
 
   monthDropdownWrapper: {
     position: 'absolute',
