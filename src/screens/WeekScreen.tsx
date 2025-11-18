@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { StyleProp, StyleSheet, Text, TextStyle, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import WeekView from 'react-native-week-view';
@@ -179,7 +179,7 @@ const WeekScreen = () => {
     };
 
     // Track if we're in the middle of a month selection to avoid overriding
-    const isSelectingMonth = React.useRef(false);
+    const isSelectingMonth = useRef(false);
 
     const handleDateSelect = (date: Date) => {
         console.log('Date selected:', date);
