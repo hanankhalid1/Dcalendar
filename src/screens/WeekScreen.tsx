@@ -1,5 +1,5 @@
 import { useNavigation } from '@react-navigation/native';
-import React, { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { StyleProp, StyleSheet, Text, TextStyle, View } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import WeekView from 'react-native-week-view';
@@ -107,7 +107,7 @@ const WeekScreen = () => {
                     return null;
                 }
   let colour = '#337E891A'; // Default color for standard events
-        if(event.list?.some((item: any) => item.key === 'task' && item.value === 'true')) {
+                if (event.list?.some((item: any) => item.key === 'task' && item.value === 'true')) {
           console.log('Event is a task:', event);
           colour = colors.figmaPurpleOpacity20; // Color for tasks
         }
@@ -254,14 +254,6 @@ const WeekScreen = () => {
         return d;
     };
     
-    // ✅ Reset to today's date when start of week setting changes
-    useEffect(() => {
-        // When selectedDay changes, reset to today's date
-        const today = new Date();
-        today.setHours(12, 0, 0, 0); // Normalize to noon
-        setSelectedDate(today);
-    }, [selectedDay]);
-    
     // ✅ Adjust selectedDate to align with start of week
     const adjustedSelectedDate = useMemo(() => {
         return getStartOfWeek(selectedDate);
@@ -368,7 +360,6 @@ const WeekScreen = () => {
                 hoursInDisplay={12}
                 timeStep={60}
                 formatTimeLabel="h A"
-                locale="en-US"
                 rightToLeft={false}
                 showNowLine={true}
                 timesColumnWidth={0.15}

@@ -23,6 +23,8 @@ import CalendarIcon from '../assets/svgs/calendar.svg';
 import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import LinearGradient from 'react-native-linear-gradient';
+import { Fonts } from '../constants/Fonts';
+
 
 interface MonthlyCalendarProps {
   onDateSelect?: (date: string) => void;
@@ -62,15 +64,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
   
   const firstDayNumber = getFirstDayNumber(selectedDay);
-  
-  // ✅ Reset to today's date when start of week setting changes
-  useEffect(() => {
-    // When selectedDay changes, reset to today's date
-    const today = new Date();
-    today.setHours(12, 0, 0, 0); // Normalize to noon
-    setSelectedDate(today);
-  }, [selectedDay]);
-  
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isEventModalVisible, setIsEventModalVisible] = useState(false);
@@ -100,43 +93,136 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     return dateString;
   }, [selectedDate]);
 
-  const generateRecurringInstances = (
-    event: any,
-    viewStartDate: Date,
-    viewEndDate: Date
-  ): Array<{ date: Date; event: any }> => {
-    const instances: Array<{ date: Date; event: any }> = [];
+  // Define a map for day names to Date.prototype.getDay() values (0=Sunday, 6=Saturday)
+const DAY_MAP: { [key: string]: number } = {
+  sunday: 0,
+  monday: 1,
+  tuesday: 2,
+  wednesday: 3,
+  thursday: 4,
+  friday: 5,
+  saturday: 6,
+};
 
-    const startDate = parseTimeToPST(event.fromTime);
-    const endDate = parseTimeToPST(event.toTime);
+// Define a map for month names to 0-indexed month numbers
+const MONTH_MAP: { [key: string]: number } = {
+  january: 0,
+  february: 1,
+  march: 2,
+  april: 3,
+  may: 4,
+  june: 5,
+  july: 6,
+  august: 7,
+  september: 8,
+  october: 9,
+  november: 10,
+  december: 11,
+};
 
-    if (!startDate || !endDate) return instances;
+// Define a map for week number text
+const WEEK_TEXT_MAP: { [key: string]: number } = {
+  first: 1,
+  second: 2,
+  third: 3,
+  fourth: 4,
+  last: -1, // Use -1 to denote the last occurrence of the day
+};
 
-    const repeatType = event.repeatEvent || event.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+/**
+ * Calculates the date of the Nth (or last) weekday of a specific month and year.
+ * @param year The year.
+ * @param monthIndex The 0-indexed month (0-11).
+ * @param dayOfWeek The 0-indexed day of the week (0=Sunday, 6=Saturday).
+ * @param occurrence The Nth occurrence (1-4, or -1 for last).
+ * @returns The Date object for the calculated occurrence, or null if invalid.
+ */
+const getNthWeekdayOfMonth = (
+  year: number,
+  monthIndex: number,
+  dayOfWeek: number,
+  occurrence: number
+): Date | null => {
+  const isLast = occurrence === -1;
+  const targetWeek = isLast ? 4 : occurrence; // Try up to the 4th week initially
 
-    // Handle empty string, undefined, null, or 'Does not repeat' as non-recurring
-    if (!repeatType || repeatType === '' || repeatType === 'Does not repeat') {
-      // For non-recurring events, only add if within view range
-      if (startDate >= viewStartDate && startDate <= viewEndDate) {
-        return [{ date: startDate, event }];
+  let dayCount = 0;
+  let date = new Date(year, monthIndex, 1);
+  const lastDayOfMonth = new Date(year, monthIndex + 1, 0).getDate();
+
+  for (let d = 1; d <= lastDayOfMonth; d++) {
+    date.setDate(d);
+    if (date.getDay() === dayOfWeek) {
+      dayCount++;
+
+      if (!isLast && dayCount === occurrence) {
+        return new Date(date);
       }
-      return instances;
+    }
+  }
+
+  // If we are looking for the 'last' occurrence, the dayCount will be the correct number.
+  if (isLast && dayCount > 0) {
+    // Find the date corresponding to the dayCount-th occurrence
+    let lastDate = new Date(year, monthIndex, 1);
+    let finalDayCount = 0;
+    for (let d = 1; d <= lastDayOfMonth; d++) {
+        lastDate.setDate(d);
+        if (lastDate.getDay() === dayOfWeek) {
+            finalDayCount++;
+            if (finalDayCount === dayCount) {
+                return new Date(lastDate);
+            }
+        }
+    }
+  }
+  
+  return null;
+};
+
+const generateRecurringInstances = (
+  event: any,
+  viewStartDate: Date,
+  viewEndDate: Date
+): Array<{ date: Date; event: any }> => {
+  const instances: Array<{ date: Date; event: any }> = [];
+
+  const startDate = parseTimeToPST(event.fromTime);
+  const endDate = parseTimeToPST(event.toTime);
+
+  if (!startDate || !endDate) return instances;
+
+  const repeatType =
+    event.repeatEvent ||
+    event.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+
+    if (!repeatType || repeatType === 'Does not repeat') {
+      return [{ date: startDate, event }];
     }
 
-    const eventDurationMs = endDate.getTime() - startDate.getTime();
-
-    let currentDate = new Date(startDate);
-    currentDate.setHours(0, 0, 0, 0);
-
-    const maxDate = new Date(viewEndDate);
-    maxDate.setHours(23, 59, 59, 999);
+  const repeatTypeLower = repeatType.toLowerCase();
+  
+  // Start from the event's original start date
+  let currentDate = new Date(startDate);
+  currentDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
+  
+  // Adjust currentDate to the *start* of the view range if the event started before
+  if (currentDate < viewStartDate) {
+    currentDate = new Date(viewStartDate);
+    currentDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
+    // Move back to the start of the day for calculation to ensure we don't skip an instance
+    currentDate.setHours(0, 0, 0, 0); 
+  } else {
+    // Also move to the start of the day for consistent iteration
+    currentDate.setHours(0, 0, 0, 0); 
+  }
+  
+  const maxDate = new Date(viewEndDate);
+  maxDate.setHours(23, 59, 59, 999);
 
     const oneYearFromNow = new Date();
     oneYearFromNow.setFullYear(oneYearFromNow.getFullYear() + 1);
     const limitDate = maxDate < oneYearFromNow ? maxDate : oneYearFromNow;
-
-    // Normalize repeatType to lowercase for comparison
-    const normalizedRepeatType = repeatType.toLowerCase().trim();
 
     while (currentDate <= limitDate) {
       if (currentDate >= viewStartDate && currentDate <= viewEndDate) {
@@ -149,36 +235,41 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         });
       }
 
-      // Handle different repeat type formats
-      if (normalizedRepeatType === 'daily' || normalizedRepeatType === 'every day') {
-        currentDate.setDate(currentDate.getDate() + 1);
-      } else if (normalizedRepeatType === 'weekdays' || normalizedRepeatType === 'every weekday') {
-        do {
+      switch (repeatType.toLowerCase()) {
+        case 'daily':
+        case 'every day':
           currentDate.setDate(currentDate.getDate() + 1);
-        } while (currentDate.getDay() === 0 || currentDate.getDay() === 6);
-      } else if (normalizedRepeatType.startsWith('weekly')) {
-        // Handle formats like 'weekly_TH', 'weekly_MO', etc.
-        currentDate.setDate(currentDate.getDate() + 7);
-      } else if (normalizedRepeatType.startsWith('monthly')) {
-        // Handle formats like 'monthly_1TH', 'monthly_-1TH', 'monthly_2TH', etc.
-        currentDate.setMonth(currentDate.getMonth() + 1);
-      } else if (normalizedRepeatType.startsWith('yearly')) {
-        // Handle formats like 'yearly_0904'
-        currentDate.setFullYear(currentDate.getFullYear() + 1);
-      } else if (normalizedRepeatType === 'bi-weekly' || normalizedRepeatType === 'every 2 weeks') {
-        currentDate.setDate(currentDate.getDate() + 14);
-      } else if (normalizedRepeatType === 'every month') {
-        currentDate.setMonth(currentDate.getMonth() + 1);
-      } else if (normalizedRepeatType === 'every year') {
-        currentDate.setFullYear(currentDate.getFullYear() + 1);
-      } else if (normalizedRepeatType.startsWith('custom_')) {
-        // Handle custom recurrence - for now, just increment by day
-        // This is a simplified approach; full custom recurrence parsing would be more complex
-        currentDate.setDate(currentDate.getDate() + 1);
-      } else {
-        // Unknown format - treat as non-recurring and return what we have
-        console.warn('Unknown repeat type:', repeatType);
-        break;
+          break;
+
+        case 'weekly':
+        case 'every week':
+          currentDate.setDate(currentDate.getDate() + 7);
+          break;
+
+        case 'bi-weekly':
+        case 'every 2 weeks':
+          currentDate.setDate(currentDate.getDate() + 14);
+          break;
+
+        case 'monthly':
+        case 'every month':
+          currentDate.setMonth(currentDate.getMonth() + 1);
+          break;
+
+        case 'yearly':
+        case 'every year':
+          currentDate.setFullYear(currentDate.getFullYear() + 1);
+          break;
+
+        case 'weekdays':
+        case 'every weekday':
+          do {
+            currentDate.setDate(currentDate.getDate() + 1);
+          } while (currentDate.getDay() === 0 || currentDate.getDay() === 6);
+          break;
+
+        default:
+          return instances;
       }
 
       if (instances.length > 366) {
@@ -187,8 +278,8 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       }
     }
 
-    return instances;
-  };
+  return instances;
+};
 
   const { markedDates, eventsByDate } = useMemo(() => {
     const marked: any = {};
@@ -431,30 +522,8 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
 
   const handleMonthChange = (month: any) => {
-    console.log('MonthlyCalenderScreen: Calendar onMonthChange called:', month);
-    if (month && month.timestamp) {
-      const newDate = new Date(month.timestamp);
-      // Normalize to noon to avoid timezone issues
-      const normalizedDate = new Date(
-        newDate.getFullYear(),
-        newDate.getMonth(),
-        newDate.getDate(),
-        12,
-        0,
-        0,
-        0,
-      );
-      console.log('MonthlyCalenderScreen: Month changed to:', normalizedDate.toDateString());
-      console.log('MonthlyCalenderScreen: Updating selectedDate and month display:', {
-        year: normalizedDate.getFullYear(),
-        month: normalizedDate.getMonth(),
-        formatted: `${normalizedDate.getMonth() + 1}/${normalizedDate.getDate()}/${normalizedDate.getFullYear()}`,
-      });
-      // IMPORTANT: Update both selectedDate and currentMonth when calendar month changes
-      // This ensures the header month display stays synchronized with the calendar view
-      setSelectedDate(normalizedDate);
-      setCurrentMonthByIndex(normalizedDate.getMonth());
-    }
+    const newDate = new Date(month.timestamp);
+    setCurrentMonthByIndex(newDate.getMonth());
   };
 
   const handleEventPress = (event: any) => {
@@ -626,18 +695,15 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
               selectedDayBackgroundColor: '#000',
               selectedDayTextColor: '#ffffff',
               todayTextColor: colors.figmaLightBlue || '#2196F3',
-              dayTextColor: '#2d4150',
-              textDisabledColor: '#d9e1e8',
+              dayTextColor: '#202020',
+              textDisabledColor: '#A8A8AA',
               dotColor: '#337E89',
               selectedDotColor: '#ffffff',
               arrowColor: colors.figmaLightBlue || '#2196F3',
-              monthTextColor: '#2d4150',
-              textDayFontFamily: 'DM Sans',
-              textMonthFontFamily: 'DM Sans',
-              textDayHeaderFontFamily: 'DM Sans',
-              textDayFontSize: 14,
-              textMonthFontSize: 16,
-              textDayHeaderFontSize: 12,
+              textDayFontFamily: Fonts.bold,
+              textDayHeaderFontFamily: Fonts.black,
+              textDayFontSize: 12,
+              textDayHeaderFontSize: 14,
             }}
             renderHeader={() => null}
             hideArrows={true}
@@ -672,7 +738,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                     onPress={() => handleEventPress(event)}
                   >
                     <View style={styles.eventContent}>
-                      <Text style={styles.eventTitle} numberOfLines={1}>
+                      <Text style={styles.eventTitle}>
                         {event.title}
                       </Text>
 
@@ -704,7 +770,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                         <View style={[styles.badge, {
                           borderColor: event.isTask ? '#8DC63F' : '#00AEEF',
                         }]}>
-                          {event.isTask? <TaskIcon height={14} width={14}/> : <EventIcon height={14} width={14}/>}
+                          {event.isTask ? <TaskIcon height={14} width={14} /> : <EventIcon height={14} width={14} />}
                           <Text style={styles.badgeText}>
                             {event.isTask ? 'Task' : 'Event'}
                           </Text>
@@ -886,12 +952,11 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.md,
     paddingHorizontal: 4,
   },
-  eventsTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'DM Sans',
+ eventsTitle: {
+    fontSize: 14,
+    fontFamily: Fonts.bold,
     marginBottom: spacing.md,
-    color: '#2d4150',
+    color: '#202020',
   },
   eventsList: {
     flexGrow: 1,
@@ -912,15 +977,15 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'DM Sans',
-    color: '#1a1a1a',
+    fontFamily: Fonts.bold,
+    color: '#000',
     marginBottom: 0,
   },
-  eventTime: {
+ eventTime: {
     fontSize: 10,
-    fontWeight: '600',
+    fontFamily: Fonts.bold,
     textAlign: 'left',
+    color: '#717680'
   },
   eventStartTime: {
     fontSize: 10,
@@ -944,10 +1009,10 @@ const styles = StyleSheet.create({
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
   },
-  badgeText: {
-    fontSize: 12,
-    fontFamily: 'DM Sans',
-    color: '#666',
+ badgeText: {
+    fontSize: 10,
+    fontFamily: Fonts.bold,
+    color: '#717680',
     fontWeight: '500',
   },
   noEventsText: {
