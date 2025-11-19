@@ -1027,9 +1027,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       setDateTimeError('');
     }
 
-    // Show detailed date time section if we have both dates and times
-    if ((calendarMode === 'from' && selectedEndDate && selectedEndTime) ||
-      (calendarMode === 'to' && selectedStartDate && selectedStartTime)) {
+    // Show detailed date time section when start time is selected
+    // The end time is automatically set when start time is selected, so we only need to check start time
+    if (calendarMode === 'from' && date && time && time.trim() !== '') {
+      // When start date and start time are selected, show the recurrence selector
+      setShowDetailedDateTime(true);
+    } else if (calendarMode === 'to' && selectedStartDate && selectedStartTime) {
+      // When end time is selected (and start date/time already exist), also show it
       setShowDetailedDateTime(true);
     }
 
@@ -3647,10 +3651,12 @@ const styles = StyleSheet.create({
   customRepeatEveryRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    width: '100%',
   },
   customRepeatEveryInput: {
     width: scaleWidth(60),
+    minWidth: scaleWidth(50),
+    maxWidth: scaleWidth(80),
     height: scaleHeight(36),
     borderWidth: 1,
     borderColor: '#DCE0E5',
@@ -3658,7 +3664,9 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: fontSize.textSize14,
     color: colors.blackText,
-    paddingHorizontal: 4,
+    paddingHorizontal: scaleWidth(4),
+    paddingVertical: 0,
+    marginRight: spacing.sm,
   },
   customRepeatUnitDropdown: {
     flexDirection: 'row',
@@ -3669,8 +3677,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     height: scaleHeight(36),
+    width: scaleWidth(100),
     minWidth: scaleWidth(80),
-    backgroundColor: colors.white, // Add this
+    maxWidth: scaleWidth(120),
+    backgroundColor: colors.white,
   },
   customRepeatUnitText: {
     fontSize: fontSize.textSize14,
