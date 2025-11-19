@@ -54,6 +54,7 @@ import { convertionISOToTime, convertSecondsToUnit } from '../utils/notification
 import dayjs from "dayjs";
 import Icon from 'react-native-vector-icons/Feather';
 import { useAuthStore } from '../stores/useAuthStore';
+import CustomAlert from '../components/CustomAlert';
 import { useSettingsStore } from '../stores/useSetting';
 const CreateEventScreen = () => {
   const navigation: any = useNavigation<AppNavigationProp>();

@@ -43,7 +43,6 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { useApiClient } from '../hooks/useApi';
 import { parseTimeToPST } from '../utils';
 import { useSettingsStore } from '../stores/useSetting';
-import { convertToSelectedTimezone } from '../utils/timezone';
 import { s } from 'react-native-size-matters';
 
 
@@ -151,20 +150,49 @@ const HomeScreen = () => {
                 startTimeData = { displayValues: null };
                 endTimeData = { displayValues: null };
             } else {
-                startTimeData = convertToSelectedTimezone(event.fromTime, selectedTimeZone);
-                endTimeData = event.toTime
-                    ? convertToSelectedTimezone(event.toTime, selectedTimeZone)
-                    : null;
+                // Parse times directly from the string format to avoid timezone conversion issues
+                const startTimeDate = parseTimeFromString(event.fromTime);
+                const endTimeDate = event.toTime ? parseTimeFromString(event.toTime) : null;
 
-                if (!startTimeData || !startTimeData.displayValues) {
-                    console.warn('Invalid fromTime after conversion:', event);
+                if (!startTimeDate || isNaN(startTimeDate.getTime())) {
+                    console.warn('Invalid fromTime after parsing:', event);
                     return;
                 }
+
+                // Extract date components for grouping
+                const year = startTimeDate.getFullYear();
+                const month = startTimeDate.getMonth() + 1; // getMonth() returns 0-11
+                const day = startTimeDate.getDate();
+                eventDateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
+
+                // Create display values object for time formatting
+                startTimeData = {
+                    date: startTimeDate, // Store the Date object for sorting
+                    displayValues: {
+                        year: year,
+                        month: month,
+                        day: day,
+                        hour: startTimeDate.getHours(),
+                        minute: startTimeDate.getMinutes(),
+                        second: startTimeDate.getSeconds()
+                    }
+                };
+                endTimeData = endTimeDate && !isNaN(endTimeDate.getTime())
+                    ? {
+                        date: endTimeDate, // Store the Date object for sorting
+                        displayValues: {
+                            year: endTimeDate.getFullYear(),
+                            month: endTimeDate.getMonth() + 1,
+                            day: endTimeDate.getDate(),
+                            hour: endTimeDate.getHours(),
+                            minute: endTimeDate.getMinutes(),
+                            second: endTimeDate.getSeconds()
+                        }
+                    }
+                    : null;
+
                 console.log("startTimeData in transform func", startTimeData);
                 console.log("endTimeData in transform func", endTimeData);
-                // Create date key using the display values (actual timezone-adjusted date)
-                const { year, month, day } = startTimeData.displayValues;
-                eventDateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             }
 
             const isTask = (event.list || []).some((item: any) => item.key === 'task');

@@ -723,8 +723,6 @@ export class BlockchainService {
       console.log("Imported events saved");
     } catch (err) {
       console.error(err);
-    } finally {
-      hideLoader();
     }
   }
 
