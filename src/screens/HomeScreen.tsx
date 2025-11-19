@@ -43,7 +43,6 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { useApiClient } from '../hooks/useApi';
 import { parseTimeToPST } from '../utils';
 import { useSettingsStore } from '../stores/useSetting';
-import { convertToSelectedTimezone } from '../utils/timezone';
 import { s } from 'react-native-size-matters';
 
 
@@ -127,25 +126,42 @@ const HomeScreen = () => {
                 return new Date(year, month, day);
             };
 
+            // Parse times directly from the string format to avoid timezone conversion issues
+            const parseTimeFromString = (dateStr: string): Date | null => {
+                if (!dateStr) return null;
+                // Format: YYYYMMDDTHHmmss
+                const match = dateStr.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?$/);
+                if (!match) return null;
+                
+                const [, year, month, day, hour, minute, second] = match;
+                return new Date(
+                    Number(year),
+                    Number(month) - 1, // JS months are 0-indexed
+                    Number(day),
+                    Number(hour),
+                    Number(minute),
+                    Number(second) || 0
+                );
+            };
+
             const startTimeDate = isAllDay
                 ? parseAllDayDate(event.fromTime)
-                : convertToSelectedTimezone(event.fromTime, selectedTimeZone);
+                : parseTimeFromString(event.fromTime);
 
             const endTimeDate = isAllDay
                 ? parseAllDayDate(event.toTime)
                 : event.toTime
-                    ? convertToSelectedTimezone(event.toTime, selectedTimeZone)
+                    ? parseTimeFromString(event.toTime)
                     : null;
 
-
-            console.log("Converted Start Time:", startTimeDate);
-            console.log("Converted End Time:", endTimeDate);
+            console.log("Parsed Start Time:", startTimeDate);
+            console.log("Parsed End Time:", endTimeDate);
             if (!(startTimeDate instanceof Date) || isNaN(startTimeDate.getTime())) {
-                console.warn('Invalid fromTime after conversion:', event);
+                console.warn('Invalid fromTime after parsing:', event);
                 return;
             }
             if (endTimeDate !== null && (!(endTimeDate instanceof Date) || isNaN(endTimeDate.getTime()))) {
-                console.warn('Invalid toTime after conversion:', event);
+                console.warn('Invalid toTime after parsing:', event);
                 // Decide whether to skip or ignore endTime here; ignoring for now
             }
 
@@ -153,6 +169,7 @@ const HomeScreen = () => {
             const isTask = (event.list || []).some((item: any) => item.key === 'task');
             const eventColor = isTask ? colors.figmaPurple : colors.figmaOrange;
 
+            // Format times directly from the parsed date without timezone conversion
             const startTime = startTimeDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
             const endTime = endTimeDate instanceof Date
                 ? endTimeDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })

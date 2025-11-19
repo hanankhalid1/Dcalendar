@@ -460,6 +460,16 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             <TouchableOpacity
               style={styles.navItem}
               onPress={() => {
+                doNavigate('ScheduleScreen');
+                onClose();
+              }}
+            >
+              <Image source={require('../assets/images/Orangefolder.png')} />
+              <Text style={styles.navText}>Schedule</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.navItem}
+              onPress={() => {
                 doNavigate('DailyCalendarScreen');
                 onClose();
               }}
