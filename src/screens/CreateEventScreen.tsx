@@ -908,6 +908,59 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       return; // Don't show error if dates aren't selected yet
     }
 
+    // Check if start date/time is in the past (only for new events, not edit mode)
+    if (mode !== 'edit') {
+      const now = new Date();
+      now.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
+
+      // Check if the selected month is in the past
+      const selectedMonth = selectedStartDate.getMonth();
+      const selectedYear = selectedStartDate.getFullYear();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+        setStartDateError('Please select valid time and date');
+        return;
+      }
+
+      if (isAllDayEvent) {
+        // For all-day events, check if start date is in the past
+        const startDateTime = new Date(selectedStartDate);
+        startDateTime.setHours(0, 0, 0, 0);
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0);
+
+        if (startDateTime < today) {
+          setStartDateError('Please select valid time and date');
+          return;
+        }
+      } else {
+        // For timed events, check if start date/time is in the past
+        if (selectedStartTime && selectedStartTime.trim() !== '') {
+          const startDateTime = new Date(selectedStartDate);
+          const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+          const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+
+          if (startTimeMatch) {
+            let hours = parseInt(startTimeMatch[1], 10);
+            const minutes = parseInt(startTimeMatch[2], 10);
+            const period = startTimeMatch[3].toUpperCase();
+
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+
+            startDateTime.setHours(hours, minutes, 0, 0);
+
+            if (startDateTime < now) {
+              setStartTimeError('Please select valid time and date');
+              return;
+            }
+          }
+        }
+      }
+    }
+
     if (isAllDayEvent) {
       // For all-day events, just validate dates
       const startDateTime = new Date(selectedStartDate);
@@ -1084,6 +1137,59 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
     if (!startDate || !endDate) {
       return;
+    }
+
+    // Check if start date/time is in the past (only for new events, not edit mode)
+    if (mode !== 'edit') {
+      const now = new Date();
+      now.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
+
+      // Check if the selected month is in the past
+      const selectedMonth = startDate.getMonth();
+      const selectedYear = startDate.getFullYear();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+        setStartDateError('Please select valid time and date');
+        return;
+      }
+
+      if (isAllDayEvent) {
+        // For all-day events, check if start date is in the past
+        const startDateTime = new Date(startDate);
+        startDateTime.setHours(0, 0, 0, 0);
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0);
+
+        if (startDateTime < today) {
+          setStartDateError('Please select valid time and date');
+          return;
+        }
+      } else {
+        // For timed events, check if start date/time is in the past
+        if (startTime && startTime.trim() !== '') {
+          const startDateTime = new Date(startDate);
+          const normalizedStartTime = startTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+          const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+
+          if (startTimeMatch) {
+            let hours = parseInt(startTimeMatch[1], 10);
+            const minutes = parseInt(startTimeMatch[2], 10);
+            const period = startTimeMatch[3].toUpperCase();
+
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+
+            startDateTime.setHours(hours, minutes, 0, 0);
+
+            if (startDateTime < now) {
+              setStartTimeError('Please select valid time and date');
+              return;
+            }
+          }
+        }
+      }
     }
 
     if (isAllDayEvent) {
@@ -1276,6 +1382,60 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     }
 
     // Location is optional - no validation needed
+
+    // Check if start date/time is in the past (only for new events, not edit mode)
+    if (mode !== 'edit' && selectedStartDate) {
+      const now = new Date();
+      now.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
+
+      // Check if the selected month is in the past
+      const selectedMonth = selectedStartDate.getMonth();
+      const selectedYear = selectedStartDate.getFullYear();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+        setStartDateError('Please select valid time and date');
+        isValid = false;
+        if (!firstErrorField) firstErrorField = 'startDate';
+      } else if (isAllDayEvent) {
+        // For all-day events, check if start date is in the past
+        const startDateTime = new Date(selectedStartDate);
+        startDateTime.setHours(0, 0, 0, 0);
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0);
+
+        if (startDateTime < today) {
+          setStartDateError('Please select valid time and date');
+          isValid = false;
+          if (!firstErrorField) firstErrorField = 'startDate';
+        }
+      } else {
+        // For timed events, check if start date/time is in the past
+        if (selectedStartTime && selectedStartTime.trim() !== '') {
+          const startDateTime = new Date(selectedStartDate);
+          const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+          const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+
+          if (startTimeMatch) {
+            let hours = parseInt(startTimeMatch[1], 10);
+            const minutes = parseInt(startTimeMatch[2], 10);
+            const period = startTimeMatch[3].toUpperCase();
+
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+
+            startDateTime.setHours(hours, minutes, 0, 0);
+
+            if (startDateTime < now) {
+              setStartTimeError('Please select valid time and date');
+              isValid = false;
+              if (!firstErrorField) firstErrorField = 'startTime';
+            }
+          }
+        }
+      }
+    }
 
     // ✅ Only validate times if NOT an all-day event
     if (!isAllDayEvent) {
