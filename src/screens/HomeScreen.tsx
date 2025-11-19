@@ -56,7 +56,9 @@ const HomeScreen = () => {
     const { getUserEvents, events: allEvents, userEvents } = useEventsStore();
     const account = useActiveAccount(state => state.account);
     const userName = account?.username || '';
-    
+    const [exitModal, setExitModal] = useState(false);
+    const [navigationAction, setNavigationAction] = useState(null);
+
     const handleEditEvent = (event: any) => {
         console.log('Edit event Uid in home:', event);
 
@@ -96,17 +98,16 @@ const HomeScreen = () => {
         setCurrentMonth(today.toLocaleString('en-US', { month: 'long' }));
     }, []);
 
+
     const transformEventsToCalendar = (allEvents: any[], selectedTimeZone: string) => {
         const groupedEvents: Record<string, any[]> = {};
 
         allEvents.forEach(event => {
+            console.log("event in transform func", event.title);
             if (!event.fromTime) {
                 console.warn('Missing fromTime:', event);
                 return;
             }
-
-            console.log("event title in home", event.title);
-            console.log("selected timezone", { selectedTimeZone })
 
             const fromTimeOnly = event.fromTime.split('T')[1];
             const toTimeOnly = event.toTime?.split('T')[1];
@@ -115,14 +116,10 @@ const HomeScreen = () => {
                 fromTimeOnly?.startsWith('000000') &&
                 toTimeOnly?.startsWith('000000');
 
-            console.log("Detected all-day:", isAllDay);
-            // Convert times with proper parsing and timezone application
-            // ✅ Skip timezone conversion if all-day
             const parseAllDayDate = (dateStr: string) => {
                 const year = parseInt(dateStr.substring(0, 4), 10);
-                const month = parseInt(dateStr.substring(4, 6), 10) - 1; // month index fix
+                const month = parseInt(dateStr.substring(4, 6), 10) - 1;
                 const day = parseInt(dateStr.substring(6, 8), 10);
-
                 return new Date(year, month, day);
             };
 
@@ -144,48 +141,69 @@ const HomeScreen = () => {
                 );
             };
 
-            const startTimeDate = isAllDay
-                ? parseAllDayDate(event.fromTime)
-                : parseTimeFromString(event.fromTime);
+            let startTimeData, endTimeData;
+            let eventDateKey: string;
 
-            const endTimeDate = isAllDay
-                ? parseAllDayDate(event.toTime)
-                : event.toTime
-                    ? parseTimeFromString(event.toTime)
+            if (isAllDay) {
+                const startDate = parseAllDayDate(event.fromTime);
+                eventDateKey = startDate.toDateString();
+                startTimeData = { displayValues: null };
+                endTimeData = { displayValues: null };
+            } else {
+                startTimeData = convertToSelectedTimezone(event.fromTime, selectedTimeZone);
+                endTimeData = event.toTime
+                    ? convertToSelectedTimezone(event.toTime, selectedTimeZone)
                     : null;
 
-            console.log("Parsed Start Time:", startTimeDate);
-            console.log("Parsed End Time:", endTimeDate);
-            if (!(startTimeDate instanceof Date) || isNaN(startTimeDate.getTime())) {
-                console.warn('Invalid fromTime after parsing:', event);
-                return;
-            }
-            if (endTimeDate !== null && (!(endTimeDate instanceof Date) || isNaN(endTimeDate.getTime()))) {
-                console.warn('Invalid toTime after parsing:', event);
-                // Decide whether to skip or ignore endTime here; ignoring for now
+                if (!startTimeData) {
+                    console.warn('Invalid fromTime after conversion:', event);
+                    return;
+                }
+                console.log("startTimeData in transform func", startTimeData);
+                console.log("endTimeData in transform func", endTimeData);
+                // Create date key using the display values (actual timezone-adjusted date)
+                const { year, month, day } = startTimeData.displayValues;
+                eventDateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
             }
 
-            const eventDateKey = startTimeDate.toDateString();
             const isTask = (event.list || []).some((item: any) => item.key === 'task');
             const eventColor = isTask ? colors.figmaPurple : colors.figmaOrange;
 
-            // Format times directly from the parsed date without timezone conversion
-            const startTime = startTimeDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-            const endTime = endTimeDate instanceof Date
-                ? endTimeDate.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true })
-                : '';
+            // Format time for display
+            const formatTime12Hour = (hour: number, minute: number) => {
+                const ampm = hour >= 12 ? 'PM' : 'AM';
+                const displayHour = hour % 12 || 12;
+                return `${displayHour}:${String(minute).padStart(2, '0')} ${ampm}`;
+            };
 
-            const eventTime = isAllDay
-                ? 'All Day'
-                : isTask
-                    ? startTime
-                    : `${startTime} - ${endTime}`;
+            let eventTime: string;
+            if (isAllDay) {
+                eventTime = 'All Day';
+            } else if (isTask) {
+                eventTime = formatTime12Hour(
+                    startTimeData.displayValues.hour,
+                    startTimeData.displayValues.minute
+                );
+            } else {
+                const startTime = formatTime12Hour(
+                    startTimeData.displayValues.hour,
+                    startTimeData.displayValues.minute
+                );
+                const endTime = endTimeData
+                    ? formatTime12Hour(
+                        endTimeData.displayValues.hour,
+                        endTimeData.displayValues.minute
+                    )
+                    : '';
+                console.log("startTime in transform func", startTime);
+                console.log("endTime in transform func", endTime);
+                eventTime = `${startTime} - ${endTime}`;
+            }
 
             if (!groupedEvents[eventDateKey]) {
                 groupedEvents[eventDateKey] = [];
             }
 
-            console.log('Event time', eventTime)
             groupedEvents[eventDateKey].push({
                 id: event.uid,
                 title: event.title || 'Untitled Event',
@@ -197,19 +215,25 @@ const HomeScreen = () => {
                 isExpandable: true,
                 hasActions: true,
                 originalRawEventData: event,
+                // Store the UTC date for sorting
+                sortDate: startTimeData?.date || parseAllDayDate(event.fromTime),
             });
         });
 
-        return Object.keys(groupedEvents).map(dateKey => {
-            const dateObj = new Date(dateKey);
+        return Object.keys(groupedEvents)
+            .sort()
+            .map(dateKey => {
+                const dateObj = new Date(dateKey);
 
-            return {
-                day: dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
-                date: dateObj.getDate().toString().padStart(2, '0'),
-                month: dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
-                events: groupedEvents[dateKey],
-            };
-        });
+                return {
+                    day: dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
+                    date: dateObj.getDate().toString().padStart(2, '0'),
+                    month: dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
+                    events: groupedEvents[dateKey].sort((a, b) =>
+                        a.sortDate.getTime() - b.sortDate.getTime()
+                    ),
+                };
+            });
     };
     // useEffect(() => {
     //         console.log('Selected Timezone in HomeScreen:', selectedTimeZone);
@@ -304,28 +328,29 @@ const HomeScreen = () => {
         // The filtering will be handled by the useEffect that depends on currentView
         // No need to navigate to different screens, just filter the current view
     };
-    const handleAction1Press = () => {
-        // If we are already filtering to 'EventsOnly', pressing the button again resets to 'All'
-        if (filterType === 'EventsOnly') {
-            console.log('Action 1 pressed: Resetting to All Events/Tasks');
-            setFilterType('All');
-        } else {
+    // Replace your current handleAction1Press and handleAction2Press with these:
+
+    const handleAction1Press = (isSelected: boolean) => {
+        if (isSelected) {
             console.log('Action 1 pressed: Showing only Events (non-tasks)');
             setFilterType('EventsOnly');
+        } else {
+            console.log('Action 1 pressed: Resetting to All Events/Tasks');
+            // Only reset if we're currently showing EventsOnly
+            setFilterType(prev => prev === 'EventsOnly' ? 'All' : prev);
         }
     };
 
-    const handleAction2Press = () => {
-        // If we are already filtering to 'TasksOnly', pressing the button again resets to 'All'
-        if (filterType === 'TasksOnly') {
-            console.log('Action 2 pressed: Resetting to All Events/Tasks');
-            setFilterType('All');
-        } else {
+    const handleAction2Press = (isSelected: boolean) => {
+        if (isSelected) {
             console.log('Action 2 pressed: Showing only Tasks');
             setFilterType('TasksOnly');
+        } else {
+            console.log('Action 2 pressed: Resetting to All Events/Tasks');
+            // Only reset if we're currently showing TasksOnly
+            setFilterType(prev => prev === 'TasksOnly' ? 'All' : prev);
         }
     };
-
     const handleFABPress = () => { };
 
 
@@ -398,6 +423,7 @@ const HomeScreen = () => {
                 onViewSelect={handleViewSelect}
                 onAction1Press={handleAction1Press}
                 onAction2Press={handleAction2Press}
+                filterType={filterType}  // ✅ Add this line
             />
 
             {/* Left edge touch area for drawer */}
@@ -418,7 +444,13 @@ const HomeScreen = () => {
                             padding: 20,
                         }}
                     >
-                        <Text>No events found</Text>
+                        <Text>
+                            {filterType === 'EventsOnly'
+                                ? 'No events found'
+                                : filterType === 'TasksOnly'
+                                    ? 'No tasks found'
+                                    : 'No events or tasks found'}
+                        </Text>
                     </View>
                 ) : (
                     events?.map((dayData, index) => (
@@ -463,6 +495,8 @@ const HomeScreen = () => {
                 isOpen={isDrawerOpen}
                 onClose={handleDrawerClose}
             />
+
+
         </View>
     );
 };

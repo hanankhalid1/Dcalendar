@@ -1,22 +1,21 @@
 export const parseCustomDateString = (dateStr: string): Date | null => {
-  // Example input: "20250925T093000"
-  // Parse into YYYY, MM, DD, HH, mm, ss parts
   if (!dateStr) return null;
 
   const match = dateStr.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?$/);
   if (!match) return null;
 
   const [, year, month, day, hour, minute, second] = match;
+
   return new Date(
     Number(year),
-    Number(month) - 1, // JS months are 0-indexed
+    Number(month) - 1,
     Number(day),
     Number(hour),
     Number(minute),
-    Number(second) || 0
+    Number(second ?? "00")
   );
-};
 
+};
 // Dummy placeholder for your convertToSelectedTimezone function
 // It should take a Date and return a Date in the selected timezone
 const normalizeTimezone = (tz: string) => {
@@ -38,7 +37,10 @@ const normalizeTimezone = (tz: string) => {
 };
 
 
-export const convertToSelectedTimezone = (dateStr: string, selectedTimeZone: string): Date | null => {
+export const convertToSelectedTimezone = (
+  dateStr: string,
+  selectedTimeZone: string
+): { date: Date; displayValues: { year: number; month: number; day: number; hour: number; minute: number; second: number } } | null => {
   console.log(`Converting dateStr: "${dateStr}" to timezone: "${selectedTimeZone}"`);
 
   if (!dateStr) {
@@ -51,7 +53,7 @@ export const convertToSelectedTimezone = (dateStr: string, selectedTimeZone: str
     console.warn('Invalid parsed date:', date);
     return null;
   }
-  console.log('Parsed date:', date);
+  console.log('Parsed UTC date:', date, 'ISO:', date.toISOString());
 
   try {
     const validTimeZone = normalizeTimezone(selectedTimeZone);
@@ -75,7 +77,7 @@ export const convertToSelectedTimezone = (dateStr: string, selectedTimeZone: str
         dateParts[part.type] = Number(part.value);
       }
     }
-    console.log('Extracted date parts:', dateParts);
+    console.log('Extracted date parts (IST):', dateParts);
 
     if (
       !dateParts.year ||
@@ -89,17 +91,18 @@ export const convertToSelectedTimezone = (dateStr: string, selectedTimeZone: str
       return null;
     }
 
-    const convertedDate = new Date(
-      dateParts.year,
-      dateParts.month - 1,
-      dateParts.day,
-      dateParts.hour,
-      dateParts.minute,
-      dateParts.second
-    );
-
-    console.log('Constructed converted Date:', convertedDate);
-    return convertedDate;
+    // ✅ Return BOTH: original UTC date for sorting + display values for showing
+    return {
+      date: date, // Original UTC Date object (for comparisons/sorting)
+      displayValues: {
+        year: dateParts.year,
+        month: dateParts.month,
+        day: dateParts.day,
+        hour: dateParts.hour,
+        minute: dateParts.minute,
+        second: dateParts.second,
+      }
+    };
   } catch (error) {
     console.error('Error during timezone conversion:', error);
     return null;

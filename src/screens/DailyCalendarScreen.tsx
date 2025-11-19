@@ -287,7 +287,6 @@ const DailyCalendarScreen = () => {
         hoursInDisplay={12}
         timeStep={60}
         formatTimeLabel="h A"
-        locale="en-US"
         rightToLeft={false}
         showNowLine={true}
         timesColumnWidth={0.15}
