@@ -54,7 +54,7 @@ import { convertionISOToTime, convertSecondsToUnit } from '../utils/notification
 import dayjs from "dayjs";
 import Icon from 'react-native-vector-icons/Feather';
 import { useAuthStore } from '../stores/useAuthStore';
-
+import { useSettingsStore } from '../stores/useSetting';
 const CreateEventScreen = () => {
   const navigation: any = useNavigation<AppNavigationProp>();
   const activeAccount = useActiveAccount(state => state.account);
@@ -63,7 +63,7 @@ const CreateEventScreen = () => {
   const { mode, eventData: editEventData } = route.params || {};
   const { getUserEvents } = useEventsStore();
   const { googleIntegration } = useAuthStore();
-
+  const currentTimezone = useSettingsStore();
   // Initialize blockchain service and get contract instance
   // Form state
   const [title, setTitle] = useState(editEventData?.title ?? '');
@@ -122,7 +122,7 @@ const CreateEventScreen = () => {
     }
   });
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
-  const [selectedTimezone, setSelectedTimezone] = useState('');
+  const [selectedTimezone, setSelectedTimezone] = useState(currentTimezone);
   const [timezoneSearchQuery, setTimezoneSearchQuery] = useState('');
   const [searchQuery, setsearchQuery] = useState("")
   const [locationSuggestions, setLocationSuggestions] = React.useState<any[]>([]);
@@ -682,59 +682,59 @@ const CreateEventScreen = () => {
     }
   }, [showLocationModal]);
 
-  const getRecurrenceOptions = (selectedStartDate: Date) => {
-    const d = dayjs(selectedStartDate);
-    const weekday = d.format("dddd");
-    const dayNumber = d.date();
-    const monthName = d.format("MMMM");
+const getRecurrenceOptions = (selectedStartDate: Date) => {
+  const d = dayjs(selectedStartDate);
+  const weekday = d.format("dddd");
+  const dayNumber = d.date();
+  const monthName = d.format("MMMM");
 
-    // 1. Determine the week position (first, second, third, fourth)
-    const weekNames = ["first", "second", "third", "fourth"];
-    const weekOfMonth = Math.ceil(dayNumber / 7);
+  // 1. Determine the week position (first, second, third, fourth)
+  const weekNames = ["first", "second", "third", "fourth"];
+  const weekOfMonth = Math.ceil(dayNumber / 7);
 
-    // 2. Check if the selected date is the ABSOLUTE last occurrence of this weekday in the month
-    const isSelectedDateTheLastWeekday = d.add(7, "day").month() !== d.month();
+  // 2. Check if the selected date is the ABSOLUTE last occurrence of this weekday in the month
+  const isSelectedDateTheLastWeekday = d.add(7, "day").month() !== d.month();
 
-    // 3. Determine the Nth Week Text to use for the first monthly option
-    let nthWeekText;
-    if (isSelectedDateTheLastWeekday) {
-      // Use "last" if it is the final occurrence of the day in the month
-      nthWeekText = "last";
-    } else {
-      // Otherwise, use the calculated "Nth" position (first, second, third, or fourth)
-      nthWeekText = weekNames[weekOfMonth - 1] || "first";
-    }
+  // 3. Determine the Nth Week Text to use for the first monthly option
+  let nthWeekText;
+  if (isSelectedDateTheLastWeekday) {
+    // Use "last" if it is the final occurrence of the day in the month
+    nthWeekText = "last";
+  } else {
+    // Otherwise, use the calculated "Nth" position (first, second, third, or fourth)
+    nthWeekText = weekNames[weekOfMonth - 1] || "first";
+  }
 
-    let options = [
-      "Does not repeat",
-      "Daily",
-      // 1. Weekly on [Weekday]
-      `Weekly on ${weekday}`,
-    ];
+  let options = [
+    "Does not repeat",
+    "Daily",
+    // 1. Weekly on [Weekday]
+    `Weekly on ${weekday}`,
+  ];
 
-    // 2. Monthly on the [Nth] [Weekday] - Uses "last" when applicable
+  // 2. Monthly on the [Nth] [Weekday] - Uses "last" when applicable
+  options.push(
+    `Monthly on the ${nthWeekText} ${weekday}`
+  );
+
+  // 3. Monthly on the last [Weekday]
+  // We ONLY add this option if the calculated Nth option (step 2) is NOT "last".
+  // This prevents the redundant inclusion of the "last" option.
+  if (!isSelectedDateTheLastWeekday) {
     options.push(
-      `Monthly on the ${nthWeekText} ${weekday}`
+      `Monthly on the last ${weekday}`
     );
+  }
 
-    // 3. Monthly on the last [Weekday]
-    // We ONLY add this option if the calculated Nth option (step 2) is NOT "last".
-    // This prevents the redundant inclusion of the "last" option.
-    if (!isSelectedDateTheLastWeekday) {
-      options.push(
-        `Monthly on the last ${weekday}`
-      );
-    }
-
-    // 4. Annually and others
-    options.push(
-      `Annually on ${monthName} ${dayNumber}`,
-      "Every Weekday (Monday to Friday)",
-      "Custom...",
-    );
-
-    return options;
-  };
+  // 4. Annually and others
+  options.push(
+    `Annually on ${monthName} ${dayNumber}`,
+    "Every Weekday (Monday to Friday)",
+    "Custom...",
+  );
+  
+  return options;
+};
   const recurrenceOptions = getRecurrenceOptions(selectedStartDate);
 
   // Handle location selection
@@ -776,13 +776,6 @@ const CreateEventScreen = () => {
     );
   }, []);
 
-  // Initialize with current timezone
-  React.useEffect(() => {
-    if (!selectedTimezone) {
-      const currentTz = getCurrentTimezone();
-      setSelectedTimezone(currentTz.id);
-    }
-  }, [selectedTimezone]);
 
   const handleEventTypeSelect = (eventType: string) => {
     setSelectedEventType(eventType);
