@@ -10,7 +10,6 @@ import {
   Switch,
   Animated,
   Dimensions,
-  Alert,
   Platform,
   ScrollView,
 } from 'react-native';
@@ -37,6 +36,7 @@ import { pick } from '@react-native-documents/picker';
 import RNBlobUtil from 'react-native-blob-util';
 import { apiClient, useApiClient } from '../hooks/useApi';
 import IntegrationsComponent from '../components/IntegrationsComponent';
+import CustomAlert from '../components/CustomAlert';
 import { spacing, fontSize } from '../utils/LightTheme';
 import * as DimensionsUtils from '../utils/dimensions';
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -379,6 +379,24 @@ const SettingsScreen = () => {
   const { userEvents: events } = useEventsStore();
   const { account } = useActiveAccount();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  
+  // Custom Alert State
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('info');
+
+  // Helper function to show custom alert
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info' = 'info'
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
 
   const exportService = new ExportService();
   const importService = new ImportService();
@@ -448,7 +466,7 @@ const SettingsScreen = () => {
 
   const handleExportEvents = async () => {
     if (!events || !account) {
-      Alert.alert('Data not ready', 'Events or account information is missing.');
+      showAlert('Data not ready', 'Events or account information is missing.', 'warning');
       return;
     }
 
@@ -485,7 +503,7 @@ const SettingsScreen = () => {
 
         // Clean up temp file
         await RNBlobUtil.fs.unlink(tempPath);
-        Alert.alert('✅ Export Successful', `Saved to Downloads as:\n${filename}`);
+        showAlert('Export Successful', `Saved to Downloads as:\n${filename}`, 'success');
       } else {
         // iOS path
         const dirs = RNBlobUtil.fs.dirs;
@@ -512,7 +530,7 @@ const SettingsScreen = () => {
       let errorMessage = 'Failed to export events. Please try again.';
       if (error instanceof Error) errorMessage = error.message;
 
-      Alert.alert('Export Failed', errorMessage);
+      showAlert('Export Failed', errorMessage, 'error');
     }
   };
 
@@ -544,7 +562,6 @@ const SettingsScreen = () => {
       const selectedFile = results[0];
 
       try {
-
         const filePath = Platform.OS === 'android' && selectedFile.uri.startsWith('content://')
           ? selectedFile.uri
           : selectedFile.uri.replace('file://', '');
@@ -553,31 +570,86 @@ const SettingsScreen = () => {
         const icalDataString = await RNFS.readFile(filePath, 'utf8');
 
         console.log("Account user name", account.userName);
+        
+        // Parse the file to get all events (before filtering)
+        const allParsedEvents = importService.parseIcal(icalDataString, account, []);
         const parsed = importService.parseIcal(icalDataString, account, events);
 
-        console.log("Parsed events", parsed);
+        console.log("All parsed events:", allParsedEvents);
+        console.log("Filtered parsed events:", parsed);
 
+        // Determine the scenario
+        const totalEventsInFile = allParsedEvents && Array.isArray(allParsedEvents) ? allParsedEvents.length : 0;
+        const newEventsCount = parsed && Array.isArray(parsed) ? parsed.length : 0;
 
-        if (parsed && Array.isArray(parsed) && parsed.length > 0) {
-          await blockchainService.saveImportedEvents(parsed, account.userName, token, api);
-
-          // ✅ Success alert here
-          Alert.alert(
-            "Success",
-            "Events have been imported successfully!",
-            [{ text: "OK" }]
+        // Case 1: File is invalid or parsing failed
+        if (allParsedEvents === null || !Array.isArray(allParsedEvents)) {
+          showAlert(
+            "Invalid File",
+            "The selected file is not a valid calendar file. Please select a valid .ics or .ical file.",
+            'error'
           );
-        } else {
-          Alert.alert("No Events Found", "The selected file did not contain any valid events.");
+          return;
+        }
+
+        // Case 2: File has no valid events
+        if (totalEventsInFile === 0) {
+          showAlert(
+            "No Events Found",
+            "The selected file does not contain any valid events.",
+            'warning'
+          );
+          return;
+        }
+
+        // Case 3: All events already exist (duplicates)
+        if (totalEventsInFile > 0 && newEventsCount === 0) {
+          showAlert(
+            "Events Already Exist",
+            `All ${totalEventsInFile} event(s) from the file already exist in your calendar. No new events were imported.`,
+            'info'
+          );
+          return;
+        }
+
+        // Case 4: Some or all events are new - proceed with import
+        if (newEventsCount > 0) {
+          try {
+            await blockchainService.saveImportedEvents(parsed, account.userName, token, api);
+            
+            // Success: Events imported
+            showAlert(
+              "Import Successful",
+              `Successfully imported ${newEventsCount} event(s)${totalEventsInFile > newEventsCount ? ` (${totalEventsInFile - newEventsCount} event(s) were skipped as they already exist)` : ''}.`,
+              'success'
+            );
+          } catch (saveError) {
+            console.error('Error saving imported events:', saveError);
+            showAlert(
+              "Import Failed",
+              "Failed to save the imported events. Please try again or check your connection.",
+              'error'
+            );
+          }
         }
       } catch (err) {
-        console.error('Error selecting file:', err);
-        Alert.alert('Error', 'Failed to pick file');
+        console.error('Error processing file:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Unknown error occurred';
+        showAlert(
+          "Import Error",
+          `Failed to import events: ${errorMessage}. Please ensure the file is a valid calendar file and try again.`,
+          'error'
+        );
       }
     }
     catch (err) {
       console.error('Error selecting file:', err);
-      Alert.alert('Error', 'Failed to pick file');
+      const errorMessage = err instanceof Error ? err.message : 'Failed to access the file';
+      showAlert(
+        "File Selection Error",
+        `Unable to select the file: ${errorMessage}. Please try again.`,
+        'error'
+      );
     }
   }
 
@@ -700,6 +772,15 @@ const SettingsScreen = () => {
       <CustomDrawer
         isOpen={isDrawerOpen}
         onClose={handleDrawerClose}
+      />
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
       />
     </SafeAreaView>
   );
