@@ -43,6 +43,7 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { useApiClient } from '../hooks/useApi';
 import { parseTimeToPST } from '../utils';
 import { useSettingsStore } from '../stores/useSetting';
+import { convertToSelectedTimezone } from '../utils/timezone';
 import { s } from 'react-native-size-matters';
 
 
@@ -155,7 +156,7 @@ const HomeScreen = () => {
                     ? convertToSelectedTimezone(event.toTime, selectedTimeZone)
                     : null;
 
-                if (!startTimeData) {
+                if (!startTimeData || !startTimeData.displayValues) {
                     console.warn('Invalid fromTime after conversion:', event);
                     return;
                 }
@@ -176,20 +177,20 @@ const HomeScreen = () => {
                 return `${displayHour}:${String(minute).padStart(2, '0')} ${ampm}`;
             };
 
-            let eventTime: string;
+            let eventTime: string = '';
             if (isAllDay) {
                 eventTime = 'All Day';
-            } else if (isTask) {
+            } else if (isTask && startTimeData?.displayValues) {
                 eventTime = formatTime12Hour(
                     startTimeData.displayValues.hour,
                     startTimeData.displayValues.minute
                 );
-            } else {
+            } else if (startTimeData?.displayValues) {
                 const startTime = formatTime12Hour(
                     startTimeData.displayValues.hour,
                     startTimeData.displayValues.minute
                 );
-                const endTime = endTimeData
+                const endTime = endTimeData?.displayValues
                     ? formatTime12Hour(
                         endTimeData.displayValues.hour,
                         endTimeData.displayValues.minute
@@ -198,6 +199,9 @@ const HomeScreen = () => {
                 console.log("startTime in transform func", startTime);
                 console.log("endTime in transform func", endTime);
                 eventTime = `${startTime} - ${endTime}`;
+            } else {
+                // Fallback if time data is missing
+                eventTime = 'Time not available';
             }
 
             if (!groupedEvents[eventDateKey]) {
