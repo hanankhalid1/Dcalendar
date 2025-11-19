@@ -2675,16 +2675,18 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               )}
             />
 
+            {/* Use Current Timezone Button - Aligned with timezone options */}
+            <TouchableOpacity
+              style={styles.useCurrentTimezoneButton}
+              onPress={handleUseCurrentTimezone}
+            >
+              <Text style={styles.useCurrentTimezoneButtonText}>
+                Use current time zone
+              </Text>
+            </TouchableOpacity>
+
             {/* Modal Footer */}
             <View style={styles.timezoneModalFooter}>
-              <TouchableOpacity
-                style={styles.timezoneModalButton}
-                onPress={handleUseCurrentTimezone}
-              >
-                <Text style={styles.timezoneModalButtonText}>
-                  Use current time zone
-                </Text>
-              </TouchableOpacity>
               <TouchableOpacity
                 style={styles.timezoneModalButton}
                 onPress={() => setShowTimezoneModal(false)}
@@ -3958,7 +3960,7 @@ const styles = StyleSheet.create({
   },
   timezoneList: {
     maxHeight: scaleHeight(250),
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   timezoneItem: {
     paddingVertical: spacing.sm,
@@ -3978,6 +3980,18 @@ const styles = StyleSheet.create({
     color: '#0B6DE0',
     fontWeight: '500',
   },
+  useCurrentTimezoneButton: {
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    marginBottom: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  useCurrentTimezoneButtonText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
+    fontWeight: '400',
+  },
   timezoneModalFooter: {
     flexDirection: 'row',
     justifyContent: 'space-between',
@@ -3992,17 +4006,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timezoneModalButtonText: {
-    fontSize: fontSize.textSize14,
+    fontSize: fontSize.textSize16,
     color: colors.blackText,
     fontWeight: '400',
   },
   timezoneModalOkButton: {
-    flex: 1,
+    flex: 0.5,
     borderRadius: borderRadius.md,
     overflow: 'hidden',
   },
   timezoneModalOkGradient: {
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
   },
