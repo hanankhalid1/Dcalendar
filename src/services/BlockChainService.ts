@@ -584,10 +584,44 @@ export class BlockchainService {
         signedResult.rawTransaction,
       );
       return txHash;
-    } catch (error) {
-      console.log(error);
-
-      Alert.alert('Error', JSON.stringify(error));
+    } catch (error: any) {
+      console.error('Blockchain transaction error:', error);
+      
+      // Parse blockchain error messages
+      let errorMessage = 'Failed to create event. Please try again.';
+      
+      if (error?.message) {
+        const errorMsg = error.message.toLowerCase();
+        const errorStr = JSON.stringify(error).toLowerCase();
+        
+        // Check for specific blockchain errors
+        if (errorMsg.includes('replacement transaction underpriced') || errorStr.includes('replacement transaction underpriced')) {
+          errorMessage = 'Transaction failed. Please wait a moment and try again.';
+        } else if (errorMsg.includes('insufficient funds') || errorStr.includes('insufficient funds')) {
+          errorMessage = 'Insufficient funds. Please check your wallet balance.';
+        } else if (errorMsg.includes('nonce') || errorStr.includes('nonce')) {
+          errorMessage = 'Transaction error. Please try again in a moment.';
+        } else if (errorMsg.includes('network') || errorStr.includes('network') || errorMsg.includes('timeout')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (errorMsg.includes('gas') || errorStr.includes('gas')) {
+          errorMessage = 'Transaction failed due to gas estimation error. Please try again.';
+        } else if (error?.code === -32000 || error?.code === -32603) {
+          errorMessage = 'Blockchain transaction failed. Please try again.';
+        } else {
+          // Try to extract meaningful error from the error object
+          try {
+            const errorObj = typeof error === 'string' ? JSON.parse(error) : error;
+            if (errorObj?.name || errorObj?.message) {
+              errorMessage = `Transaction error: ${errorObj.name || errorObj.message}`;
+            }
+          } catch (parseError) {
+            // If parsing fails, use default message
+          }
+        }
+      }
+      
+      // Throw error with user-friendly message so it can be caught by the calling function
+      throw new Error(errorMessage);
     }
   }
 
@@ -797,10 +831,44 @@ export class BlockchainService {
         signedResult.rawTransaction,
       );
       return txHash;
-    } catch (error) {
-      console.log(error);
-
-      Alert.alert('Error', JSON.stringify(error));
+    } catch (error: any) {
+      console.error('Blockchain transaction error (update):', error);
+      
+      // Parse blockchain error messages (same logic as createEvent)
+      let errorMessage = 'Failed to update event. Please try again.';
+      
+      if (error?.message) {
+        const errorMsg = error.message.toLowerCase();
+        const errorStr = JSON.stringify(error).toLowerCase();
+        
+        // Check for specific blockchain errors
+        if (errorMsg.includes('replacement transaction underpriced') || errorStr.includes('replacement transaction underpriced')) {
+          errorMessage = 'Transaction failed. Please wait a moment and try again.';
+        } else if (errorMsg.includes('insufficient funds') || errorStr.includes('insufficient funds')) {
+          errorMessage = 'Insufficient funds. Please check your wallet balance.';
+        } else if (errorMsg.includes('nonce') || errorStr.includes('nonce')) {
+          errorMessage = 'Transaction error. Please try again in a moment.';
+        } else if (errorMsg.includes('network') || errorStr.includes('network') || errorMsg.includes('timeout')) {
+          errorMessage = 'Network error. Please check your connection and try again.';
+        } else if (errorMsg.includes('gas') || errorStr.includes('gas')) {
+          errorMessage = 'Transaction failed due to gas estimation error. Please try again.';
+        } else if (error?.code === -32000 || error?.code === -32603) {
+          errorMessage = 'Blockchain transaction failed. Please try again.';
+        } else {
+          // Try to extract meaningful error from the error object
+          try {
+            const errorObj = typeof error === 'string' ? JSON.parse(error) : error;
+            if (errorObj?.name || errorObj?.message) {
+              errorMessage = `Transaction error: ${errorObj.name || errorObj.message}`;
+            }
+          } catch (parseError) {
+            // If parsing fails, use default message
+          }
+        }
+      }
+      
+      // Throw error with user-friendly message so it can be caught by the calling function
+      throw new Error(errorMessage);
     }
   }
 

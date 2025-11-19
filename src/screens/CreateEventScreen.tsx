@@ -54,6 +54,7 @@ import { convertionISOToTime, convertSecondsToUnit } from '../utils/notification
 import dayjs from "dayjs";
 import Icon from 'react-native-vector-icons/Feather';
 import { useAuthStore } from '../stores/useAuthStore';
+import CustomAlert from '../components/CustomAlert';
 
 const CreateEventScreen = () => {
   const navigation: any = useNavigation<AppNavigationProp>();
@@ -138,6 +139,24 @@ const CreateEventScreen = () => {
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const endsOptions = ['Never', 'On', 'After'];
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
+  
+  // Custom Alert State
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('error');
+
+  // Helper function to show custom alert
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info' = 'error'
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
 
   const isAllDayEventCheck = (fromTime: string, toTime: string): boolean => {
     if (!fromTime || !toTime) {
@@ -1540,13 +1559,15 @@ const CreateEventScreen = () => {
         await getUserEvents(activeAccount.userName, api);
 
         navigation.goBack();
-        Alert.alert('Event Updated', 'Event Updated Successfully');
+        showAlert('Event Updated', 'Event updated successfully!', 'success');
       } else {
-        Alert.alert('Event Update Failed', 'Failed to Update Event');
+        showAlert('Event Update Failed', 'Failed to update event. Please try again.', 'error');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error in handleEditEvent:', error);
-      Alert.alert('Error', 'Failed to Update Event');
+      // Show user-friendly error message from blockchain service
+      const errorMessage = error?.message || 'Failed to update event. Please try again.';
+      showAlert('Event Update Failed', errorMessage, 'error');
     }
   };
 
@@ -1663,13 +1684,15 @@ const CreateEventScreen = () => {
 
         navigation.goBack();
 
-        Alert.alert('Event created', 'Event Created Successfully');
+        showAlert('Event Created', 'Event created successfully!', 'success');
       } else {
-        Alert.alert('Event Creation Failed', 'Failed to Create Event');
+        showAlert('Event Creation Failed', 'Failed to create event. Please try again.', 'error');
       }
-    } catch (error) {
-      console.log(error);
-      Alert.alert('Error', 'Failed to Create Event');
+    } catch (error: any) {
+      console.error('Error creating event:', error);
+      // Show user-friendly error message from blockchain service
+      const errorMessage = error?.message || 'Failed to create event. Please try again.';
+      showAlert('Event Creation Failed', errorMessage, 'error');
     }
   };
 
@@ -3064,6 +3087,15 @@ const CreateEventScreen = () => {
           </View>
         </View>
       </Modal>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 };
