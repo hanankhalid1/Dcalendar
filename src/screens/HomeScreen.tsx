@@ -66,9 +66,13 @@ const HomeScreen = () => {
         const eventToPass = event.originalRawEventData || event;
 
         // Use the raw data for checking if it's a task (as tags/list are present here)
-        const isTask = (eventToPass.list || eventToPass.tags || []).some(
+        // Check both list and tags arrays, and also check the event itself
+        const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
+        const isTask = list.some(
             (item: any) => item.key === 'task'
         );
+
+        console.log('Is Task check:', { isTask, list, eventToPass, event });
 
         // 2. Determine the target screen
         const targetScreen = isTask

@@ -27,7 +27,8 @@ import { AppNavigationProp } from "../navigations/appNavigation.type";
 import { useNavigation, useRoute } from "@react-navigation/native";
 import GradientText from "../components/home/GradientText";
 import { Colors } from "../constants/Colors";
-import { dayAbbreviations, dayNames, eventTypes, recurrenceOptions, timezones } from "../constants/dummyData";
+import { dayAbbreviations, dayNames, eventTypes, timezones } from "../constants/dummyData";
+import dayjs from "dayjs";
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useToken } from '../stores/useTokenStore';
 import { formatToISO8601 } from '../utils';
@@ -36,6 +37,7 @@ import { NECJSPRIVATE_KEY } from "../constants/Config";
 import { useEventsStore } from "../stores/useEventsStore";
 import { useApiClient } from "../hooks/useApi";
 import { generateEventUID } from "../utils/eventUtils";
+import CustomAlert from '../components/CustomAlert';
 
 const CreateTaskScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
@@ -46,23 +48,48 @@ const CreateTaskScreen = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { getUserEvents } = useEventsStore();
+  const { getUserEvents, setUserEvents, userEvents } = useEventsStore();
   const { api } = useApiClient();
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
   const [selectedRecurrence, setSelectedRecurrence] = useState('Does not repeat');
   const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
-  const [customRecurrence, setCustomRecurrence] = useState({
-    repeatEvery: '1',
-    repeatUnit: 'Week',
-    repeatOn: ['Thursday'],
-    endsType: 'Never',
-    endsDate: '',
-    endsAfter: '13',
+  const [customRecurrence, setCustomRecurrence] = useState(() => {
+    const weekday =
+      selectedDate
+        ? selectedDate.toLocaleDateString('en-US', { weekday: 'long' })
+        : 'Thursday'; // default fallback
+    return {
+      repeatEvery: '1',
+      repeatUnit: 'Week',
+      repeatOn: [weekday],
+      endsType: 'Never',
+      endsDate: '',
+      endsAfter: '13',
+    }
   });
   const endsOptions = ['Never', 'On', 'After'];
   const [selectedValue, setSelectedValue] = useState(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+  
+  // Custom Alert State
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('error');
+
+  // Helper function to show custom alert
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info' = 'error'
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
   const getCurrentTimezone = React.useCallback(() => {
     const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     const timezoneData = timezones.find(tz => tz.id === timezone);
@@ -71,9 +98,21 @@ const CreateTaskScreen = () => {
     );
   }, [timezones]);
 
-  const [selectedDate, setSelectedDate] = useState<Date | null>(
-    editEventData?.selectedDate ? new Date(editEventData.selectedDate) : null,
-  );
+  // Initialize selectedDate from editEventData.fromTime if editing (like CreateEventScreen)
+  const getInitialDate = () => {
+    if (mode === 'edit' && editEventData?.fromTime) {
+      // Parse fromTime immediately to set initial date
+      const year = editEventData.fromTime.substring(0, 4);
+      const month = editEventData.fromTime.substring(4, 6);
+      const day = editEventData.fromTime.substring(6, 8);
+      if (year && month && day) {
+        return new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+      }
+    }
+    return null;
+  };
+
+  const [selectedDate, setSelectedDate] = useState<Date | null>(getInitialDate());
   const [selectedStartTime, setSelectedStartTime] = useState(
     editEventData?.selectedStartTime || '',
   );
@@ -102,6 +141,75 @@ const CreateTaskScreen = () => {
     { label: "Personal", value: "3" },
   ]);
   const repeatUnits = ['Day', 'Week', 'Month', 'Year'];
+
+  useEffect(() => {
+    if (selectedDate) {
+      const weekday = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+      setCustomRecurrence(prev => ({
+        ...prev,
+        repeatOn: [weekday],
+      }));
+    }
+  }, [selectedDate]);
+
+  const getRecurrenceOptions = (selectedDate: Date) => {
+    const d = dayjs(selectedDate);
+    const weekday = d.format("dddd");
+    const dayNumber = d.date();
+    const monthName = d.format("MMMM");
+
+    // 1. Determine the week position (first, second, third, fourth)
+    const weekNames = ["first", "second", "third", "fourth"];
+    const weekOfMonth = Math.ceil(dayNumber / 7);
+
+    // 2. Check if the selected date is the ABSOLUTE last occurrence of this weekday in the month
+    const isSelectedDateTheLastWeekday = d.add(7, "day").month() !== d.month();
+
+    // 3. Determine the Nth Week Text to use for the first monthly option
+    let nthWeekText;
+    if (isSelectedDateTheLastWeekday) {
+      // Use "last" if it is the final occurrence of the day in the month
+      nthWeekText = "last";
+    } else {
+      // Otherwise, use the calculated "Nth" position (first, second, third, or fourth)
+      nthWeekText = weekNames[weekOfMonth - 1] || "first";
+    }
+
+    let options = [
+      "Does not repeat",
+      "Daily",
+      // 1. Weekly on [Weekday]
+      `Weekly on ${weekday}`,
+    ];
+
+    // 2. Monthly on the [Nth] [Weekday] - Uses "last" when applicable
+    options.push(
+      `Monthly on the ${nthWeekText} ${weekday}`
+    );
+
+    // 3. Monthly on the last [Weekday]
+    // We ONLY add this option if the calculated Nth option (step 2) is NOT "last".
+    // This prevents the redundant inclusion of the "last" option.
+    if (!isSelectedDateTheLastWeekday) {
+      options.push(
+        `Monthly on the last ${weekday}`
+      );
+    }
+
+    // 4. Annually and others
+    options.push(
+      `Annually on ${monthName} ${dayNumber}`,
+      "Every Weekday (Monday to Friday)",
+      "Custom...",
+    );
+    
+    return options;
+  };
+
+  const handleUnitSelect = (unit) => {
+    setCustomRecurrence(prev => ({ ...prev, repeatUnit: unit }));
+    setShowUnitDropdown(false);
+  };
 
   const handleRecurrenceSelect = (recurrence: string) => {
     if (recurrence === 'Custom...') {
@@ -140,39 +248,196 @@ const CreateTaskScreen = () => {
     }));
   };
 
+  const recurrenceOptions = selectedDate ? getRecurrenceOptions(selectedDate) : [
+    "Does not repeat",
+    "Daily",
+    "Weekly on Thursday",
+    "Monthly on the first Thursday",
+    "Monthly on the last Thursday",
+    "Annually on January 1",
+    "Every Weekday (Monday to Friday)",
+    "Custom...",
+  ];
 
 
 
+
+
+  // Helper function to parse datetime from different formats (same as CreateEventScreen)
+  const parseDateTime = (dateTimeString: string) => {
+    if (!dateTimeString) return { date: null, time: '' };
+
+    let date: Date;
+    let timeString = '';
+
+    try {
+      // Handle ISO format (2025-09-19T05:00:00.000Z)
+      if (dateTimeString.includes('T') && dateTimeString.includes('Z')) {
+        date = new Date(dateTimeString);
+        if (isNaN(date.getTime())) {
+          console.error('Invalid ISO date:', dateTimeString);
+          return { date: null, time: '' };
+        }
+        timeString = date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      }
+      // Handle YYYYMMDDTHHMMSS format (20250924T210000)
+      else if (dateTimeString.match(/^\d{8}T\d{6}$/)) {
+        const year = dateTimeString.substring(0, 4);
+        const month = dateTimeString.substring(4, 6);
+        const day = dateTimeString.substring(6, 8);
+        const timePart = dateTimeString.substring(9); // Get HHMMSS
+        const hour = dateTimeString.substring(9, 11);
+        const minute = dateTimeString.substring(11, 13);
+        const second = dateTimeString.substring(13, 15);
+
+        // CHECK IF IT'S MIDNIGHT (ALL-DAY EVENT)
+        if (timePart === '000000') {
+          date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+          return { date, time: '' };
+        }
+
+        // Parse as normal timed event
+        date = new Date(
+          parseInt(year),
+          parseInt(month) - 1,
+          parseInt(day),
+          parseInt(hour),
+          parseInt(minute),
+          parseInt(second)
+        );
+
+        if (isNaN(date.getTime())) {
+          console.error('Invalid YYYYMMDDTHHMMSS date:', dateTimeString);
+          return { date: null, time: '' };
+        }
+
+        // Convert to 12-hour format manually to avoid locale issues
+        const hourNum = parseInt(hour);
+        const minuteNum = parseInt(minute);
+
+        let displayHour = hourNum;
+        let period = 'AM';
+
+        if (hourNum >= 12) {
+          period = 'PM';
+          if (hourNum > 12) {
+            displayHour = hourNum - 12;
+          }
+        } else if (hourNum === 0) {
+          displayHour = 12;
+        }
+
+        timeString = `${displayHour.toString().padStart(2, '0')}:${minuteNum.toString().padStart(2, '0')} ${period}`;
+      }
+      // Handle date-only format (YYYYMMDD) - treat as all-day
+      else if (dateTimeString.match(/^\d{8}$/)) {
+        const year = dateTimeString.substring(0, 4);
+        const month = dateTimeString.substring(4, 6);
+        const day = dateTimeString.substring(6, 8);
+
+        date = new Date(parseInt(year), parseInt(month) - 1, parseInt(day));
+        if (isNaN(date.getTime())) {
+          console.error('Invalid YYYYMMDD date:', dateTimeString);
+          return { date: null, time: '' };
+        }
+
+        return { date, time: '' };
+      }
+      // Handle other formats
+      else {
+        date = new Date(dateTimeString);
+        if (isNaN(date.getTime())) {
+          console.error('Invalid date format:', dateTimeString);
+          return { date: null, time: '' };
+        }
+        timeString = date.toLocaleTimeString('en-US', {
+          hour: '2-digit',
+          minute: '2-digit',
+          hour12: true
+        });
+      }
+
+      return { date, time: timeString };
+    } catch (error) {
+      console.error('Error parsing datetime:', dateTimeString, error);
+      return { date: null, time: '' };
+    }
+  };
+
+  // Helper function to parse event data from tags/list (same as CreateEventScreen)
+  const parseEventData = (eventData: any) => {
+    if (!eventData) return {};
+
+    const dataArray = eventData.list || eventData.tags || [];
+    const parsedData: any = {};
+
+    dataArray.forEach((item: any) => {
+      const { key, value } = item;
+      switch (key) {
+        case 'repeatEvent':
+          parsedData.repeatEvent = value;
+          break;
+        case 'customRepeatEvent':
+          parsedData.customRepeatEvent = value;
+          break;
+        default:
+          break;
+      }
+    });
+
+    return parsedData;
+  };
 
   useEffect(() => {
+    console.log('Edit Task Data:', JSON.stringify(editEventData));
+
     if (mode === 'edit' && editEventData) {
+      const parsedData = parseEventData(editEventData);
+      console.log('Parsed Data from tags/list:', parsedData);
+
       // Set title
-      console.log("edit task opened:", editEventData)
       setTitle(editEventData.title || '');
 
       // Set description
       setDescription(editEventData.description || '');
-      if (editEventData.date) {
-        // Parse date string like "Wed Oct 01 2025"
+
+      // Parse date and time from fromTime (same as CreateEventScreen)
+      if (editEventData.fromTime) {
+        const startDateTime = parseDateTime(editEventData.fromTime);
+        if (startDateTime.date) {
+          setSelectedDate(startDateTime.date);
+          // Convert 12-hour format to 24-hour format for selectedStartTime
+          if (startDateTime.time) {
+            const [time, period] = startDateTime.time.split(' ');
+            const [hours, minutes] = time.split(':');
+
+            let hour24 = parseInt(hours, 10);
+            if (period === 'PM' && hour24 !== 12) {
+              hour24 += 12;
+            } else if (period === 'AM' && hour24 === 12) {
+              hour24 = 0;
+            }
+
+            const time24h = `${hour24.toString().padStart(2, '0')}:${minutes}`;
+            setSelectedStartTime(time24h);
+          } else {
+            // All-day event
+            setSelectedStartTime('');
+          }
+        }
+      } else if (editEventData.date && editEventData.time) {
+        // Fallback: parse from date and time strings if fromTime is not available
         const parsedDate = new Date(editEventData.date);
-        setSelectedDate(parsedDate);
-      }
+        if (!isNaN(parsedDate.getTime())) {
+          setSelectedDate(parsedDate);
+        }
 
-      const repeatEventTag = editEventData.tags.find(tag => tag.key === 'repeatEvent');
-
-      // Check if the tag was found
-      if (repeatEventTag) {
-        // Use the value from the found tag object (e.g., 'Daily')
-        setSelectedRecurrence(repeatEventTag.value);
-
-        // Show recurrence dropdown
-        //setShowRecurrenceDropdown(true);
-      }
-      console.log("Edit Event Start Time:", editEventData);
-      // Set date and time from fromTime
-      if (editEventData.time) {
-        // Convert 12-hour format to 24-hour format (HH:MM)
-        const time12h = editEventData.time; // e.g., "11:10 PM"
+        // Convert 12-hour format to 24-hour format
+        const time12h = editEventData.time;
         const [time, period] = time12h.split(' ');
         const [hours, minutes] = time.split(':');
 
@@ -187,7 +452,15 @@ const CreateTaskScreen = () => {
         setSelectedStartTime(time24h);
       }
 
-      setShowDetailedDateTime(true);
+      // Set recurrence
+      if (parsedData.repeatEvent) {
+        setSelectedRecurrence(parsedData.repeatEvent);
+      }
+
+      // Set showDetailedDateTime if we have date/time
+      if (editEventData.fromTime || (editEventData.date && editEventData.time)) {
+        setShowDetailedDateTime(true);
+      }
     }
   }, [mode, editEventData]);
 
@@ -199,6 +472,7 @@ const CreateTaskScreen = () => {
     setSelectedDate(date);
     setSelectedStartTime(startTime);
     setShowDetailedDateTime(true);
+    setSelectedRecurrence("Does not repeat");
     // Clear errors when date/time is selected
     setDateError('');
     setTimeError('');
@@ -330,10 +604,11 @@ const CreateTaskScreen = () => {
     console.log("Processing task...");
 
     try {
-      console.log("edit event uid:", editEventData?.id);
-      const uid = mode === 'edit' && editEventData?.id
-        ? editEventData.id
+      // Use uid (like web version) or fallback to id
+      const uid = mode === 'edit' && (editEventData?.uid || editEventData?.id)
+        ? (editEventData.uid || editEventData.id)
         : generateEventUID();
+      console.log("Edit event uid:", editEventData?.uid || editEventData?.id);
       console.log("Generated/Using UID:", uid);
       const startTimeISO = formatToISO8601(selectedDate!, selectedStartTime);
 
@@ -345,25 +620,91 @@ const CreateTaskScreen = () => {
 
       const endTimeISO = formatToISO8601(selectedDate!, endTimeString);
 
-      const repeatEvents = (editEventData?.list || [])
-        .filter((data: any) => data.key === "repeatEvent")
-        .map((data: any) => data.value)
-        .filter((value: any) => value !== null);
-      // ... [Same customRepeat and meetingEventIdValue extraction logic] ...
-      const customRepeat = (editEventData?.list || [])
-        .filter((data: any) => data.key === "customRepeatEvent")
-        .map((data: any) => data.value)
-        .filter((value: any) => value !== null);
-      const entries = [
-        { key: "task", value: "true" },
-        { key: "repeatEvent", value: repeatEvents },
-        { key: "customRepeatEvent", value: customRepeat },
-        { key: "LabelName", value: "My Tasks" },
-        { key: "organizer", value: activeAccount?.userName }
-      ].filter((entry) => entry.value !== undefined && entry.value !== '');
+      // Build recurrence data from current state (exactly like CreateEventScreen)
+      const repeatEventValue = selectedRecurrence !== 'Does not repeat' ? selectedRecurrence : '';
+      
+      // Build custom recurrence string if it's a custom recurrence (exactly like CreateEventScreen)
+      let customRepeatEventValue = '';
+      if (selectedRecurrence.startsWith('Every ') && selectedRecurrence !== 'Every Weekday (Monday to Friday)') {
+        // This is a custom recurrence, format it exactly like CreateEventScreen
+        const { repeatEvery, repeatUnit, repeatOn, endsType, endsAfter, endsDate } = customRecurrence;
+        customRepeatEventValue = `${repeatEvery}|${repeatUnit}|${repeatOn.join(',')}|${endsType}|${endsAfter}|${endsDate}`;
+      }
 
-      const list: { key: string; value: string }[] = [];
-      list.push(...entries);
+      let list: { key: string; value: string }[] = [];
+
+      // Build list array exactly like CreateEventScreen pattern
+      // If editing, preserve existing list and only update specific keys
+      if (mode === 'edit' && editEventData?.list && Array.isArray(editEventData.list)) {
+        // Map through existing list and update only the keys we need to change (like web version)
+        const updatedList = editEventData.list.map((data: any) => {
+          switch (data.key) {
+            case "repeatEvent":
+              // Update with new value, or remove if empty
+              return repeatEventValue ? { ...data, value: repeatEventValue } : null;
+            case "customRepeatEvent":
+              // Update with new value, or remove if empty
+              return customRepeatEventValue ? { ...data, value: customRepeatEventValue } : null;
+            case "LabelName":
+              // Preserve LabelName if it exists
+              return { ...data, value: data.value || "My Tasks" };
+            default:
+              // Preserve all other items
+              return data;
+          }
+        }).filter((item: any) => item !== null); // Remove null entries
+
+        // Filter out entries with empty values
+        list = updatedList.filter((entry: any) => {
+          if (entry.key === 'repeatEvent' && !entry.value) return false;
+          if (entry.key === 'customRepeatEvent' && !entry.value) return false;
+          return entry.value !== undefined && entry.value !== '';
+        });
+
+        // Ensure required entries exist
+        const hasTask = list.some((item: any) => item.key === 'task');
+        const hasLabelName = list.some((item: any) => item.key === 'LabelName');
+        const hasOrganizer = list.some((item: any) => item.key === 'organizer');
+        const hasRepeatEvent = list.some((item: any) => item.key === 'repeatEvent');
+        const hasCustomRepeatEvent = list.some((item: any) => item.key === 'customRepeatEvent');
+
+        if (!hasTask) {
+          list.push({ key: "task", value: "true" });
+        }
+        if (!hasLabelName) {
+          list.push({ key: "LabelName", value: "My Tasks" });
+        }
+        if (!hasOrganizer) {
+          list.push({ key: "organizer", value: activeAccount?.userName || '' });
+        }
+        // Add recurrence entries if they don't exist but have values
+        if (!hasRepeatEvent && repeatEventValue) {
+          list.push({ key: "repeatEvent", value: repeatEventValue });
+        }
+        if (!hasCustomRepeatEvent && customRepeatEventValue) {
+          list.push({ key: "customRepeatEvent", value: customRepeatEventValue });
+        }
+      } else {
+        // For new tasks, build list from scratch (exactly like CreateEventScreen pattern)
+        const entries = [
+          { key: "task", value: "true" },
+          { key: "LabelName", value: "My Tasks" },
+          { key: "organizer", value: activeAccount?.userName || '' }
+        ];
+
+        // Add recurrence if it exists (exactly like CreateEventScreen)
+        if (repeatEventValue) {
+          entries.push({ key: "repeatEvent", value: repeatEventValue });
+        }
+
+        // Add custom recurrence if it exists (exactly like CreateEventScreen)
+        if (customRepeatEventValue) {
+          entries.push({ key: "customRepeatEvent", value: customRepeatEventValue });
+        }
+
+        // Filter out empty values (exactly like CreateEventScreen)
+        list = entries.filter((entry) => entry.value !== undefined && entry.value !== '');
+      }
 
       // 6. Build task data structure
       const taskData = {
@@ -388,12 +729,19 @@ const CreateTaskScreen = () => {
         await handleCreateTask(taskData, activeAccount);
       }
 
-      await getUserEvents(activeAccount.userName, api);
+      // Navigate immediately for better UX (don't wait for refresh)
       navigation.goBack();
+
+      // Refresh events in background (non-blocking) after navigation
+      getUserEvents(activeAccount.userName, api).catch(err => {
+        console.error('Background event refresh failed:', err);
+      });
 
     } catch (error: any) {
       console.error('Error saving task:', error);
-      Alert.alert('Error', error.message || 'Failed to save task. Please try again.');
+      // Show user-friendly error message from blockchain service
+      const errorMessage = error?.message || 'Failed to save task. Please try again.';
+      showAlert('Task Save Failed', errorMessage, 'error');
     } finally {
       // 5. Hide Loader
       setIsLoading(false);
@@ -402,13 +750,14 @@ const CreateTaskScreen = () => {
 
   const handleCreateTask = async (taskData, activeAccount) => {
     try {
-
       console.log("Creating task on blockchain:", taskData);
       const response = await blockchainService.createEvent(
         taskData,
         activeAccount,
         token,
       );
+      
+      // Extract recurrence data from list (exactly like CreateEventScreen)
       const repeatEvents = (taskData?.list || [])
         .filter((data: any) => data.key === "repeatEvent")
         .map((data: any) => data.value)
@@ -416,6 +765,8 @@ const CreateTaskScreen = () => {
       const customRepeat = (taskData?.list || [])
         .filter((data: any) => data.key === "customRepeatEvent")
         .map((data: any) => data.value)
+        .filter((value: any) => value !== null);
+      
       const updatePayload = {
         events: [{
           uid: taskData?.uid,
@@ -424,29 +775,42 @@ const CreateTaskScreen = () => {
           repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
           customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
           meetingEventId: '',
-
         }],
         active: activeAccount?.userName,
         type: 'update',
       };
+      
       // Call the same API as edit
       await api('POST', '/updateevents', updatePayload);
 
-      await getUserEvents(activeAccount.userName, api);
+      // Optimistically add task to local state for immediate UI feedback
+      if (userEvents && Array.isArray(userEvents)) {
+        const newTask = {
+          uid: taskData.uid,
+          title: taskData.title,
+          description: taskData.description,
+          fromTime: taskData.fromTime,
+          toTime: taskData.toTime,
+          list: taskData.list,
+          done: taskData.done,
+        };
+        setUserEvents([...userEvents, newTask]);
+      }
 
-      navigation.goBack();
+      // Don't wait for refresh - navigation happens in createTask
     } catch (error: any) {
       console.error('Error in handleCreateTask:', error);
-      Alert.alert('Error', 'An unexpected error occurred while creating the task. Please check your network connection.');
+      // Show user-friendly error message from blockchain service
+      const errorMessage = error?.message || 'An unexpected error occurred while creating the task. Please check your network connection.';
+      showAlert('Task Creation Failed', errorMessage, 'error');
     }
   };
 
   const handleEditTask = async (taskData: any, activeAccount: any) => {
     try {
-
       console.log("Updating task on blockchain:", taskData);
 
-      // Using the same createEvent method as per your requirement
+      // Using the same updateEvent method as per your requirement
       const response = await blockchainService.updateEvent(
         taskData,
         activeAccount,
@@ -454,13 +818,65 @@ const CreateTaskScreen = () => {
       );
 
       if (response) {
-        Alert.alert('Success', 'Task has been successfully updated.');
+        // Extract recurrence data from list (exactly like CreateEventScreen)
+        const repeatEvents = (taskData?.list || [])
+          .filter((data: any) => data.key === 'repeatEvent')
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+        const customRepeat = (taskData?.list || [])
+          .filter((data: any) => data.key === 'customRepeatEvent')
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+
+        const updatePayload = {
+          events: [{
+            uid: taskData?.uid,
+            fromTime: taskData?.fromTime,
+            toTime: taskData?.toTime,
+            repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
+            customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
+            meetingEventId: '',
+          }],
+          active: activeAccount?.userName,
+          type: 'update',
+        };
+
+        const apiResponse = await api('POST', '/updateevents', updatePayload);
+        console.log('API response data (edit task):', apiResponse.data);
+
+        // Optimistically update local state for immediate UI feedback
+        if (userEvents && Array.isArray(userEvents)) {
+          const updatedEvents = userEvents.map((event: any) => {
+            if (event.uid === taskData.uid) {
+              return {
+                ...event,
+                title: taskData.title,
+                description: taskData.description,
+                fromTime: taskData.fromTime,
+                toTime: taskData.toTime,
+                list: taskData.list,
+              };
+            }
+            return event;
+          });
+          setUserEvents(updatedEvents);
+        }
+
+        // Show success and navigate immediately
+        showAlert('Task Updated', 'Task has been successfully updated.', 'success');
+        
+        // Refresh events in background (non-blocking) for sync
+        getUserEvents(activeAccount.userName, api).catch(err => {
+          console.error('Background event refresh failed:', err);
+        });
       } else {
-        Alert.alert('Failed', 'Failed to update the task. Please try again.');
+        showAlert('Task Update Failed', 'Failed to update the task. Please try again.', 'error');
       }
     } catch (error: any) {
       console.error('Error in handleEditTask:', error);
-      Alert.alert('Error', 'An unexpected error occurred while updating the task.');
+      // Show user-friendly error message from blockchain service
+      const errorMessage = error?.message || 'Failed to update the task. Please try again.';
+      showAlert('Task Update Failed', errorMessage, 'error');
     }
   };
 
@@ -697,6 +1113,16 @@ const CreateTaskScreen = () => {
         isVisible={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
         onDateTimeSelect={handleDateTimeSelect}
+        mode="from"
+        selectedDate={selectedDate}
+        selectedTime={selectedStartTime ? (() => {
+          // Convert 24-hour format to 12-hour format for display
+          const [hours, minutes] = selectedStartTime.split(':');
+          const hour24 = parseInt(hours, 10);
+          const period = hour24 >= 12 ? 'PM' : 'AM';
+          const hour12 = hour24 % 12 || 12;
+          return `${hour12}:${minutes} ${period}`;
+        })() : undefined}
       />
 
 
@@ -712,8 +1138,12 @@ const CreateTaskScreen = () => {
             <View style={styles.customModalHeader}>
               <Text style={styles.customModalTitle}>Custom recurrence</Text>
             </View>
-
-            <View style={styles.customRecurrenceContent}>
+            <ScrollView
+              style={{ flexGrow: 0 }}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingBottom: spacing.lg }}
+            >
+              <View style={styles.customRecurrenceContent}>
               {/* Repeat every section */}
               <View style={styles.customRecurrenceSection}>
                 <Text style={styles.customRecurrenceSectionTitle}>
@@ -733,16 +1163,20 @@ const CreateTaskScreen = () => {
                     maxLength={2}
                     editable={!isLoading}
                   />
-                  <View style={styles.customRepeatUnitDropdown}>
+                  <TouchableOpacity
+                    style={styles.customRepeatUnitDropdown}
+                    onPress={() => setShowUnitDropdown(prev => !prev)}
+                  >
                     <Text style={styles.customRepeatUnitText}>
                       {customRecurrence.repeatUnit}
                     </Text>
                     <FeatherIcon
                       name="chevron-down"
-                      size={16}
+                      size={14}
                       color="#6C6C6C"
+                      style={{ paddingTop: 3 }}
                     />
-                  </View>
+                  </TouchableOpacity>
                 </View>
               </View>
 
@@ -752,35 +1186,35 @@ const CreateTaskScreen = () => {
                   <Text style={styles.customRecurrenceSectionTitle}>
                     Repeat on
                   </Text>
-                  <View style={styles.customDaysRow}>
-                    {dayAbbreviations.map((day, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={[
-                          styles.customDayButton,
-                          customRecurrence.repeatOn.includes(dayNames[index]) &&
-                          styles.customDayButtonSelected,
-                        ]}
-                        onPress={() => {
-                          if (!isLoading) {
-                            handleDayToggle(dayNames[index]);
-                          }
-                        }}
-                        disabled={isLoading}
-                      >
-                        <Text
+                  <ScrollView horizontal={true}
+                    showsHorizontalScrollIndicator={false}
+                    contentContainerStyle={{ alignItems: 'center' }}
+                  >
+                    <View style={styles.customDaysRow}>
+                      {dayAbbreviations.map((day, index) => (
+                        <TouchableOpacity
+                          key={index}
                           style={[
-                            styles.customDayButtonText,
-                            customRecurrence.repeatOn.includes(
-                              dayNames[index],
-                            ) && styles.customDayButtonTextSelected,
+                            styles.customDayButton,
+                            customRecurrence.repeatOn.includes(dayNames[index]) &&
+                            styles.customDayButtonSelected,
                           ]}
+                          onPress={() => handleDayToggle(dayNames[index])}
                         >
-                          {day}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
+                          <Text
+                            style={[
+                              styles.customDayButtonText,
+                              customRecurrence.repeatOn.includes(
+                                dayNames[index],
+                              ) && styles.customDayButtonTextSelected,
+                            ]}
+                          >
+                            {day}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
+                  </ScrollView>
                 </View>
               )}
 
@@ -887,8 +1321,23 @@ const CreateTaskScreen = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
-            </View>
-
+              </View>
+              {showUnitDropdown && (
+                <View style={styles.dropdownOverlay}>
+                  <View style={styles.dropdownContainer}>
+                    {repeatUnits.map(unit => (
+                      <TouchableOpacity
+                        key={unit}
+                        style={styles.dropdownItem}
+                        onPress={() => handleUnitSelect(unit)}
+                      >
+                        <Text style={styles.dropdownItemText}>{unit}</Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
+                </View>
+              )}
+            </ScrollView>
             {/* Action Buttons */}
             <View style={styles.customModalActions}>
               <TouchableOpacity
@@ -946,9 +1395,17 @@ const CreateTaskScreen = () => {
           </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
-
 };
 
 const styles = StyleSheet.create({
@@ -1240,15 +1697,16 @@ const styles = StyleSheet.create({
   // Custom Recurrence Modal Styles
   customRecurrenceModalContainer: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
-    maxHeight: '80%',
-    minHeight: '60%',
-    paddingBottom: scaleHeight(40),
+    borderRadius: 20,
+    width: '100%',
+    maxHeight: '75%',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.sm,
   },
   customRecurrenceContent: {
     flex: 1,
     paddingHorizontal: spacing.lg,
+    overflow: 'visible',
   },
 
   // Custom Modal Styles
@@ -1270,6 +1728,7 @@ const styles = StyleSheet.create({
   },
   customRecurrenceSection: {
     marginBottom: spacing.xl,
+    overflow: 'visible',
   },
   customRecurrenceSectionTitle: {
     fontSize: fontSize.textSize16,
@@ -1309,6 +1768,32 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     fontWeight: '400',
     marginRight: spacing.xs,
+  },
+  dropdownContainer: {
+    position: 'absolute',
+    top: scaleHeight(45), // Position below the button row
+    left: scaleWidth(60) + spacing.sm, // Align with dropdown button
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    minWidth: scaleWidth(120),
+    maxWidth: scaleWidth(150),
+    paddingVertical: spacing.xs,
+    zIndex: 1001,
+  },
+  dropdownItem: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+  },
+  dropdownItemText: {
+    fontSize: fontSize.textSize16,
+    color: colors.blackText,
   },
   customDaysRow: {
     flexDirection: 'row',
@@ -1359,20 +1844,21 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.primaryblue,
   },
   customEndsOptionText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     color: colors.blackText,
     fontWeight: '400',
     minWidth: scaleWidth(40),
   },
   customEndsInput: {
     width: scaleWidth(100),
-    height: scaleHeight(32),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
     paddingHorizontal: spacing.sm,
-    fontSize: fontSize.textSize14,
+    fontSize: fontSize.textSize12,
     color: colors.blackText,
+    paddingVertical: spacing.sm,
+    lineHeight: scaleHeight(13),
   },
   customEndsInputDisabled: {
     backgroundColor: '#F5F5F5',
@@ -1387,15 +1873,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'flex-end',
     gap: spacing.md,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+    backgroundColor: colors.white,
   },
   customCancelButton: {
-    paddingVertical: spacing.md,
+    paddingVertical: 10,
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,
     backgroundColor: '#F3F4F6',
   },
   customCancelButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     fontWeight: '500',
     color: '#6B7280',
   },
@@ -1404,12 +1895,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   customDoneButtonGradient: {
-    paddingVertical: spacing.md,
+    paddingVertical: 10,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
   },
   customDoneButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     fontWeight: '600',
     color: colors.white,
   },

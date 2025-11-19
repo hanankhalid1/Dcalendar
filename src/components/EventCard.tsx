@@ -119,38 +119,49 @@ const EventCard: React.FC<EventCardProps> = ({
   const [editingEvent, setEditingEvent] = useState(null);
   const token = useToken(state => state.token);
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-  const { getUserEvents } = useEventsStore();
+  const { getUserEvents, setUserEvents, userEvents } = useEventsStore();
 
 
   // In your React Native component (e.g., EventCard or a wrapper screen)
 
   const handleDeleteEvent = async (eventId: string) => {
-    // These need to be available in the component's scope:
-    // blockchainService, account, token, api, navigation, setEvents, setDeletedEvents, hideLoader, showLoader, moment
-
     try {
       setIsLoading(true); // ✅ show loader immediately
-
 
       if (!account) {
         console.log('Error', 'No active account found. Please log in again.');
         return false;
       }
+      
       console.log("Account found: ", account);
+      
+      // Store current events for potential revert
+      const currentEvents = [...(userEvents || [])];
+      
+      // Optimistically remove event from UI immediately for better UX
+      if (userEvents && Array.isArray(userEvents)) {
+        const filteredEvents = userEvents.filter((ev: any) => ev.uid !== eventId);
+        setUserEvents(filteredEvents);
+      }
+
       // Call the service to modify data, re-encrypt, and submit the transaction.
       await blockchainService.deleteEventSoft(eventId, account, token, api);
 
-      await getUserEvents(account.userName, api);
+      // Refresh events in background (non-blocking) for sync
+      getUserEvents(account.userName, api).catch(err => {
+        console.error('Background event refresh failed:', err);
+        // If refresh fails, revert optimistic update
+        setUserEvents(currentEvents);
+      });
 
     } catch (err) {
       console.error("Delete Event Failed:", err);
+      // Revert optimistic update on error
+      setUserEvents(currentEvents);
       Alert.alert("Error", "Failed to move the event to the trash");
     } finally {
       setIsLoading(false);
-
     }
-
-
   };
 
   //   try {

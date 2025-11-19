@@ -233,9 +233,22 @@ const DailyCalendarScreen = () => {
 
   const handleEditEvent = (event: any) => {
     handleCloseEventModal();
-    (navigation as any).navigate(Screen.CreateEventScreen, {
+    
+    // Extract the raw data if available
+    const eventToPass = event.originalRawEventData || event;
+    
+    // Check if it's a task
+    const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
+    const isTask = list.some((item: any) => item.key === 'task');
+    
+    // Determine the target screen
+    const targetScreen = isTask
+      ? Screen.CreateTaskScreen
+      : Screen.CreateEventScreen;
+    
+    (navigation as any).navigate(targetScreen, {
       mode: 'edit',
-      eventData: event,
+      eventData: eventToPass,
     });
   };
 

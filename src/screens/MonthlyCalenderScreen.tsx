@@ -44,7 +44,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const navigation = useNavigation();
   const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
   const { account } = useActiveAccount();
-  const { userEvents, userEventsLoading, getUserEvents } = useEventsStore();
+  const { userEvents, userEventsLoading, getUserEvents, setUserEvents } = useEventsStore();
   const { selectedDate, setSelectedDate } = useCalendarStore();
   // ✅ Get start of week setting from store
 
@@ -759,9 +759,22 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const handleEditEvent = (event: any) => {
     console.log("edit event from monthly" , event);
     handleCloseEventModal();
-    (navigation as any).navigate(Screen.CreateEventScreen, {
+    
+    // Extract the raw data if available
+    const eventToPass = event.originalRawEventData || event;
+    
+    // Check if it's a task
+    const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
+    const isTask = list.some((item: any) => item.key === 'task');
+    
+    // Determine the target screen
+    const targetScreen = isTask
+      ? Screen.CreateTaskScreen
+      : Screen.CreateEventScreen;
+    
+    (navigation as any).navigate(targetScreen, {
       mode: 'edit',
-      eventData: event,
+      eventData: eventToPass,
     });
   };
 
@@ -775,10 +788,29 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       handleCloseEventModal();
 
       setIsDeleting(true);
+      
+      // Store current events for potential revert
+      const currentEvents = [...(userEvents || [])];
+      
+      // Optimistically remove event from UI immediately for better UX
+      if (userEvents && Array.isArray(userEvents)) {
+        const filteredEvents = userEvents.filter((ev: any) => ev.uid !== event.uid);
+        setUserEvents(filteredEvents);
+      }
+
+      // Delete on blockchain (this will take time, but UI already updated)
       await blockchainService.deleteEventSoft(event.uid, account, token, api);
-      await getUserEvents(account.userName, api);
+      
+      // Refresh events in background (non-blocking) for sync
+      getUserEvents(account.userName, api).catch(err => {
+        console.error('Background event refresh failed:', err);
+        // If refresh fails, revert optimistic update
+        setUserEvents(currentEvents);
+      });
     } catch (err) {
       console.error("Delete Event Failed:", err);
+      // Revert optimistic update on error
+      setUserEvents(currentEvents);
       Alert.alert("Error", "Failed to move the event to the trash");
     } finally {
       setIsDeleting(false);
@@ -965,11 +997,15 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                               hour: 'numeric',
                               minute: '2-digit',
                             })}
-                            {' - '}
-                            {parseTimeToPST(event.toTime)?.toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })}
+                            {!event.isTask && (
+                              <>
+                                {' - '}
+                                {parseTimeToPST(event.toTime)?.toLocaleTimeString('en-US', {
+                                  hour: 'numeric',
+                                  minute: '2-digit',
+                                })}
+                              </>
+                            )}
                           </Text>
                         </View>
 
