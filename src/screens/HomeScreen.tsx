@@ -41,9 +41,10 @@ import CustomLoader from '../global/CustomLoader';
 import CustomeHeader from '../global/CustomeHeader';
 import { useEventsStore } from '../stores/useEventsStore';
 import { useApiClient } from '../hooks/useApi';
-import { parseTimeToPST } from '../utils';
+import { parseTimeToPST, isEventInPast } from '../utils';
 import { useSettingsStore } from '../stores/useSetting';
 import { s } from 'react-native-size-matters';
+import CustomAlert from '../components/CustomAlert';
 
 
 const HomeScreen = () => {
@@ -59,18 +60,45 @@ const HomeScreen = () => {
     const [exitModal, setExitModal] = useState(false);
     const [navigationAction, setNavigationAction] = useState(null);
 
+    // Custom Alert State
+    const [alertVisible, setAlertVisible] = useState(false);
+    const [alertTitle, setAlertTitle] = useState('');
+    const [alertMessage, setAlertMessage] = useState('');
+    const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('error');
+
+    // Helper function to show custom alert
+    const showAlert = (
+        title: string,
+        message: string,
+        type: 'success' | 'error' | 'warning' | 'info' = 'error'
+    ) => {
+        setAlertTitle(title);
+        setAlertMessage(message);
+        setAlertType(type);
+        setAlertVisible(true);
+    };
+
     const handleEditEvent = (event: any) => {
         console.log('Edit event Uid in home:', event);
 
         // 1. Extract the raw data. This contains the original fromTime and toTime strings.
         const eventToPass = event.originalRawEventData || event;
 
-        // Use the raw data for checking if it's a task (as tags/list are present here)
-        // Check both list and tags arrays, and also check the event itself
+        // Check if it's a task first (needed for conditional alert message)
         const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
         const isTask = list.some(
             (item: any) => item.key === 'task'
         );
+
+        // Check if event is in the past
+        if (isEventInPast(eventToPass)) {
+            showAlert(
+                isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
+                '',
+                'warning'
+            );
+            return;
+        }
 
         console.log('Is Task check:', { isTask, list, eventToPass, event });
 
@@ -524,6 +552,15 @@ const HomeScreen = () => {
                             break;
                     }
                 }}
+            />
+
+            {/* Custom Alert */}
+            <CustomAlert
+                visible={alertVisible}
+                title={alertTitle}
+                message={alertMessage}
+                type={alertType}
+                onClose={() => setAlertVisible(false)}
             />
 
             {/* Custom Drawer */}

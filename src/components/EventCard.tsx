@@ -227,29 +227,45 @@ const EventCard: React.FC<EventCardProps> = ({
           ]}
           {...containerProps}
         >
-          {/* Compact Header - Time, Title, and Chevron in same row */}
+          {/* Compact Header - Time, Title, Edit Button, and Chevron */}
           <View style={expanded ? styles.compactHeader1 : styles.compactHeader2}>
             <View style={styles.compactTitleContainer}>
               <View
                 style={[styles.compactColorIndicator, { backgroundColor: color }]}
               />
               {expanded ? (
-                <Text
-                  numberOfLines={1}
-                  ellipsizeMode="tail"
-                  style={styles.compactTitle}
-                >
-                  {title}
-                </Text>
-              ) : (
-                <View style={styles.compactTimeTitleColumn}>
+                <View style={styles.compactTitleRow}>
                   <Text
-                    numberOfLines={2} // Allow 2 lines for longer titles
+                    numberOfLines={2}
                     ellipsizeMode="tail"
                     style={styles.compactTitle}
                   >
                     {title}
                   </Text>
+                  <TouchableOpacity
+                    style={styles.compactEditButton}
+                    onPress={() => onEdit?.(event)}
+                  >
+                    {renderIcon('edit', 'MaterialIcons', 18, colors.black)}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.compactTimeTitleColumn}>
+                  <View style={styles.compactTitleRow}>
+                    <Text
+                      numberOfLines={2} // Allow 2 lines for longer titles
+                      ellipsizeMode="tail"
+                      style={styles.compactTitle}
+                    >
+                      {title}
+                    </Text>
+                    <TouchableOpacity
+                      style={styles.compactEditButton}
+                      onPress={() => onEdit?.(event)}
+                    >
+                      {renderIcon('edit', 'MaterialIcons', 18, colors.black)}
+                    </TouchableOpacity>
+                  </View>
                   <Text style={styles.compactTime}>{time}</Text>
                 </View>
               )}
@@ -314,14 +330,8 @@ const EventCard: React.FC<EventCardProps> = ({
                 </View>
               )} */}
 
-                {/* Action Icons - Now shown for all events when expanded */}
+                {/* Action Icons - Delete button and other actions when expanded */}
                 <View style={styles.compactActionIcons}>
-                  <TouchableOpacity
-                    style={styles.compactActionIcon}
-                    onPress={() => onEdit?.(event)}
-                  >
-                    {renderIcon('edit', 'MaterialIcons', 18, colors.black)}
-                  </TouchableOpacity>
                   <TouchableOpacity
                     style={styles.compactActionIcon}
                     // 1. Wrap the logic in an inline function
@@ -631,6 +641,14 @@ const styles = StyleSheet.create({
     marginRight: spacing.xs, // Reduced margin to give more space to title
     minWidth: 0, // Allow flex shrinking
   },
+  compactTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start', // Align to top to handle 2-line titles
+    flex: 1,
+    flexWrap: 'wrap', // Allow wrapping to next line
+    minWidth: 0, // Allow flex shrinking
+    gap: spacing.xs, // Add gap between title and edit button
+  },
   compactTimeTitleRow: {
     flexDirection: 'row',
     alignItems: 'flex-start', // Align to top to handle 2-line titles
@@ -670,6 +688,11 @@ const styles = StyleSheet.create({
     flex: 1,
     minWidth: 0, // Allow title to shrink and ellipsize
     lineHeight: screenWidth < 375 ? 18 : 20, // Set line height for better readability
+  },
+  compactEditButton: {
+    padding: spacing.xs,
+    flexShrink: 0, // Prevent button from shrinking
+    marginLeft: spacing.xs,
   },
   compactTitleExpanded: {
     fontSize: fontSize.textSize20,

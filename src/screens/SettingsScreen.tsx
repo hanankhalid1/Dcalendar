@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
   View,
   Text,
@@ -166,6 +166,13 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
   const blockchainService = new BlockchainService();
   const [isSaving, setIsSaving] = useState(false);
 
+  // Reset isSaving when modal closes
+  useEffect(() => {
+    if (!visible) {
+      setIsSaving(false);
+    }
+  }, [visible]);
+
   const handleDaySelect = async (day: string) => {
     // ✅ Update local store immediately (Zustand persist will save to AsyncStorage automatically)
     onSelectDay(day);
@@ -186,6 +193,9 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
         // Don't show error to user - local storage is working
         setIsSaving(false);
       });
+    } else {
+      // If no account, ensure isSaving is false
+      setIsSaving(false);
     }
   };
 
@@ -206,7 +216,7 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
             style={styles.radioOption}
             onPress={() => handleDaySelect(day)}
             activeOpacity={0.7}
-            disabled={isSaving}
+            disabled={false}
           >
             <View style={styles.radioButton}>
               {selectedDay === day && (
@@ -311,6 +321,8 @@ const ThemeSelectionModal = ({ visible, onClose, selectedTheme, onSelectTheme })
 
 // Time Zone Modal Component
 const TimeZoneModal = ({ visible, onClose, selectedTimeZone, onSelectTimeZone }) => {
+  const [tempSelectedTimeZone, setTempSelectedTimeZone] = useState(selectedTimeZone);
+  
   const timeZones = [
     { id: 'ist', label: '(GMT+05:30) Indian Standard' },
     { id: 'utc', label: '(GMT+00:00) UTC' },
@@ -318,12 +330,26 @@ const TimeZoneModal = ({ visible, onClose, selectedTimeZone, onSelectTimeZone })
     { id: 'pst', label: '(GMT-08:00) Pacific Standard' },
   ];
 
+  // Reset temp state when modal opens or selectedTimeZone changes
+  useEffect(() => {
+    if (visible) {
+      setTempSelectedTimeZone(selectedTimeZone);
+    }
+  }, [visible, selectedTimeZone]);
+
   const handleConfirm = () => {
+    onSelectTimeZone(tempSelectedTimeZone);
+    onClose();
+  };
+
+  const handleCancel = () => {
+    // Reset to original value
+    setTempSelectedTimeZone(selectedTimeZone);
     onClose();
   };
 
   return (
-    <BottomSheetModal visible={visible} onClose={onClose}>
+    <BottomSheetModal visible={visible} onClose={handleCancel}>
       <View style={styles.modalHeader}>
         <Text style={styles.modalTitle}>Time Zone</Text>
       </View>
@@ -333,10 +359,10 @@ const TimeZoneModal = ({ visible, onClose, selectedTimeZone, onSelectTimeZone })
           <TouchableOpacity
             key={timezone.id}
             style={styles.radioOption}
-            onPress={() => onSelectTimeZone(timezone.id)}
+            onPress={() => setTempSelectedTimeZone(timezone.id)}
           >
             <View style={styles.radioButton}>
-              {selectedTimeZone === timezone.id && (
+              {tempSelectedTimeZone === timezone.id && (
                 <LinearGradient
                   colors={['#18F06E', '#0B6DE0']}
                   start={{ x: 0, y: 0 }}
@@ -350,7 +376,7 @@ const TimeZoneModal = ({ visible, onClose, selectedTimeZone, onSelectTimeZone })
       </View>
 
       <View style={styles.modalButtons}>
-        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
+        <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
         <TouchableOpacity style={{ flex: 1 }} onPress={handleConfirm}>

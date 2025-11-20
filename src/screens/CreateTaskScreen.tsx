@@ -9,10 +9,13 @@ import {
   Image,
   StatusBar,
   Modal,
-  Alert
+  Alert,
+  KeyboardAvoidingView,
+  Platform
 } from "react-native";
 import LinearGradient from 'react-native-linear-gradient';
 import CalendarWithTime from '../components/CalendarWithTime';
+import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from "react-native-safe-area-context";
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
@@ -60,18 +63,19 @@ const CreateTaskScreen = () => {
         ? selectedDate.toLocaleDateString('en-US', { weekday: 'long' })
         : 'Thursday'; // default fallback
     return {
-      repeatEvery: '1',
-      repeatUnit: 'Week',
+    repeatEvery: '1',
+    repeatUnit: 'Week',
       repeatOn: [weekday],
-      endsType: 'Never',
-      endsDate: '',
-      endsAfter: '13',
+    endsType: 'Never',
+      endsDate: null as Date | null,
+    endsAfter: '13',
     }
   });
   const endsOptions = ['Never', 'On', 'After'];
   const [selectedValue, setSelectedValue] = useState(null);
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+  const [showEndsDatePicker, setShowEndsDatePicker] = useState(false);
   
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
@@ -221,6 +225,20 @@ const CreateTaskScreen = () => {
     }
   };
   const handleCustomRecurrenceDone = () => {
+    // Validate repeatEvery value
+    const repeatEveryNum = parseInt(customRecurrence.repeatEvery, 10);
+    
+    // Check if repeatEvery is valid (must be a positive integer between 1-99)
+    if (isNaN(repeatEveryNum) || repeatEveryNum < 1 || repeatEveryNum > 99) {
+      // Show error alert
+      showAlert(
+        'Invalid Repeat Value',
+        'Please enter a valid number between 1 and 99 for "Repeat every".',
+        'error'
+      );
+      return;
+    }
+    
     // Generate custom recurrence text based on settings
     const { repeatEvery, repeatUnit, repeatOn, endsType } = customRecurrence;
     let customText = `Every ${repeatEvery} ${repeatUnit.toLowerCase()}`;
@@ -231,8 +249,13 @@ const CreateTaskScreen = () => {
 
     if (endsType === 'After') {
       customText += ` (${customRecurrence.endsAfter} times)`;
-    } else if (endsType === 'On') {
-      customText += ` (until ${customRecurrence.endsDate})`;
+    } else if (endsType === 'On' && customRecurrence.endsDate) {
+      // Format date as MM/DD/YYYY
+      const date = customRecurrence.endsDate;
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const year = date.getFullYear();
+      customText += ` (until ${month}/${day}/${year})`;
     }
 
     setSelectedRecurrence(customText);
@@ -410,20 +433,9 @@ const CreateTaskScreen = () => {
         const startDateTime = parseDateTime(editEventData.fromTime);
         if (startDateTime.date) {
           setSelectedDate(startDateTime.date);
-          // Convert 12-hour format to 24-hour format for selectedStartTime
+          // Store in 12-hour format (like CreateEventScreen)
           if (startDateTime.time) {
-            const [time, period] = startDateTime.time.split(' ');
-            const [hours, minutes] = time.split(':');
-
-            let hour24 = parseInt(hours, 10);
-            if (period === 'PM' && hour24 !== 12) {
-              hour24 += 12;
-            } else if (period === 'AM' && hour24 === 12) {
-              hour24 = 0;
-            }
-
-            const time24h = `${hour24.toString().padStart(2, '0')}:${minutes}`;
-            setSelectedStartTime(time24h);
+            setSelectedStartTime(startDateTime.time);
           } else {
             // All-day event
             setSelectedStartTime('');
@@ -433,23 +445,11 @@ const CreateTaskScreen = () => {
         // Fallback: parse from date and time strings if fromTime is not available
         const parsedDate = new Date(editEventData.date);
         if (!isNaN(parsedDate.getTime())) {
-          setSelectedDate(parsedDate);
-        }
+        setSelectedDate(parsedDate);
+      }
 
-        // Convert 12-hour format to 24-hour format
-        const time12h = editEventData.time;
-        const [time, period] = time12h.split(' ');
-        const [hours, minutes] = time.split(':');
-
-        let hour24 = parseInt(hours, 10);
-        if (period === 'PM' && hour24 !== 12) {
-          hour24 += 12;
-        } else if (period === 'AM' && hour24 === 12) {
-          hour24 = 0;
-        }
-
-        const time24h = `${hour24.toString().padStart(2, '0')}:${minutes}`;
-        setSelectedStartTime(time24h);
+        // Store in 12-hour format (like CreateEventScreen)
+        setSelectedStartTime(editEventData.time);
       }
 
       // Set recurrence
@@ -464,18 +464,216 @@ const CreateTaskScreen = () => {
     }
   }, [mode, editEventData]);
 
+  // Real-time validation for past date/time (only for new tasks, not edit mode)
+  const validateDateTime = React.useCallback(() => {
+    // Clear previous errors first
+    setDateError('');
+    setTimeError('');
+
+    // Only validate for new tasks, not when editing
+    if (mode === 'edit' || !selectedDate || !selectedStartTime) {
+      return;
+    }
+
+    const now = new Date();
+    now.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
+
+    // Check if the selected month is in the past
+    const selectedMonth = selectedDate.getMonth();
+    const selectedYear = selectedDate.getFullYear();
+    const currentMonth = now.getMonth();
+    const currentYear = now.getFullYear();
+
+    if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+      setDateError('Please select valid time and date');
+      return;
+    }
+
+    // Check if the selected date is in the past
+    const selectedDateOnly = new Date(selectedDate);
+    selectedDateOnly.setHours(0, 0, 0, 0);
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+
+    if (selectedDateOnly < today) {
+      setDateError('Please select valid time and date');
+      return;
+    }
+
+    // If same day, check if time is in the past
+    if (selectedDateOnly.getTime() === today.getTime()) {
+      if (selectedStartTime && selectedStartTime.trim() !== '') {
+        // Parse time from 12-hour format (e.g., "11:30 AM") or 24-hour format (e.g., "11:30")
+        const normalizedTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+        const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        
+        if (timeMatch) {
+          // 12-hour format
+          let hours = parseInt(timeMatch[1], 10);
+          const minutes = parseInt(timeMatch[2], 10);
+          const period = timeMatch[3].toUpperCase();
+
+          if (period === 'PM' && hours !== 12) hours += 12;
+          if (period === 'AM' && hours === 12) hours = 0;
+
+          const selectedDateTime = new Date(selectedDate);
+          selectedDateTime.setHours(hours, minutes, 0, 0);
+
+          if (selectedDateTime < now) {
+            setTimeError('Please select valid time and date');
+            return;
+          }
+        } else {
+          // Try 24-hour format (HH:MM)
+          const [hours, minutes] = selectedStartTime.split(':');
+          const hour24 = parseInt(hours, 10);
+          const minute24 = parseInt(minutes, 10);
+
+          if (!isNaN(hour24) && !isNaN(minute24)) {
+            const selectedDateTime = new Date(selectedDate);
+            selectedDateTime.setHours(hour24, minute24, 0, 0);
+
+            if (selectedDateTime < now) {
+              setTimeError('Please select valid time and date');
+              return;
+            }
+          }
+        }
+      }
+    }
+    
+    // If we reach here, validation passed - errors are already cleared at the start
+  }, [mode, selectedDate, selectedStartTime]);
+
+  // Validate when date/time changes
+  useEffect(() => {
+    validateDateTime();
+  }, [validateDateTime]);
+
   const handleDateTimeSelect = (
     date: Date,
     startTime: string,
-    endTime: string,
+    endTime?: string,
   ) => {
-    setSelectedDate(date);
-    setSelectedStartTime(startTime);
-    setShowDetailedDateTime(true);
-    setSelectedRecurrence("Does not repeat");
-    // Clear errors when date/time is selected
+    // Clear errors first
     setDateError('');
     setTimeError('');
+    
+    // Normalize time to prevent AM/PM duplication
+    // Remove any duplicate AM/PM patterns (e.g., "10:00 AM AM" -> "10:00 AM")
+    let normalizedTime = startTime.trim();
+    
+    // Extract the time part (HH:MM) and the period (AM/PM)
+    // Match pattern: HH:MM followed by optional spaces and AM/PM (possibly duplicated)
+    const timeMatch = normalizedTime.match(/^(\d{1,2}:\d{2})\s*(AM|PM).*$/i);
+    
+    if (timeMatch) {
+      // Extract clean time and the last AM/PM (in case of duplicates)
+      const timePart = timeMatch[1];
+      // Find the last AM or PM in the string (handles duplicates)
+      const lastPeriodMatch = normalizedTime.match(/(AM|PM)\s*$/i);
+      const period = lastPeriodMatch ? lastPeriodMatch[1].toUpperCase() : '';
+      
+      normalizedTime = period ? `${timePart} ${period}` : timePart;
+    } else {
+      // If format doesn't match expected pattern, try to clean it
+      // Remove any trailing duplicate AM/PM patterns
+      normalizedTime = normalizedTime.replace(/\s+(AM|PM)(\s+(AM|PM))+$/gi, (match) => {
+        // Extract the last AM/PM
+        const lastMatch = match.match(/(AM|PM)\s*$/i);
+        return lastMatch ? ` ${lastMatch[1].toUpperCase()}` : '';
+      });
+      
+      // Also handle cases where AM/PM might be concatenated without spaces
+      normalizedTime = normalizedTime.replace(/(AM|PM)(AM|PM)+$/gi, (match) => {
+        const lastMatch = match.match(/(AM|PM)$/i);
+        return lastMatch ? lastMatch[1].toUpperCase() : '';
+      });
+    }
+    
+    setSelectedDate(date);
+    setSelectedStartTime(normalizedTime);
+    setShowDetailedDateTime(true);
+    setSelectedRecurrence("Does not repeat");
+    
+    // Validate immediately after state updates (for real-time feedback)
+    setTimeout(() => {
+      // Only validate for new tasks, not when editing
+      if (mode === 'edit' || !date || !startTime) {
+        return;
+      }
+
+      const now = new Date();
+      now.setSeconds(0, 0);
+
+      // Check if the selected month is in the past
+      const selectedMonth = date.getMonth();
+      const selectedYear = date.getFullYear();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+        setDateError('Please select valid time and date');
+        return;
+      }
+
+      // Check if the selected date is in the past
+      const selectedDateOnly = new Date(date);
+      selectedDateOnly.setHours(0, 0, 0, 0);
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+
+      if (selectedDateOnly < today) {
+        setDateError('Please select valid time and date');
+        return;
+      }
+
+      // If same day, check if time is in the past
+      if (selectedDateOnly.getTime() === today.getTime()) {
+        if (startTime && startTime.trim() !== '') {
+          // Parse time from 12-hour format (e.g., "11:30 AM") or 24-hour format (e.g., "11:30")
+          const normalizedTime = startTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+          const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+          
+          if (timeMatch) {
+            // 12-hour format
+            let hours = parseInt(timeMatch[1], 10);
+            const minutes = parseInt(timeMatch[2], 10);
+            const period = timeMatch[3].toUpperCase();
+
+            if (period === 'PM' && hours !== 12) hours += 12;
+            if (period === 'AM' && hours === 12) hours = 0;
+
+            const selectedDateTime = new Date(date);
+            selectedDateTime.setHours(hours, minutes, 0, 0);
+
+            if (selectedDateTime < now) {
+              setTimeError('Please select valid time and date');
+              return;
+            }
+          } else {
+            // Try 24-hour format (HH:MM)
+            const [hours, minutes] = startTime.split(':');
+            const hour24 = parseInt(hours, 10);
+            const minute24 = parseInt(minutes, 10);
+
+            if (!isNaN(hour24) && !isNaN(minute24)) {
+              const selectedDateTime = new Date(date);
+              selectedDateTime.setHours(hour24, minute24, 0, 0);
+
+              if (selectedDateTime < now) {
+                setTimeError('Please select valid time and date');
+                return;
+              }
+            }
+          }
+        }
+      }
+      
+      // If we reach here, validation passed - ensure errors are cleared
+    setDateError('');
+    setTimeError('');
+    }, 0);
   };
   const handleEventTypeSelect = (eventType: string) => {
     setSelectedEventType(eventType);
@@ -525,6 +723,78 @@ const CreateTaskScreen = () => {
       setTimeError('Time is required');
       isValid = false;
       if (!firstErrorField) firstErrorField = 'time';
+    }
+
+    // Validate past date/time (only for new tasks, not edit mode)
+    if (mode !== 'edit' && selectedDate && selectedStartTime) {
+      const now = new Date();
+      now.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
+
+      // Check if the selected month is in the past
+      const selectedMonth = selectedDate.getMonth();
+      const selectedYear = selectedDate.getFullYear();
+      const currentMonth = now.getMonth();
+      const currentYear = now.getFullYear();
+
+      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+        setDateError('Please select valid time and date');
+        isValid = false;
+        if (!firstErrorField) firstErrorField = 'date';
+      } else {
+        // Check if the selected date is in the past
+        const selectedDateOnly = new Date(selectedDate);
+        selectedDateOnly.setHours(0, 0, 0, 0);
+        const today = new Date(now);
+        today.setHours(0, 0, 0, 0);
+
+        if (selectedDateOnly < today) {
+          setDateError('Please select valid time and date');
+          isValid = false;
+          if (!firstErrorField) firstErrorField = 'date';
+        } else if (selectedDateOnly.getTime() === today.getTime()) {
+          // Same day - check if time is in the past
+          if (selectedStartTime && selectedStartTime.trim() !== '') {
+            // Parse time from 12-hour format (e.g., "11:30 AM") or 24-hour format (e.g., "11:30")
+            const normalizedTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+            const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+            
+            if (timeMatch) {
+              // 12-hour format
+              let hours = parseInt(timeMatch[1], 10);
+              const minutes = parseInt(timeMatch[2], 10);
+              const period = timeMatch[3].toUpperCase();
+
+              if (period === 'PM' && hours !== 12) hours += 12;
+              if (period === 'AM' && hours === 12) hours = 0;
+
+              const selectedDateTime = new Date(selectedDate);
+              selectedDateTime.setHours(hours, minutes, 0, 0);
+
+              if (selectedDateTime < now) {
+                setTimeError('Please select valid time and date');
+                isValid = false;
+                if (!firstErrorField) firstErrorField = 'time';
+              }
+            } else {
+              // Try 24-hour format (HH:MM)
+              const [hours, minutes] = selectedStartTime.split(':');
+              const hour24 = parseInt(hours, 10);
+              const minute24 = parseInt(minutes, 10);
+
+              if (!isNaN(hour24) && !isNaN(minute24)) {
+                const selectedDateTime = new Date(selectedDate);
+                selectedDateTime.setHours(hour24, minute24, 0, 0);
+
+                if (selectedDateTime < now) {
+                  setTimeError('Please select valid time and date');
+                  isValid = false;
+                  if (!firstErrorField) firstErrorField = 'time';
+                }
+              }
+            }
+          }
+        }
+      }
     }
 
     if (!activeAccount) {
@@ -610,9 +880,30 @@ const CreateTaskScreen = () => {
         : generateEventUID();
       console.log("Edit event uid:", editEventData?.uid || editEventData?.id);
       console.log("Generated/Using UID:", uid);
-      const startTimeISO = formatToISO8601(selectedDate!, selectedStartTime);
+      // Convert 12-hour format to 24-hour format for formatToISO8601 (like CreateEventScreen)
+      const convertTo24Hour = (time12h: string): string => {
+        if (!time12h || time12h.trim() === '') return '';
+        const normalizedTime = time12h.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+        const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        
+        if (timeMatch) {
+          let hours = parseInt(timeMatch[1], 10);
+          const minutes = parseInt(timeMatch[2], 10);
+          const period = timeMatch[3].toUpperCase();
+          
+          if (period === 'PM' && hours !== 12) hours += 12;
+          if (period === 'AM' && hours === 12) hours = 0;
+          
+          return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+        }
+        return time12h; // Fallback: assume it's already 24-hour
+      };
 
-      const [hours, minutes] = selectedStartTime.split(':');
+      const startTime24h = convertTo24Hour(selectedStartTime);
+      const startTimeISO = formatToISO8601(selectedDate!, startTime24h);
+
+      // Calculate end time (30 minutes after start) in 24-hour format
+      const [hours, minutes] = startTime24h.split(':');
       const totalMinutes = parseInt(hours) * 60 + parseInt(minutes) + 30;
       const endHours = Math.floor(totalMinutes / 60) % 24;
       const endMinutes = totalMinutes % 60;
@@ -628,7 +919,11 @@ const CreateTaskScreen = () => {
       if (selectedRecurrence.startsWith('Every ') && selectedRecurrence !== 'Every Weekday (Monday to Friday)') {
         // This is a custom recurrence, format it exactly like CreateEventScreen
         const { repeatEvery, repeatUnit, repeatOn, endsType, endsAfter, endsDate } = customRecurrence;
-        customRepeatEventValue = `${repeatEvery}|${repeatUnit}|${repeatOn.join(',')}|${endsType}|${endsAfter}|${endsDate}`;
+        // Format endsDate as YYYYMMDD if it's a Date object
+        const formattedEndsDate = endsDate
+          ? `${endsDate.getFullYear()}${String(endsDate.getMonth() + 1).padStart(2, '0')}${String(endsDate.getDate()).padStart(2, '0')}`
+          : '';
+        customRepeatEventValue = `${repeatEvery}|${repeatUnit}|${repeatOn.join(',')}|${endsType}|${endsAfter}|${formattedEndsDate}`;
       }
 
       let list: { key: string; value: string }[] = [];
@@ -686,9 +981,9 @@ const CreateTaskScreen = () => {
         }
       } else {
         // For new tasks, build list from scratch (exactly like CreateEventScreen pattern)
-        const entries = [
-          { key: "task", value: "true" },
-          { key: "LabelName", value: "My Tasks" },
+      const entries = [
+        { key: "task", value: "true" },
+        { key: "LabelName", value: "My Tasks" },
           { key: "organizer", value: activeAccount?.userName || '' }
         ];
 
@@ -732,10 +1027,8 @@ const CreateTaskScreen = () => {
       // Navigate immediately for better UX (don't wait for refresh)
       navigation.goBack();
 
-      // Refresh events in background (non-blocking) after navigation
-      getUserEvents(activeAccount.userName, api).catch(err => {
-        console.error('Background event refresh failed:', err);
-      });
+      // Note: getUserEvents is not called here to avoid showing "Loading Events" indicator
+      // The optimistic UI update in handleCreateTask/handleEditTask already updates the local state
 
     } catch (error: any) {
       console.error('Error saving task:', error);
@@ -865,10 +1158,8 @@ const CreateTaskScreen = () => {
         // Show success and navigate immediately
         showAlert('Task Updated', 'Task has been successfully updated.', 'success');
         
-        // Refresh events in background (non-blocking) for sync
-        getUserEvents(activeAccount.userName, api).catch(err => {
-          console.error('Background event refresh failed:', err);
-        });
+        // Note: getUserEvents is not called here to avoid showing "Loading Events" indicator
+        // The optimistic UI update already updates the local state
       } else {
         showAlert('Task Update Failed', 'Failed to update the task. Please try again.', 'error');
       }
@@ -954,10 +1245,18 @@ const CreateTaskScreen = () => {
         </View>
       )}
 
-      <ScrollView 
-        ref={scrollViewRef}
-        style={styles.scrollView}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
+        <ScrollView 
+          ref={scrollViewRef}
+          style={styles.scrollView}
+          scrollEnabled={!showRecurrenceDropdown}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 100 }}
+        >
         <View style={styles.formContainer}>
           <View 
             ref={titleInputRef}
@@ -1055,6 +1354,9 @@ const CreateTaskScreen = () => {
                   style={styles.recurrenceDropdownScroll}
                   showsVerticalScrollIndicator={false}
                   nestedScrollEnabled={true}
+                  keyboardShouldPersistTaps="handled"
+                  bounces={true}
+                  scrollEventThrottle={16}
                 >
                   {recurrenceOptions.map((option, index) => (
                     <TouchableOpacity
@@ -1106,7 +1408,8 @@ const CreateTaskScreen = () => {
             editable={!isLoading}
           />
         </View>
-      </ScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
       {/* Calendar with Time Modal */}
       <CalendarWithTime
@@ -1115,14 +1418,7 @@ const CreateTaskScreen = () => {
         onDateTimeSelect={handleDateTimeSelect}
         mode="from"
         selectedDate={selectedDate}
-        selectedTime={selectedStartTime ? (() => {
-          // Convert 24-hour format to 12-hour format for display
-          const [hours, minutes] = selectedStartTime.split(':');
-          const hour24 = parseInt(hours, 10);
-          const period = hour24 >= 12 ? 'PM' : 'AM';
-          const hour12 = hour24 % 12 || 12;
-          return `${hour12}:${minutes} ${period}`;
-        })() : undefined}
+        selectedTime={selectedStartTime || undefined}
       />
 
 
@@ -1143,7 +1439,7 @@ const CreateTaskScreen = () => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: spacing.lg }}
             >
-              <View style={styles.customRecurrenceContent}>
+            <View style={styles.customRecurrenceContent}>
               {/* Repeat every section */}
               <View style={styles.customRecurrenceSection}>
                 <Text style={styles.customRecurrenceSectionTitle}>
@@ -1153,12 +1449,25 @@ const CreateTaskScreen = () => {
                   <TextInput
                     style={styles.customRepeatEveryInput}
                     value={customRecurrence.repeatEvery}
-                    onChangeText={text =>
+                    onChangeText={text => {
+                      // Only allow positive integers (1-99)
+                      // Remove any non-numeric characters
+                      const numericOnly = text.replace(/[^0-9]/g, '');
+                      
+                      // Prevent empty string or zero
+                      if (numericOnly === '' || numericOnly === '0') {
+                        // Don't update if it would be empty or zero
+                        return;
+                      }
+                      
+                      // Limit to 2 digits (1-99)
+                      const limitedValue = numericOnly.length > 2 ? numericOnly.slice(0, 2) : numericOnly;
+                      
                       setCustomRecurrence(prev => ({
                         ...prev,
-                        repeatEvery: text,
-                      }))
-                    }
+                        repeatEvery: limitedValue,
+                      }));
+                    }}
                     keyboardType="numeric"
                     maxLength={2}
                     editable={!isLoading}
@@ -1190,30 +1499,30 @@ const CreateTaskScreen = () => {
                     showsHorizontalScrollIndicator={false}
                     contentContainerStyle={{ alignItems: 'center' }}
                   >
-                    <View style={styles.customDaysRow}>
-                      {dayAbbreviations.map((day, index) => (
-                        <TouchableOpacity
-                          key={index}
-                          style={[
-                            styles.customDayButton,
-                            customRecurrence.repeatOn.includes(dayNames[index]) &&
-                            styles.customDayButtonSelected,
-                          ]}
+                  <View style={styles.customDaysRow}>
+                    {dayAbbreviations.map((day, index) => (
+                      <TouchableOpacity
+                        key={index}
+                        style={[
+                          styles.customDayButton,
+                          customRecurrence.repeatOn.includes(dayNames[index]) &&
+                          styles.customDayButtonSelected,
+                        ]}
                           onPress={() => handleDayToggle(dayNames[index])}
+                      >
+                        <Text
+                          style={[
+                            styles.customDayButtonText,
+                            customRecurrence.repeatOn.includes(
+                              dayNames[index],
+                            ) && styles.customDayButtonTextSelected,
+                          ]}
                         >
-                          <Text
-                            style={[
-                              styles.customDayButtonText,
-                              customRecurrence.repeatOn.includes(
-                                dayNames[index],
-                              ) && styles.customDayButtonTextSelected,
-                            ]}
-                          >
-                            {day}
-                          </Text>
-                        </TouchableOpacity>
-                      ))}
-                    </View>
+                          {day}
+                        </Text>
+                      </TouchableOpacity>
+                    ))}
+                  </View>
                   </ScrollView>
                 </View>
               )}
@@ -1264,20 +1573,36 @@ const CreateTaskScreen = () => {
                   <Text style={styles.customEndsOptionText}>
                     {endsOptions[1]}
                   </Text>
-                  <TextInput
+                    <TouchableOpacity
                     style={[
                       styles.customEndsInput,
                       customRecurrence.endsType !== endsOptions[1] &&
                       styles.customEndsInputDisabled,
                     ]}
-                    value={customRecurrence.endsDate}
-                    onChangeText={text =>
-                      setCustomRecurrence(prev => ({ ...prev, endsDate: text }))
-                    }
-                    placeholder="04/09/2025"
-                    placeholderTextColor="#9E9E9E"
-                    editable={customRecurrence.endsType === endsOptions[1] && !isLoading}
-                  />
+                      onPress={() => {
+                        if (customRecurrence.endsType === endsOptions[1] && !isLoading) {
+                          setShowEndsDatePicker(true);
+                        }
+                      }}
+                      disabled={customRecurrence.endsType !== endsOptions[1] || isLoading}
+                    >
+                      <Text
+                        style={[
+                          styles.customEndsInputText,
+                          !customRecurrence.endsDate && styles.customEndsInputPlaceholder,
+                        ]}
+                      >
+                        {customRecurrence.endsDate
+                          ? (() => {
+                              const date = customRecurrence.endsDate;
+                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                              const day = String(date.getDate()).padStart(2, '0');
+                              const year = date.getFullYear();
+                              return `${month}/${day}/${year}`;
+                            })()
+                          : '04/09/2025'}
+                      </Text>
+                    </TouchableOpacity>
                 </TouchableOpacity>
 
                 <TouchableOpacity
@@ -1321,7 +1646,7 @@ const CreateTaskScreen = () => {
                   </Text>
                 </TouchableOpacity>
               </View>
-              </View>
+            </View>
               {showUnitDropdown && (
                 <View style={styles.dropdownOverlay}>
                   <View style={styles.dropdownContainer}>
@@ -1338,6 +1663,57 @@ const CreateTaskScreen = () => {
                 </View>
               )}
             </ScrollView>
+            
+            {/* Date Picker Modal for Ends Date */}
+            <Modal
+              visible={showEndsDatePicker}
+              transparent={true}
+              animationType="fade"
+              onRequestClose={() => setShowEndsDatePicker(false)}
+            >
+              <View style={styles.datePickerModalOverlay}>
+                <View style={styles.datePickerModalContainer}>
+                  <View style={styles.datePickerModalHeader}>
+                    <Text style={styles.datePickerModalTitle}>Select End Date</Text>
+                    <TouchableOpacity
+                      onPress={() => setShowEndsDatePicker(false)}
+                      style={styles.datePickerModalCloseButton}
+                    >
+                      <Text style={styles.datePickerModalCloseText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Calendar
+                    onDayPress={(day) => {
+                      const selectedDate = new Date(day.dateString);
+                      setCustomRecurrence(prev => ({ ...prev, endsDate: selectedDate }));
+                      setShowEndsDatePicker(false);
+                    }}
+                    minDate={new Date().toISOString().split('T')[0]}
+                    markedDates={
+                      customRecurrence.endsDate
+                        ? {
+                            [customRecurrence.endsDate.toISOString().split('T')[0]]: {
+                              selected: true,
+                              selectedColor: '#0B6DE0',
+                            },
+                          }
+                        : {}
+                    }
+                    theme={{
+                      selectedDayBackgroundColor: '#0B6DE0',
+                      selectedDayTextColor: '#ffffff',
+                      todayTextColor: '#0B6DE0',
+                      arrowColor: '#0B6DE0',
+                      monthTextColor: '#000000',
+                      textDayFontWeight: '400',
+                      textMonthFontWeight: 'bold',
+                      textDayHeaderFontWeight: '600',
+                    }}
+                  />
+                </View>
+              </View>
+            </Modal>
+
             {/* Action Buttons */}
             <View style={styles.customModalActions}>
               <TouchableOpacity
@@ -1626,6 +2002,7 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     fontWeight: '400',
     marginLeft: spacing.sm,
+    flex: 1,
   },
   buttonText: {
     color: "#fff",
@@ -1644,7 +2021,7 @@ const styles = StyleSheet.create({
   },
   recurrenceDropdown: {
     position: 'absolute',
-    top: scaleHeight(160),
+    top: scaleHeight(180),
     left: scaleWidth(20),
     right: scaleWidth(20),
     backgroundColor: colors.white,
@@ -1664,7 +2041,7 @@ const styles = StyleSheet.create({
     maxHeight: scaleHeight(400),
   },
   recurrenceDropdownScroll: {
-    maxHeight: scaleHeight(360),
+    maxHeight: scaleHeight(380),
   },
   recurrenceItem: {
     flexDirection: 'row',
@@ -1739,10 +2116,16 @@ const styles = StyleSheet.create({
   customRepeatEveryRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    width: '100%',
+    justifyContent: 'flex-start',
+    flexWrap: 'wrap',
+    marginBottom: spacing.xs,
     gap: spacing.sm,
   },
   customRepeatEveryInput: {
-    width: scaleWidth(60),
+    width: scaleWidth(70),
+    minWidth: scaleWidth(60),
+    maxWidth: scaleWidth(90),
     height: scaleHeight(40),
     borderWidth: 1,
     borderColor: '#DCE0E5',
@@ -1750,18 +2133,25 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: fontSize.textSize16,
     color: colors.blackText,
-    paddingHorizontal: 4,
+    paddingHorizontal: scaleWidth(10),
+    paddingVertical: 0,
+    backgroundColor: colors.white,
+    flexShrink: 0,
   },
   customRepeatUnitDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     height: scaleHeight(40),
-    minWidth: scaleWidth(80),
+    minWidth: scaleWidth(90),
+    maxWidth: scaleWidth(130),
+    flex: 0,
+    backgroundColor: colors.white,
   },
   customRepeatUnitText: {
     fontSize: fontSize.textSize16,
@@ -1827,6 +2217,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: spacing.sm,
+    flexWrap: 'wrap',
   },
   customRadioButton: {
     width: scaleWidth(20),
@@ -1850,7 +2241,8 @@ const styles = StyleSheet.create({
     minWidth: scaleWidth(40),
   },
   customEndsInput: {
-    width: scaleWidth(100),
+    minWidth: scaleWidth(100),
+    width: scaleWidth(110),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
@@ -1859,10 +2251,50 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     paddingVertical: spacing.sm,
     lineHeight: scaleHeight(13),
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   customEndsInputDisabled: {
     backgroundColor: '#F5F5F5',
+  },
+  customEndsInputText: {
+    fontSize: fontSize.textSize12,
+    color: colors.blackText,
+    flexShrink: 0,
+  },
+  customEndsInputPlaceholder: {
     color: '#9E9E9E',
+  },
+  datePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerModalContainer: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    width: '90%',
+    maxWidth: scaleWidth(400),
+  },
+  datePickerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  datePickerModalTitle: {
+    fontSize: fontSize.textSize18,
+    fontWeight: 'bold',
+    color: colors.blackText,
+  },
+  datePickerModalCloseButton: {
+    padding: spacing.xs,
+  },
+  datePickerModalCloseText: {
+    fontSize: fontSize.textSize20,
+    color: colors.blackText,
   },
   customEndsOccurrencesText: {
     fontSize: fontSize.textSize14,

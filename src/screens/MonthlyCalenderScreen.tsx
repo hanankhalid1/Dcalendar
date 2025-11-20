@@ -8,8 +8,9 @@ import WeekHeader from '../components/WeekHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
-import { parseTimeToPST } from '../utils';
+import { parseTimeToPST, isEventInPast } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
+import CustomAlert from '../components/CustomAlert';
 import { useSettingsStore } from '../stores/useSetting';
 import EventDetailsModal from '../components/EventDetailsModal';
 import { colors, spacing } from '../utils/LightTheme';
@@ -76,6 +77,24 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const [navigationAction, setNavigationAction] = useState(null);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
+  
+  // Custom Alert State
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('warning');
+
+  // Helper function to show custom alert
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info' = 'warning'
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
 
   // Extract userName similar to HomeScreen
   const userName = account?.username || '';
@@ -763,9 +782,19 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     // Extract the raw data if available
     const eventToPass = event.originalRawEventData || event;
     
-    // Check if it's a task
+    // Check if it's a task first (needed for conditional alert message)
     const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
     const isTask = list.some((item: any) => item.key === 'task');
+    
+    // Check if event is in the past
+    if (isEventInPast(eventToPass)) {
+      showAlert(
+        isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
+        '',
+        'warning'
+      );
+      return;
+    }
     
     // Determine the target screen
     const targetScreen = isTask
@@ -1161,6 +1190,15 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
               break;
           }
         }}
+      />
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
       />
 
       <CustomDrawer isOpen={isDrawerOpen} onClose={handleDrawerClose} />

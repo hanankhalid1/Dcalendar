@@ -42,14 +42,47 @@ const CalendarWithTime: React.FC<CalendarWithTimeProps> = ({
       setCurrentMonth(propSelectedDate); // Also update the current month to show the selected date's month
     }
     if (propSelectedTime) {
-      setSelectedTime(propSelectedTime);
+      // Normalize time to prevent AM/PM duplication
+      // Remove any duplicate AM/PM patterns before setting
+      let normalizedTime = propSelectedTime.trim();
+      
+      // Extract the time part (HH:MM) and the period (AM/PM)
+      // Match pattern: HH:MM followed by optional spaces and AM/PM (possibly duplicated)
+      const timeMatch = normalizedTime.match(/^(\d{1,2}:\d{2})\s*(AM|PM).*$/i);
+      
+      if (timeMatch) {
+        // Extract clean time and the last AM/PM (in case of duplicates)
+        const timePart = timeMatch[1];
+        // Find the last AM or PM in the string (handles duplicates)
+        const lastPeriodMatch = normalizedTime.match(/(AM|PM)\s*$/i);
+        const period = lastPeriodMatch ? lastPeriodMatch[1].toUpperCase() : '';
+        
+        normalizedTime = period ? `${timePart} ${period}` : timePart;
+      } else {
+        // If format doesn't match expected pattern, try to clean it
+        // Remove any trailing duplicate AM/PM patterns
+        normalizedTime = normalizedTime.replace(/\s+(AM|PM)(\s+(AM|PM))+$/gi, (match) => {
+          // Extract the last AM/PM
+          const lastMatch = match.match(/(AM|PM)\s*$/i);
+          return lastMatch ? ` ${lastMatch[1].toUpperCase()}` : '';
+        });
+        
+        // Also handle cases where AM/PM might be concatenated without spaces
+        normalizedTime = normalizedTime.replace(/(AM|PM)(AM|PM)+$/gi, (match) => {
+          const lastMatch = match.match(/(AM|PM)$/i);
+          return lastMatch ? lastMatch[1].toUpperCase() : '';
+        });
+      }
+      
+      setSelectedTime(normalizedTime);
     }
   }, [propSelectedDate, propSelectedTime]);
 
-  // Generate time slots from 8:00 AM to 8:00 PM in 30-minute intervals
+  // Generate time slots from 12:00 AM to 11:30 PM in 30-minute intervals (full 24-hour range)
   const generateTimeSlots = () => {
     const slots = [];
-    for (let hour = 8; hour <= 20; hour++) {
+    // Generate all 24 hours (0 to 23) with 30-minute intervals
+    for (let hour = 0; hour < 24; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
         const time = new Date();
         time.setHours(hour, minute, 0, 0);

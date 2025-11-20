@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  KeyboardAvoidingView,
   Modal,
   Platform,
   ScrollView,
@@ -16,6 +17,7 @@ import {
   View,
   findNodeHandle,
 } from 'react-native';
+import { Calendar } from 'react-native-calendars';
 import LinearGradient from 'react-native-linear-gradient';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import {
@@ -118,10 +120,11 @@ const CreateEventScreen = () => {
       repeatUnit: 'Week',
       repeatOn: [weekday],
       endsType: 'Never',
-      endsDate: '',
+      endsDate: null as Date | null,
       endsAfter: '13',
     }
   });
+  const [showEndsDatePicker, setShowEndsDatePicker] = useState(false);
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
   const [selectedTimezone, setSelectedTimezone] = useState(currentTimezone);
   const [timezoneSearchQuery, setTimezoneSearchQuery] = useState('');
@@ -823,6 +826,20 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   };
 
   const handleCustomRecurrenceDone = () => {
+    // Validate repeatEvery value
+    const repeatEveryNum = parseInt(customRecurrence.repeatEvery, 10);
+    
+    // Check if repeatEvery is valid (must be a positive integer between 1-99)
+    if (isNaN(repeatEveryNum) || repeatEveryNum < 1 || repeatEveryNum > 99) {
+      // Show error alert
+      showAlert(
+        'Invalid Repeat Value',
+        'Please enter a valid number between 1 and 99 for "Repeat every".',
+        'error'
+      );
+      return;
+    }
+    
     // Generate custom recurrence text based on settings
     const { repeatEvery, repeatUnit, repeatOn, endsType } = customRecurrence;
     let customText = `Every ${repeatEvery} ${repeatUnit.toLowerCase()}`;
@@ -833,8 +850,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
     if (endsType === 'After') {
       customText += ` (${customRecurrence.endsAfter} times)`;
-    } else if (endsType === 'On') {
-      customText += ` (until ${customRecurrence.endsDate})`;
+    } else if (endsType === 'On' && customRecurrence.endsDate) {
+      // Format date as MM/DD/YYYY
+      const date = customRecurrence.endsDate;
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      const year = date.getFullYear();
+      customText += ` (until ${month}/${day}/${year})`;
     }
 
     setSelectedRecurrence(customText);
@@ -1086,6 +1108,30 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           previousEndTime: selectedEndTime
         });
         setSelectedEndTime(suggestedEndTime);
+        
+        // Check if end time rolled over to next day (12:00 AM)
+        // If start time is 11:30 PM or later, end time will be 12:00 AM (next day)
+        const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+        const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (timeMatch) {
+          let hours = parseInt(timeMatch[1], 10);
+          const minutes = parseInt(timeMatch[2], 10);
+          const period = timeMatch[3].toUpperCase();
+          if (period === 'PM' && hours !== 12) hours += 12;
+          if (period === 'AM' && hours === 12) hours = 0;
+          
+          // If start time is 11:30 PM (23:30) or later, end time will be next day
+          if (hours >= 23 || (hours === 23 && minutes >= 30)) {
+            // Add 1 day to end date
+            const nextDay = new Date(date);
+            nextDay.setDate(nextDay.getDate() + 1);
+            setSelectedEndDate(nextDay);
+          } else if (selectedEndDate && selectedEndDate.getTime() !== date.getTime()) {
+            // If end date was previously set to next day but start time changed to earlier,
+            // reset end date to same as start date
+            setSelectedEndDate(date);
+          }
+        }
       } else {
         // If time is empty, clear end time too
         setSelectedEndTime('');
@@ -1111,13 +1157,31 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
     // Validate immediately with new values (don't wait for state to update)
     const newStartDate = calendarMode === 'from' ? date : selectedStartDate;
-    const newEndDate = calendarMode === 'to' ? date : (selectedEndDate || date);
+    let newEndDate = calendarMode === 'to' ? date : (selectedEndDate || date);
     const newStartTime = calendarMode === 'from' ? time : selectedStartTime;
     let newEndTime = calendarMode === 'to' ? time : selectedEndTime;
 
     // If setting start time, calculate end time
     if (calendarMode === 'from' && time && time.trim() !== '') {
       newEndTime = addMinutesToTime(time, 30);
+      
+      // Check if end time rolled over to next day (12:00 AM)
+      const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (timeMatch) {
+        let hours = parseInt(timeMatch[1], 10);
+        const period = timeMatch[3].toUpperCase();
+        if (period === 'PM' && hours !== 12) hours += 12;
+        if (period === 'AM' && hours === 12) hours = 0;
+        
+        // If start time is 11:30 PM (23:30) or later, end time will be next day
+        if (hours >= 23 || (hours === 23 && parseInt(timeMatch[2], 10) >= 30)) {
+          // Add 1 day to end date
+          const nextDay = new Date(date);
+          nextDay.setDate(nextDay.getDate() + 1);
+          newEndDate = nextDay;
+        }
+      }
     }
 
     // Validate immediately
@@ -1349,7 +1413,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   // Form validation
   const validateForm = () => {
     let isValid = true;
-    let firstErrorField: 'title' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | null = null;
+    let firstErrorField: 'title' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | 'location' | null = null;
 
     // Clear previous errors
     setTitleError('');
@@ -1381,7 +1445,17 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       if (!firstErrorField) firstErrorField = 'endDate';
     }
 
-    // Location is optional - no validation needed
+    // Validate location format (if provided)
+    if (location.trim() && location.trim().length > 0) {
+      // Check for invalid characters that could cause issues
+      // Blocked: < > { } [ ] | \ ` ~ ^ /
+      const invalidChars = /[<>{}[\]|\\`~^\/]/;
+      if (invalidChars.test(location)) {
+        setLocationError('Location contains invalid characters. Please use letters, numbers, and common punctuation.');
+        isValid = false;
+        if (!firstErrorField) firstErrorField = 'location';
+      }
+    }
 
     // Check if start date/time is in the past (only for new events, not edit mode)
     if (mode !== 'edit' && selectedStartDate) {
@@ -2200,11 +2274,18 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         </View>
       )}
 
-      <ScrollView
-        ref={scrollViewRef}
-        style={styles.content}
-        showsVerticalScrollIndicator={false}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={{ flex: 1 }}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
+        <ScrollView
+          ref={scrollViewRef}
+          style={styles.content}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{ paddingBottom: 100 }}
+        >
         {/* Title Input */}
         <View
           ref={titleInputRef}
@@ -2732,9 +2813,11 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             editable={!isLoading}
           />
         </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
 
-        {/* Bottom Action Bar */}
-        <View style={styles.bottomActionBar}>
+      {/* Bottom Action Bar */}
+      <View style={styles.bottomActionBar}>
           <TouchableOpacity
             style={styles.advanceOptionsButton}
             onPress={() => {
@@ -2766,7 +2849,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             </LinearGradient>
           </TouchableOpacity>
         </View>
-      </ScrollView>
 
 
       {/* Calendar with Time Modal */}
@@ -2899,12 +2981,25 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                     <TextInput
                       style={styles.customRepeatEveryInput}
                       value={customRecurrence.repeatEvery}
-                      onChangeText={text =>
+                      onChangeText={text => {
+                        // Only allow positive integers (1-99)
+                        // Remove any non-numeric characters
+                        const numericOnly = text.replace(/[^0-9]/g, '');
+                        
+                        // Prevent empty string or zero
+                        if (numericOnly === '' || numericOnly === '0') {
+                          // Don't update if it would be empty or zero
+                          return;
+                        }
+                        
+                        // Limit to 2 digits (1-99)
+                        const limitedValue = numericOnly.length > 2 ? numericOnly.slice(0, 2) : numericOnly;
+                        
                         setCustomRecurrence(prev => ({
                           ...prev,
-                          repeatEvery: text,
-                        }))
-                      }
+                          repeatEvery: limitedValue,
+                        }));
+                      }}
                       keyboardType="numeric"
                       maxLength={2}
                     />
@@ -3005,20 +3100,36 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                     <Text style={styles.customEndsOptionText}>
                       {endsOptions[1]}
                     </Text>
-                    <TextInput
+                    <TouchableOpacity
                       style={[
                         styles.customEndsInput,
                         customRecurrence.endsType !== endsOptions[1] &&
                         styles.customEndsInputDisabled,
                       ]}
-                      value={customRecurrence.endsDate}
-                      onChangeText={text =>
-                        setCustomRecurrence(prev => ({ ...prev, endsDate: text }))
-                      }
-                      placeholder="04/09/2025"
-                      placeholderTextColor="#9E9E9E"
-                      editable={customRecurrence.endsType === endsOptions[1]}
-                    />
+                      onPress={() => {
+                        if (customRecurrence.endsType === endsOptions[1]) {
+                          setShowEndsDatePicker(true);
+                        }
+                      }}
+                      disabled={customRecurrence.endsType !== endsOptions[1]}
+                    >
+                      <Text
+                        style={[
+                          styles.customEndsInputText,
+                          !customRecurrence.endsDate && styles.customEndsInputPlaceholder,
+                        ]}
+                      >
+                        {customRecurrence.endsDate
+                          ? (() => {
+                              const date = customRecurrence.endsDate;
+                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                              const day = String(date.getDate()).padStart(2, '0');
+                              const year = date.getFullYear();
+                              return `${month}/${day}/${year}`;
+                            })()
+                          : '04/09/2025'}
+                      </Text>
+                    </TouchableOpacity>
                   </TouchableOpacity>
 
                   <TouchableOpacity
@@ -3077,6 +3188,57 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               )}
 
             </ScrollView>
+            
+            {/* Date Picker Modal for Ends Date */}
+            <Modal
+              visible={showEndsDatePicker}
+              transparent={true}
+              animationType="fade"
+              onRequestClose={() => setShowEndsDatePicker(false)}
+            >
+              <View style={styles.datePickerModalOverlay}>
+                <View style={styles.datePickerModalContainer}>
+                  <View style={styles.datePickerModalHeader}>
+                    <Text style={styles.datePickerModalTitle}>Select End Date</Text>
+                    <TouchableOpacity
+                      onPress={() => setShowEndsDatePicker(false)}
+                      style={styles.datePickerModalCloseButton}
+                    >
+                      <Text style={styles.datePickerModalCloseText}>✕</Text>
+                    </TouchableOpacity>
+                  </View>
+                  <Calendar
+                    onDayPress={(day) => {
+                      const selectedDate = new Date(day.dateString);
+                      setCustomRecurrence(prev => ({ ...prev, endsDate: selectedDate }));
+                      setShowEndsDatePicker(false);
+                    }}
+                    minDate={new Date().toISOString().split('T')[0]}
+                    markedDates={
+                      customRecurrence.endsDate
+                        ? {
+                            [customRecurrence.endsDate.toISOString().split('T')[0]]: {
+                              selected: true,
+                              selectedColor: '#0B6DE0',
+                            },
+                          }
+                        : {}
+                    }
+                    theme={{
+                      selectedDayBackgroundColor: '#0B6DE0',
+                      selectedDayTextColor: '#ffffff',
+                      todayTextColor: '#0B6DE0',
+                      arrowColor: '#0B6DE0',
+                      monthTextColor: '#000000',
+                      textDayFontWeight: '400',
+                      textMonthFontWeight: 'bold',
+                      textDayHeaderFontWeight: '600',
+                    }}
+                  />
+                </View>
+              </View>
+            </Modal>
+            
             {/* Action Buttons */}
             <View style={styles.customModalActions}>
               <TouchableOpacity
@@ -3126,6 +3288,16 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 placeholderTextColor={colors.grey400}
                 value={location}
                 onChangeText={text => {
+                  // Check for invalid characters
+                  // Blocked: < > { } [ ] | \ ` ~ ^ /
+                  const invalidChars = /[<>{}[\]|\\`~^\/]/;
+                  if (invalidChars.test(text)) {
+                    // Show error message and don't update the location
+                    setLocationError('Special characters are not allowed. Please use letters, numbers, and common punctuation.');
+                    return;
+                  }
+                  
+                  // If valid, update location and clear error
                   setLocation(text);
                   if (locationError) setLocationError('');
                   if (text.length >= 2) {
@@ -3846,34 +4018,40 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     width: '100%',
+    justifyContent: 'flex-start',
+    flexWrap: 'wrap',
+    marginBottom: spacing.xs,
+    gap: spacing.sm,
   },
   customRepeatEveryInput: {
-    width: scaleWidth(60),
-    minWidth: scaleWidth(50),
-    maxWidth: scaleWidth(80),
-    height: scaleHeight(36),
+    width: scaleWidth(70),
+    minWidth: scaleWidth(60),
+    maxWidth: scaleWidth(90),
+    height: scaleHeight(40),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
     textAlign: 'center',
     fontSize: fontSize.textSize14,
     color: colors.blackText,
-    paddingHorizontal: scaleWidth(4),
+    paddingHorizontal: scaleWidth(10),
     paddingVertical: 0,
-    marginRight: spacing.sm,
+    backgroundColor: colors.white,
+    flexShrink: 0,
   },
   customRepeatUnitDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    height: scaleHeight(36),
-    width: scaleWidth(100),
-    minWidth: scaleWidth(80),
-    maxWidth: scaleWidth(120),
+    height: scaleHeight(40),
+    minWidth: scaleWidth(90),
+    maxWidth: scaleWidth(130),
+    flex: 0,
     backgroundColor: colors.white,
   },
   customRepeatUnitText: {
@@ -3974,6 +4152,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: spacing.sm,
+    flexWrap: 'wrap',
   },
   customRadioButton: {
     width: scaleWidth(20),
@@ -3998,7 +4177,8 @@ const styles = StyleSheet.create({
 
   },
   customEndsInput: {
-    width: scaleWidth(100),
+    minWidth: scaleWidth(100),
+    width: scaleWidth(110),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
@@ -4007,10 +4187,50 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     paddingVertical: spacing.sm,
     lineHeight: scaleHeight(13),
+    justifyContent: 'center',
+    flexShrink: 0,
   },
   customEndsInputDisabled: {
     backgroundColor: '#F5F5F5',
+  },
+  customEndsInputText: {
+    fontSize: fontSize.textSize12,
+    color: colors.blackText,
+    flexShrink: 0,
+  },
+  customEndsInputPlaceholder: {
     color: '#9E9E9E',
+  },
+  datePickerModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  datePickerModalContainer: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    width: '90%',
+    maxWidth: scaleWidth(400),
+  },
+  datePickerModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  datePickerModalTitle: {
+    fontSize: fontSize.textSize18,
+    fontWeight: 'bold',
+    color: colors.blackText,
+  },
+  datePickerModalCloseButton: {
+    padding: spacing.xs,
+  },
+  datePickerModalCloseText: {
+    fontSize: fontSize.textSize20,
+    color: colors.blackText,
   },
   customEndsOccurrencesText: {
     fontSize: fontSize.textSize14,

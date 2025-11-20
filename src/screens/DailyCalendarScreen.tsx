@@ -5,7 +5,8 @@ import {
   StyleSheet,
   Text,
   TextStyle,
-  View
+  View,
+  Alert
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import WeekView from 'react-native-week-view';
@@ -19,7 +20,8 @@ import { useActiveAccount } from '../stores/useActiveAccount';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import { useEventsStore } from '../stores/useEventsStore';
 import { useToken } from '../stores/useTokenStore';
-import { parseTimeToPST } from '../utils';
+import { parseTimeToPST, isEventInPast } from '../utils';
+import CustomAlert from '../components/CustomAlert';
 import { colors } from '../utils/LightTheme';
 
 const CustomDayHeader = ({
@@ -100,6 +102,24 @@ const DailyCalendarScreen = () => {
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isEventModalVisible, setIsEventModalVisible] = useState(false);
+  
+  // Custom Alert State
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('warning');
+
+  // Helper function to show custom alert
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info' = 'warning'
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
 
 
   // Transform UserEvents to WeekView format
@@ -237,9 +257,19 @@ const DailyCalendarScreen = () => {
     // Extract the raw data if available
     const eventToPass = event.originalRawEventData || event;
     
-    // Check if it's a task
+    // Check if it's a task first (needed for conditional alert message)
     const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
     const isTask = list.some((item: any) => item.key === 'task');
+    
+    // Check if event is in the past
+    if (isEventInPast(eventToPass)) {
+      showAlert(
+        isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
+        '',
+        'warning'
+      );
+      return;
+    }
     
     // Determine the target screen
     const targetScreen = isTask
@@ -344,6 +374,15 @@ const DailyCalendarScreen = () => {
       <CustomDrawer
         isOpen={isDrawerOpen}
         onClose={handleDrawerClose}
+      />
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
       />
 
       {/* Event Details Modal */}

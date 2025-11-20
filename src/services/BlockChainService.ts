@@ -216,22 +216,47 @@ export class BlockchainService {
       );
 
       const walletAddress = await this.getWalletAddress(Config.NECJSPK);
-      const wallet = this.provider.getSigner(walletAddress);
-
-      const gasEstimate = await helperContract
-        .connect(wallet)
-        .methods.updateSettings(username, key, options)
-        .estimateGas();
+      
+      // Estimate gas
+      const gasEstimate = await helperContract.methods
+        .updateSettings(username, key, options)
+        .estimateGas({
+          from: walletAddress,
+        });
 
       console.log('⛽ Gas estimate:', gasEstimate.toString());
 
-      const tx = await helperContract
-        .connect(wallet)
-        .methods.updateSettings(username, key, options)
-        .send({ gasLimit: gasEstimate });
+      // Get transaction parameters
+      const sender = await WalletModule.privateKeyToWalletAddressMobile(
+        Config.NECJSPK,
+      );
+      const nonce = await this.provider.getTransactionCount(sender);
+      const gasPrice = await this.provider.getGasPrice();
 
-      console.log('✅ Settings updated successfully. Transaction:', tx);
-      return tx;
+      // Get transaction hash using nativeSend
+      const transactionHash = await helperContract.methods
+        .updateSettings(username, key, options)
+        .nativeSend({
+          from: walletAddress,
+          gas: gasEstimate,
+          gasPrice: gasPrice,
+          nonce: nonce,
+          value: '0x0',
+        });
+
+      // Sign transaction
+      const signedResult = await WalletModule.signTransactionMobile(
+        transactionHash,
+        Config.NECJSPK,
+      );
+
+      // Send transaction
+      const txHash = await this.provider.sendRawTransaction(
+        signedResult.rawTransaction,
+      );
+
+      console.log('✅ Settings updated successfully. Transaction hash:', txHash);
+      return txHash;
     } catch (error: any) {
       console.error('❌ Failed to update settings:', error.message);
       throw error;
