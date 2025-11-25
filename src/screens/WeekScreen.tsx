@@ -6,7 +6,7 @@ import WeekView from 'react-native-week-view';
 import CustomDrawer from '../components/CustomDrawer';
 import EventDetailsModal from '../components/EventDetailsModal';
 import FloatingActionButton from '../components/FloatingActionButton';
-import WeekHeader from '../components/WeekHeader';
+import CustomeHeader from '../global/CustomeHeader';
 import { Screen } from '../navigations/appNavigation.type';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import { useSettingsStore } from '../stores/useSetting';
@@ -360,14 +360,11 @@ const WeekScreen = () => {
 
     return (
         <View style={styles.container}>
-            <WeekHeader
+            <CustomeHeader
                 onMenuPress={handleMenuPress}
                 currentMonth={currentMonth}
                 onMonthPress={handleMonthPress}
                 onMonthSelect={handleMonthSelect}
-                onDateSelect={handleDateSelect}
-                currentDate={selectedDate}
-                selectedDate={selectedDate}
             />
 
             {/* Loading indicator */}

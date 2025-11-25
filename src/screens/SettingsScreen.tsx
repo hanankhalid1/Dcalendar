@@ -21,7 +21,6 @@ import { Fonts } from '../constants/Fonts';
 import { Colors } from '../constants/Colors';
 import { useSettingsStore } from '../stores/useSetting';
 import { BlockchainService } from '../services/BlockChainService';
-import WeekHeader from '../components/WeekHeader';
 import { ExportService } from '../services/ExportService';
 import { ImportService } from '../services/ImportService';
 import { useEventsStore } from '../stores/useEventsStore';

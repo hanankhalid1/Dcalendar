@@ -9,10 +9,11 @@ import {
   Image,
   ActivityIndicator,
   Easing,
+  Switch,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CalenderIcon from 'react-native-vector-icons/MaterialIcons';
-import { useNavigation } from '@react-navigation/native';
+import { useNavigation, useRoute } from '@react-navigation/native';
 import {
   moderateScale,
   scaleHeight,
@@ -30,6 +31,14 @@ import { useToken } from '../stores/useTokenStore';
 import { useEventsStore } from '../stores/useEventsStore';
 import { Colors } from '../constants/Colors';
 import { Fonts } from '../constants/Fonts';
+import { useSettingsStore } from '../stores/useSetting';
+// Import SVG icons
+import DIcon from '../assets/svgs/DIcon.svg';
+import CrossIcon from '../assets/svgs/crossIcon.svg';
+import HomeIcon from '../assets/svgs/sidebarHomeIcon.svg';
+import CalendarIcon from '../assets/svgs/calendar.svg';
+import TrashIcon from '../assets/svgs/trash.svg';
+import SettingIcon from '../assets/svgs/setting.svg';
 
 interface CustomDrawerProps {
   isOpen: boolean;
@@ -55,6 +64,27 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   const slideAnim = useRef(new Animated.Value(-scaleWidth(280))).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<any>();
+  const route = useRoute();
+  const { selectedTheme, setSelectedTheme } = useSettingsStore();
+  
+  // State to track current route name
+  const [currentRouteName, setCurrentRouteName] = useState<string | undefined>(route?.name);
+  
+  // Update route name when navigation state changes
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('state', () => {
+      const state = navigation.getState();
+      const currentRoute = state?.routes[state?.index || 0];
+      setCurrentRouteName(currentRoute?.name);
+    });
+    
+    // Also set initial route name
+    const state = navigation.getState();
+    const currentRoute = state?.routes[state?.index || 0];
+    setCurrentRouteName(currentRoute?.name || route?.name);
+    
+    return unsubscribe;
+  }, [navigation, route?.name]);
 
   // State for calendar items check/uncheck
   const [myCalendars, setMyCalendars] = useState({
@@ -216,7 +246,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
       return;
     }
     setIsLoadingAccount(true);
-    setLoadingAccountId(selectedAccount.userName);
+    setLoadingAccountId(selectedAccount.userName || null);
     // Call the function to fetch and save token for the selected account
     try {
       // Call the function to fetch and save token for the selected account
@@ -406,136 +436,189 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             activeOpacity={1}
           />
         )}
+        <View style={styles.drawerContent}>
+          {/* Top Section - Header with DCalendar and Close */}
+          <View style={styles.topSection}>
+            <View style={styles.headerRow}>
+              <View style={styles.logoContainer}>
+                <DIcon width={scaleWidth(24)} height={scaleHeight(24)} />
+                <Text style={styles.logoText}>DCalendar</Text>
+              </View>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={onClose}
+                hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+              >
+                <CrossIcon width={12} height={12} />
+              </TouchableOpacity>
+            </View>
+          </View>
+
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
+          contentContainerStyle={styles.scrollContent}
         >
-          {/* Top Section */}
-          <View style={styles.topSection}>
 
-            {/* NEW: Container for Menu Button + Logo/Home Link */}
-            <View style={styles.logoRow}>
-
-              {/* 1. MENU BUTTON: Only closes the drawer */}
+          {/* Navigation Items Section */}
+          <View style={styles.section}>
+            {/* Home */}
+            <View style={styles.navItemContainer}>
               <TouchableOpacity
-                style={styles.menuCloseButton} // Add a new style for spacing
-                onPress={onClose} // Just close the drawer
-              >
-                <Icon name="menu" size={24} color={colors.white} />
-              </TouchableOpacity>
-
-              {/* 2. LOGO/TITLE BUTTON: Navigates to HomeScreen AND closes the drawer */}
-              <TouchableOpacity
-                style={styles.logoSection} // Use a style that handles alignment, no margin needed here
+                style={[
+                  styles.navItem,
+                  (currentRouteName === 'HomeScreen' || currentRouteName === 'ScheduleScreen') && styles.navItemActive
+                ]}
                 onPress={() => {
-                  // This is the desired behavior for the Home link
-                  doNavigate('HomeScreen');
+                  doNavigate('ScheduleScreen');
                   onClose();
                 }}
               >
-                <View style={styles.logoContainer}>
-                  {/* Removed the original Icon name="menu" here */}
-                  <View style={{ paddingHorizontal: spacing.sm }}>
-                    <Image
-                      source={require('../assets/images/DrawerMainIcon.png')}
-                    />
-                  </View>
-                  <Text style={styles.logoText}>Calendar</Text>
-                </View>
+                <HomeIcon 
+                  width={22} 
+                  height={22} 
+                  fill={(currentRouteName === 'HomeScreen' || currentRouteName === 'ScheduleScreen') ? colors.primaryBlue : '#414651'} 
+                />
+                <Text style={[
+                  styles.navText,
+                  (currentRouteName === 'HomeScreen' || currentRouteName === 'ScheduleScreen') && styles.navTextActive
+                ]}>
+                  Home
+                </Text>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.createButtonText}
-              onPress={() => {
-                setShowCreateMenu(prev => !prev);
-              }}
-              onLayout={e => setCreateBtnWindowLayout(e.nativeEvent.layout)}
-            >
-              <Image source={require('../assets/images/createButton.png')} />
-            </TouchableOpacity>
-          </View>
 
-          {/* Views Section */}
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                doNavigate('ScheduleScreen');
-                onClose();
-              }}
-            >
-              <Image source={require('../assets/images/Orangefolder.png')} />
-              <Text style={styles.navText}>Schedule</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                doNavigate('DailyCalendarScreen');
-                onClose();
-              }}
-            >
-              <Image source={require('../assets/images/Orangefolder.png')} />
-              <Text style={styles.navText}>Day</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                doNavigate('WeekScreen');
-                onClose();
-              }}
-            >
-              <Image source={require('../assets/images/Blackfolder.png')} />
-              <Text style={styles.navText}>Week</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                doNavigate('MonthlyCalenderScreen');
-                onClose();
-              }}
-            >
-              <Image source={require('../assets/images/Grayfolder.png')} />
-              <Text style={styles.navText}>Month</Text>
-            </TouchableOpacity>
-          </View>
-
-          <View style={styles.separator} />
-
-          {/* User Profile with Dropdown Toggle */}
-          <TouchableOpacity
-            style={styles.profileSection}
-            onPress={toggleAccountDropdown}
-            onLayout={e => setAccountBtnLayout(e.nativeEvent.layout)}
-          >
-            {/* Avatar Section */}
-            {
-              (() => {
-                const initial = (account?.name?.trim()?.charAt(0) || 'N').toUpperCase();
-                return (
-                  <View style={styles.avatarContainer}>
-                    <Text style={styles.avatarText}>{initial}</Text>
-                  </View>
-                );
-              })()
-            }
-            {/* Profile Text */}
-            <View style={styles.profileTextContainer}>
-              <Text style={styles.profileName}>{account?.name || "Name"}</Text>
-              <Text style={styles.profileUsername}>
-                {account?.username || account?.userName || 'Select Account'}
-              </Text>
+            {/* Daily Calendar */}
+            <View style={styles.navItemContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.navItem,
+                  currentRouteName === 'DailyCalendarScreen' && styles.navItemActive
+                ]}
+                onPress={() => {
+                  doNavigate('DailyCalendarScreen');
+                  onClose();
+                }}
+              >
+                <CalendarIcon 
+                  width={22} 
+                  height={22} 
+                  fill={currentRouteName === 'DailyCalendarScreen' ? colors.primaryBlue : '#414651'} 
+                />
+                <Text style={[
+                  styles.navText,
+                  currentRouteName === 'DailyCalendarScreen' && styles.navTextActive
+                ]}>
+                  Daily calendar
+                </Text>
+              </TouchableOpacity>
             </View>
-            {/* Dropdown Indicator Icon */}
-            <Icon
-              name={isAccountDropdownOpen ? "menu-up" : "menu-down"}
-              size={24}
-              color={colors.white}
-              style={{ marginLeft: 'auto' }}
-            />
-          </TouchableOpacity>
 
-          {/* RENDER THE ACCOUNT DROPDOWN HERE */}
-          {renderAccountDropdown()}
+            {/* Weekly Calendar */}
+            <View style={styles.navItemContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.navItem,
+                  currentRouteName === 'WeekScreen' && styles.navItemActive
+                ]}
+                onPress={() => {
+                  doNavigate('WeekScreen');
+                  onClose();
+                }}
+              >
+                <CalendarIcon 
+                  width={22} 
+                  height={22} 
+                  fill={currentRouteName === 'WeekScreen' ? colors.primaryBlue : '#414651'} 
+                />
+                <Text style={[
+                  styles.navText,
+                  currentRouteName === 'WeekScreen' && styles.navTextActive
+                ]}>
+                  Weekly calendar
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Monthly Calendar */}
+            <View style={styles.navItemContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.navItem,
+                  currentRouteName === 'MonthlyCalenderScreen' && styles.navItemActive
+                ]}
+                onPress={() => {
+                  doNavigate('MonthlyCalenderScreen');
+                  onClose();
+                }}
+              >
+                <CalendarIcon 
+                  width={22} 
+                  height={22} 
+                  fill={currentRouteName === 'MonthlyCalenderScreen' ? colors.primaryBlue : '#414651'} 
+                />
+                <Text style={[
+                  styles.navText,
+                  currentRouteName === 'MonthlyCalenderScreen' && styles.navTextActive
+                ]}>
+                  Monthly calendar
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Recycle bin / Trash */}
+            <View style={styles.navItemContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.navItem,
+                  currentRouteName === 'DeletedEventsScreen' && styles.navItemActive
+                ]}
+                onPress={() => {
+                  doNavigate('DeletedEventsScreen');
+                  onClose();
+                }}
+              >
+                <TrashIcon 
+                  width={22} 
+                  height={22} 
+                  fill={currentRouteName === 'DeletedEventsScreen' ? colors.primaryBlue : '#414651'} 
+                />
+                <Text style={[
+                  styles.navText,
+                  currentRouteName === 'DeletedEventsScreen' && styles.navTextActive
+                ]}>
+                  Recycle bin
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Settings */}
+            <View style={styles.navItemContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.navItem,
+                  currentRouteName === 'SettingsScreen' && styles.navItemActive
+                ]}
+                onPress={() => {
+                  doNavigate('SettingsScreen');
+                  onClose();
+                }}
+              >
+                <SettingIcon 
+                  width={22} 
+                  height={22} 
+                  fill={currentRouteName === 'SettingsScreen' ? colors.primaryBlue : '#414651'} 
+                />
+                <Text style={[
+                  styles.navText,
+                  currentRouteName === 'SettingsScreen' && styles.navTextActive
+                ]}>
+                  Settings
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+
 
 
           {/* <View style={styles.section}>
@@ -659,66 +742,25 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             )}
           </View> */}
 
-          <View style={styles.separator} />
-
-          {/* Bottom Nav */}
-          <View style={styles.section}>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                doNavigate('DeletedEventsScreen');
-                onClose();
-              }}
-            >
-              <Icon name="delete-outline" size={24} color="#FFFFFF" />
-              <Text style={styles.navText}>Trash</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                doNavigate('SettingsScreen');
-                onClose();
-              }}
-            >
-              <Image
-                source={require('../assets/images/Primaryfolder-open.png')}
-              />
-              <Text style={styles.navText}>Settings</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                doNavigate('SendFeedbackScreen');
-                onClose();
-              }}
-            >
-              <Image source={require('../assets/images/Orangefolder.png')} />
-              <Text style={styles.navText}>Send Feedback</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                doNavigate('HelpScreen');
-                onClose();
-              }}
-            >
-              <Image source={require('../assets/images/Blackfolder.png')} />
-              <Text style={styles.navText}>Help</Text>
-            </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles.navItem}
-              onPress={() => {
-                handleLogout();
-                onClose();
-              }}
-            >
-              <Icon name="logout" size={24} color="#F44336" /> // Material red
-
-              <Text style={styles.navText}>Log Out</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
+
+          {/* Dark Mode Toggle - Fixed at bottom */}
+          <View style={styles.darkModeWrapper}>
+            <View style={styles.navItemContainer}>
+              <View style={styles.darkModeSection}>
+                <Text style={styles.darkModeText}>Dark mode</Text>
+                <Switch
+                  value={selectedTheme === 'dark'}
+                  onValueChange={(value) => {
+                    setSelectedTheme(value ? 'dark' : 'light');
+                  }}
+                  trackColor={{ false: '#D1D5DB', true: colors.primaryBlue }}
+                  thumbColor={colors.white}
+                />
+              </View>
+            </View>
+          </View>
+        </View>
         {showCreateMenu && (
           <View
             style={[
@@ -787,14 +829,13 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   drawer: {
-    width: scaleWidth(280),
-    height: screenHeight,
-    backgroundColor: colors.drawerBackground,
+    width: scaleWidth(273), // Responsive width
+    height: screenHeight, // Responsive height
+    backgroundColor: '#F5F5F5', // Light gray background
     ...shadows.lg,
     position: 'absolute',
     left: 0,
     top: 0,
-    paddingBottom: scaleHeight(80),
   },
   menuBackdrop: {
     position: 'absolute',
@@ -804,29 +845,49 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 50,
   },
+  drawerContent: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'space-between',
+  },
   scrollView: {
     flex: 1,
-    paddingTop: scaleHeight(20),
+  },
+  scrollContent: {
+    paddingBottom: scaleHeight(100), // Add more space at bottom of scroll content
   },
   topSection: {
     paddingHorizontal: spacing.md,
+    paddingTop: scaleHeight(20),
     paddingBottom: spacing.lg,
     position: 'relative',
+    backgroundColor: '#F5F5F5', // Gray background like drawer
+    // Removed borderBottomWidth and borderBottomColor
   },
-  logoSection: {
+  headerRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: spacing.lg,
-
+    justifyContent: 'space-between',
+    width: '100%',
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: scaleWidth(8),
   },
   logoText: {
-    fontSize: fontSize.textSize20,
-    color: colors.white,
-    fontWeight: '700',
+    fontSize: 16, // 16px
+    color: '#000000', // Black
+    fontWeight: '800', // ExtraBold
+    fontFamily: Fonts.latoExtraBold,
+    lineHeight: 16, // 100% of font size
+    letterSpacing: 0, // 0%
+  },
+  closeButton: {
+    width: scaleWidth(32),
+    height: scaleHeight(32),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   createButtonText: {
     alignSelf: 'center',
@@ -869,6 +930,13 @@ const styles = StyleSheet.create({
   section: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
+    gap: scaleHeight(8), // Consistent gap between navigation items
+  },
+  navItemContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 8, // Rounded corners
+    marginBottom: scaleHeight(8), // Consistent margin bottom
+    overflow: 'hidden',
   },
   sectionTitle: {
     fontSize: fontSize.textSize16,
@@ -886,18 +954,49 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    gap: scaleWidth(12),
+    backgroundColor: colors.white,
+  },
+  navItemActive: {
+    backgroundColor: colors.white, // Keep white background
   },
   navText: {
-    fontSize: fontSize.textSize16,
-    color: colors.white,
-    fontWeight: '600',
-    paddingHorizontal: spacing.sm,
+    fontSize: 14, // 14px
+    color: '#414651', // Default black color
+    fontWeight: '400', // Regular
+    fontFamily: Fonts.latoRegular,
+    lineHeight: 14, // 100% of font size
+    letterSpacing: 0, // 0%
   },
-  separator: {
-    height: 1,
-    backgroundColor: colors.drawerBorder,
-    marginVertical: spacing.lg,
-    marginHorizontal: spacing.md,
+  navTextActive: {
+    color: colors.primaryBlue, // Blue when selected
+    fontWeight: '400', // Keep Regular
+    fontFamily: Fonts.latoRegular,
+    lineHeight: 14,
+    letterSpacing: 0,
+  },
+  darkModeWrapper: {
+    paddingHorizontal: spacing.md,
+    marginTop: scaleHeight(100), // Large margin to push it far down from settings
+    marginBottom: scaleHeight(10),
+    paddingBottom: scaleHeight(10),
+  },
+  darkModeSection: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    width: '100%',
+  },
+  darkModeText: {
+    fontSize: 14,
+    color: '#414651',
+    fontWeight: '400',
+    fontFamily: Fonts.latoRegular,
+    lineHeight: 14,
+    letterSpacing: 0,
   },
   profileSection: {
     flexDirection: 'row',
@@ -913,33 +1012,36 @@ const styles = StyleSheet.create({
     width: scaleWidth(32),
     height: scaleWidth(32),
     borderRadius: scaleWidth(16),
-    backgroundColor: '#2D3748',
+    backgroundColor: colors.grey200,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarText: {
-    color: '#FFFFFF',
+    color: colors.blackText,
     fontWeight: '700',
     fontSize: fontSize.textSize14,
+    fontFamily: Fonts.latoBold,
   },
   profileName: {
     fontSize: fontSize.textSize18,
-    color: colors.white,
+    color: colors.blackText,
     fontWeight: '600',
+    fontFamily: Fonts.latoBold,
   },
   profileUsername: {
     fontSize: fontSize.textSize12,
-    color: colors.drawerTextLight,
+    color: colors.mediumlightgray,
     fontWeight: '500',
+    fontFamily: Fonts.latoRegular,
   },
   // NEW: Styles for account dropdown
   accountDropdownContainer: {
-    backgroundColor: colors.drawerBackground,
+    backgroundColor: colors.white,
     marginHorizontal: spacing.md,
     marginVertical: spacing.xs,
     borderRadius: moderateScale(8),
     borderWidth: 1,
-    borderColor: colors.drawerBorder,
+    borderColor: colors.grey20,
     maxHeight: scaleHeight(200),
 
   },
@@ -949,7 +1051,7 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: colors.drawerBorder,
+    borderBottomColor: colors.grey20,
   },
   activeAccountIndicator: {
     fontSize: fontSize.textSize10,

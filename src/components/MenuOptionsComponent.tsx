@@ -48,14 +48,14 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
       label: 'Task',
       icon: 'check-circle',
       iconType: 'Feather',
-      gradient: ['#18F06E', '#0B6DE0'],
+      gradient: ['#18F06E', '#00AEEF'],
     },
     {
       id: 'event',
       label: 'Event',
       icon: 'event-available',
       iconType: 'MaterialIcons',
-      gradient: ['#18F06E', '#0B6DE0'],
+      gradient: ['#18F06E', '#00AEEF'],
     },
   ];
 

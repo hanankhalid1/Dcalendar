@@ -11,7 +11,12 @@ import LinearGradient from 'react-native-linear-gradient';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import Feather from 'react-native-vector-icons/Feather';
 import FontAwesome6 from 'react-native-vector-icons/FontAwesome6';
-import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
+import DIcon from '../assets/svgs/DIcon.svg';
+import SearchIcon from '../assets/svgs/search.svg';
+import CalendarIcon from '../assets/svgs/calendarBlack.svg';
+import MenuIcon from '../assets/svgs/menu.svg';
+import { Fonts } from '../constants/Fonts';
+import { moderateScale, scaleHeight, scaleWidth, screenWidth } from '../utils/dimensions';
 import {
   borderRadius,
   colors,
@@ -94,7 +99,7 @@ const CustomeHeader: React.FC<HeaderProps> = ({
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
       <View style={styles.header}>
-        {/* Left Section */}
+        {/* Left Section - Hamburger Menu + Logo */}
         <View style={styles.leftSection}>
           {/* Hamburger Menu */}
           <TouchableOpacity
@@ -103,110 +108,31 @@ const CustomeHeader: React.FC<HeaderProps> = ({
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Image
-              source={require('../assets/images/HeaderImages/HeaderDrawer.png')}
-            />
+            <MenuIcon width={24} height={24} />
           </TouchableOpacity>
 
-          {/* Month Selector - COMMENTED OUT */}
-          {/* <TouchableOpacity
-            style={styles.monthSelector}
-            onPress={() => {
-              setIsMonthDropdownVisible(!isMonthDropdownVisible);
-              setIsViewDropdownVisible(false); // close other dropdown
-            }}
-          >
-            <Text style={styles.monthText}>{selectedMonth}</Text>
-            <Image
-              source={require('../assets/images/HeaderImages/arrowDropdown.png')}
-            />
-          </TouchableOpacity> */}
-        </View>
-
-        {/* Spacer to push right section to the far right */}
-        <View style={styles.spacer} />
-
-        {/* Right Section - View Selector */}
-        <View style={styles.rightSection}>
-          <View style={styles.viewSelectorContainer}>
-            <TouchableOpacity
-              style={styles.viewSelectorContent}
-              onPress={() => {
-                setIsViewDropdownVisible(!isViewDropdownVisible);
-                setIsMonthDropdownVisible(false); // close other dropdown
-                // Removed onViewPress to prevent automatic value change
-              }}
-            >
-              <LinearGradient
-                colors={['#18F06E', '#0B6DE0']}
-                start={{ x: 0, y: 0.5 }}
-                end={{ x: 1, y: 0.5 }}
-                style={styles.gradientBorder}
-              >
-                <View style={styles.viewSelectorContent}>
-                  <Text style={styles.viewText}>{selectedView}</Text>
-                  <Image
-                    source={require('../assets/images/HeaderImages/arrowDropdown.png')}
-                    style={[
-                      styles.dropdownArrow,
-                      isViewDropdownVisible && styles.dropdownArrowRotated,
-                    ]}
-                  />
-                </View>
-              </LinearGradient>
-            </TouchableOpacity>
-
-            {/* View Dropdown */}
-            {isViewDropdownVisible && (
-              <View style={styles.viewDropdown}>
-                {views.map((view) => (
-                  <TouchableOpacity
-                    key={view}
-                    style={[
-                      styles.viewDropdownItem,
-                      view === selectedView && styles.viewDropdownItemSelected,
-                    ]}
-                    onPress={() => handleViewSelect(view)}
-                    activeOpacity={0.7}
-                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-                  >
-                    <Text
-                      style={[
-                        styles.viewDropdownText,
-                        view === selectedView && styles.viewDropdownTextSelected,
-                      ]}
-                    >
-                      {view}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            )}
+          {/* DCalendar Logo */}
+          <View style={styles.logoContainer}>
+            <DIcon width={scaleWidth(24)} height={scaleHeight(24)} />
+            <Text style={styles.logoText}>DCalendar</Text>
           </View>
         </View>
 
-        {/* Action Buttons */}
-        <View style={styles.actionButtonsContainer}>
+        {/* Right Section - Search and Calendar Icons */}
+        <View style={styles.rightSection}>
           <TouchableOpacity
-            style={styles.actionButton1}
-            onPress={onAction1Press}
+            style={styles.iconButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <AntDesign
-              name="check"
-              size={14}
-              color="#000"
-              style={{ backgroundColor: 'transparent' }}
-            />
-            <View style={styles.CalenderView}>
-              <FontAwesome6 name="calendar" size={14} color="#000" />
-            </View>
+            <SearchIcon width={24} height={24} />
           </TouchableOpacity>
-
           <TouchableOpacity
-            style={styles.actionButton2}
-            onPress={onAction2Press}
+            style={styles.iconButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Feather name="check-circle" size={20} color="#000" />
+            <CalendarIcon width={24} height={24} />
           </TouchableOpacity>
         </View>
       </View>
@@ -250,6 +176,7 @@ const CustomeHeader: React.FC<HeaderProps> = ({
           onPress={() => setIsViewDropdownVisible(false)}
         />
       )}
+
     </View>
   );
 };
@@ -257,31 +184,46 @@ const CustomeHeader: React.FC<HeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.white,
-    paddingBottom: spacing.md,
-    ...shadows.sm,
+    width: screenWidth, // Full screen width for responsiveness
+    flexDirection: 'column', // Changed to column to stack header and navigation
     position: 'relative',
     zIndex: 1,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-  },
-  spacer: {
-    flex: 1, // This will take up all available space, pushing right section to the far right
+    justifyContent: 'space-between',
+    width: '100%',
+    height: scaleHeight(80),
+    paddingRight: scaleWidth(18),
+    paddingLeft: scaleWidth(18),
+    borderBottomWidth: 1,
+    borderBottomColor: colors.white,
+    gap: scaleWidth(12),
   },
   leftSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: scaleWidth(8), // Increased gap between menu and logo
+    flex: 1,
   },
   menuButton: {
-    width: moderateScale(40),
-    height: moderateScale(40),
+    width: scaleWidth(40),
+    height: scaleHeight(40),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
     padding: spacing.xs,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: scaleWidth(8),
+  },
+  logoText: {
+    fontSize: fontSize.textSize18,
+    fontWeight: '600',
+    fontFamily: Fonts.latoBold,
+    color: colors.blackText,
   },
   monthSelector: {
     flexDirection: 'row',
@@ -296,11 +238,13 @@ const styles = StyleSheet.create({
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: scaleWidth(8), // Reduced gap between search and calendar icons
   },
-  actionButtonsContainer: {
-    flexDirection: 'row',
+  iconButton: {
+    width: scaleWidth(40),
+    height: scaleHeight(40),
+    justifyContent: 'center',
     alignItems: 'center',
-    marginLeft: spacing.sm,
   },
   viewSelectorContainer: {
     position: 'relative',
@@ -385,7 +329,7 @@ const styles = StyleSheet.create({
   // Highlighted selected item
   selectedText: {
     fontWeight: 'bold',
-    color: '#0B6DE0',
+    color: '#00AEEF',
   },
   actionButton2: {
     backgroundColor: colors.white,
@@ -452,12 +396,14 @@ const styles = StyleSheet.create({
   },
   viewDropdownText: {
     fontSize: fontSize.textSize16,
+    fontFamily: Fonts.latoMedium,
     color: colors.blackText,
     fontWeight: '500',
   },
   viewDropdownTextSelected: {
     fontWeight: '600',
-    color: colors.primary || '#0B6DE0',
+    fontFamily: Fonts.latoBold,
+    color: colors.primary || '#00AEEF',
   },
 });
 

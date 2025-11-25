@@ -13,7 +13,7 @@ import WeekView from 'react-native-week-view';
 import CustomDrawer from '../components/CustomDrawer';
 import EventDetailsModal from '../components/EventDetailsModal';
 import FloatingActionButton from '../components/FloatingActionButton';
-import WeekHeader from '../components/WeekHeader';
+import CustomeHeader from '../global/CustomeHeader';
 import { useApiClient } from '../hooks/useApi';
 import { Screen } from '../navigations/appNavigation.type';
 import { useActiveAccount } from '../stores/useActiveAccount';
@@ -180,6 +180,10 @@ const DailyCalendarScreen = () => {
     setCurrentMonthByIndex(date.getMonth());
   };
 
+  const handleMonthSelect = (monthIndex: number) => {
+    setCurrentMonthByIndex(monthIndex);
+  };
+
   const handleDateSelect = (date: Date) => {
     console.log('Date selected:', date);
     console.log('Date day of week:', date.getDay()); // 0 = Sunday, 1 = Monday, etc.
@@ -291,13 +295,11 @@ const DailyCalendarScreen = () => {
   // Drawer-specific handlers removed; CustomDrawer navigates internally
   return (
     <View style={styles.container}>
-      <WeekHeader
+      <CustomeHeader
         onMenuPress={handleMenuPress}
         currentMonth={currentMonth}
         onMonthPress={handleMonthPress}
-        onDateSelect={handleDateSelect}
-        currentDate={selectedDate}
-        selectedDate={selectedDate}
+        onMonthSelect={handleMonthSelect}
       />
       {/* Loading indicator */}
       {userEventsLoading && (

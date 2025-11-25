@@ -4,7 +4,7 @@ import { Calendar } from 'react-native-calendars';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../navigations/appNavigation.type';
 import FloatingActionButton from '../components/FloatingActionButton';
-import WeekHeader from '../components/WeekHeader';
+import CustomeHeader from '../global/CustomeHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
@@ -944,14 +944,11 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         onDelete={handleDeleteEvent}
       />
 
-      <WeekHeader
+      <CustomeHeader
         onMenuPress={handleMenuPress}
         currentMonth={currentMonth}
         onMonthPress={handleMonthPress}
         onMonthSelect={handleMonthSelect}
-        onDateSelect={handleDateSelect}
-        currentDate={selectedDate}
-        selectedDate={selectedDate}
       />
 
       <ScrollView

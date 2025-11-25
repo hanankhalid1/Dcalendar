@@ -15,13 +15,19 @@ import WalletScreen from '../screens/wallet/WalletScreen';
 import AccountSelection from '../screens/wallet/AccountSelection';
 import HelpScreen from '../screens/HelpScreen';
 import DeletedEventsScreen from '../screens/DeletedEventsScreen';
+import SplashScreen from '../screens/SplashScreen';
 
 const Stack = createNativeStackNavigator();
 
 // 🔹 Stack Navigator (for Main App Screens)
 const StackNavigator = () => {
   return (
-    <Stack.Navigator initialRouteName="Wallet">
+    <Stack.Navigator initialRouteName="SplashScreen">
+      <Stack.Screen
+        name="SplashScreen"
+        component={SplashScreen}
+        options={{ headerShown: false, gestureEnabled: false }}
+      />
       <Stack.Screen
         name="SignInScreen"
         component={SignInScreen}

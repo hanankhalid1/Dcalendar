@@ -6,7 +6,6 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Image,
   StatusBar,
   Modal,
   Alert,
@@ -19,6 +18,10 @@ import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from "react-native-safe-area-context";
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
+import ClockIcon from '../assets/svgs/clock.svg';
+import CalendarIcon from '../assets/svgs/calendar.svg';
+import ArrowDownIcon from '../assets/svgs/arrow-down.svg';
+import { Fonts } from '../constants/Fonts';
 import {
   colors,
   fontSize,
@@ -28,9 +31,8 @@ import {
 } from '../utils/LightTheme';
 import { AppNavigationProp } from "../navigations/appNavigation.type";
 import { useNavigation, useRoute } from "@react-navigation/native";
-import GradientText from "../components/home/GradientText";
 import { Colors } from "../constants/Colors";
-import { dayAbbreviations, dayNames, eventTypes, timezones } from "../constants/dummyData";
+import { dayAbbreviations, dayNames, timezones } from "../constants/dummyData";
 import dayjs from "dayjs";
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useToken } from '../stores/useTokenStore';
@@ -56,24 +58,11 @@ const CreateTaskScreen = () => {
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
   const [selectedRecurrence, setSelectedRecurrence] = useState('Does not repeat');
+  const [isRepeatDropdownOpen, setIsRepeatDropdownOpen] = useState(false);
   const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
-  const [customRecurrence, setCustomRecurrence] = useState(() => {
-    const weekday =
-      selectedDate
-        ? selectedDate.toLocaleDateString('en-US', { weekday: 'long' })
-        : 'Thursday'; // default fallback
-    return {
-    repeatEvery: '1',
-    repeatUnit: 'Week',
-      repeatOn: [weekday],
-    endsType: 'Never',
-      endsDate: null as Date | null,
-    endsAfter: '13',
-    }
-  });
+  const [activeField, setActiveField] = useState<'title' | 'date' | 'startTime' | 'endTime' | 'repeat' | 'description' | null>(null);
   const endsOptions = ['Never', 'On', 'After'];
   const [selectedValue, setSelectedValue] = useState(null);
-  const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const [showEndsDatePicker, setShowEndsDatePicker] = useState(false);
   
@@ -117,13 +106,45 @@ const CreateTaskScreen = () => {
   };
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(getInitialDate());
+  
+  // Initialize customRecurrence after selectedDate is defined
+  const [customRecurrence, setCustomRecurrence] = useState(() => {
+    const weekday =
+      getInitialDate()
+        ? getInitialDate()!.toLocaleDateString('en-US', { weekday: 'long' })
+        : 'Thursday'; // default fallback
+    return {
+      repeatEvery: '1',
+      repeatUnit: 'Week',
+      repeatOn: [weekday],
+      endsType: 'Never',
+      endsDate: null as Date | null,
+      endsAfter: '13',
+    }
+  });
   const [selectedStartTime, setSelectedStartTime] = useState(
     editEventData?.selectedStartTime || '',
   );
+  const [selectedEndTime, setSelectedEndTime] = useState(
+    editEventData?.selectedEndTime || '',
+  );
+  const [showCalendarModal, setShowCalendarModal] = useState(false);
+  const [calendarModalMode, setCalendarModalMode] = useState<'date' | 'startTime' | 'endTime'>('date');
 
   const [showDetailedDateTime, setShowDetailedDateTime] = useState(
     !!editEventData,
   );
+  
+  // Update customRecurrence when selectedDate changes
+  useEffect(() => {
+    if (selectedDate) {
+      const weekday = selectedDate.toLocaleDateString('en-US', { weekday: 'long' });
+      setCustomRecurrence(prev => ({
+        ...prev,
+        repeatOn: [weekday],
+      }));
+    }
+  }, [selectedDate]);
   
   // Error states
   const [titleError, setTitleError] = useState<string>('');
@@ -134,11 +155,6 @@ const CreateTaskScreen = () => {
   const scrollViewRef = useRef<ScrollView>(null);
   const titleInputRef = useRef<View>(null);
   const dateTimeSectionRef = useRef<View>(null);
-  const [showEventTypeDropdown, setShowEventTypeDropdown] =
-    useState(false);
-  const [selectedEventType, setSelectedEventType] = useState(
-    editEventData?.selectedEventType || 'Task',
-  );
   const [labelList, setLabelList] = useState([
     { label: "My Tasks", value: "1" },
     { label: "Work", value: "2" },
@@ -218,10 +234,14 @@ const CreateTaskScreen = () => {
   const handleRecurrenceSelect = (recurrence: string) => {
     if (recurrence === 'Custom...') {
       setShowRecurrenceDropdown(false);
+      setIsRepeatDropdownOpen(false);
+      setActiveField(null);
       setShowCustomRecurrenceModal(true);
     } else {
       setSelectedRecurrence(recurrence);
       setShowRecurrenceDropdown(false);
+      setActiveField(null);
+      setIsRepeatDropdownOpen(false);
     }
   };
   const handleCustomRecurrenceDone = () => {
@@ -260,6 +280,16 @@ const CreateTaskScreen = () => {
 
     setSelectedRecurrence(customText);
     setShowCustomRecurrenceModal(false);
+  };
+
+  const toggleRepeatDropdown = () => {
+    if (isLoading) {
+      return;
+    }
+
+    setShowRecurrenceDropdown(prev => !prev);
+    setIsRepeatDropdownOpen(prev => !prev);
+    setActiveField(prev => (prev === 'repeat' ? null : 'repeat'));
   };
 
   const handleDayToggle = (day: string) => {
@@ -595,6 +625,7 @@ const CreateTaskScreen = () => {
     setSelectedStartTime(normalizedTime);
     setShowDetailedDateTime(true);
     setSelectedRecurrence("Does not repeat");
+    setActiveField(null);
     
     // Validate immediately after state updates (for real-time feedback)
     setTimeout(() => {
@@ -675,22 +706,6 @@ const CreateTaskScreen = () => {
     setTimeError('');
     }, 0);
   };
-  const handleEventTypeSelect = (eventType: string) => {
-    setSelectedEventType(eventType);
-    setShowEventTypeDropdown(false);
-
-    // Navigate to corresponding screen
-    if (eventType === 'Event') {
-      navigation.replace('CreateEventScreen');
-    } else if (eventType === 'Out of office') {
-      navigation.replace('CreateOutOfOfficeScreen');
-    } else if (eventType === 'Task') {
-      // Stay on current screen
-      return;
-    }
-    // Add navigation for other event types as needed
-  };
-
   const handleClose = () => {
     navigation.goBack();
   };
@@ -1175,75 +1190,15 @@ const CreateTaskScreen = () => {
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      {/* Invisible overlay to close dropdowns when clicking outside */}
-      {(showEventTypeDropdown) && (
-        <TouchableOpacity
-          style={styles.dropdownOverlay}
-          activeOpacity={1}
-          onPress={() => {
-            setShowEventTypeDropdown(false);
-          }}
-        />
-      )}
       <View style={styles.header}>
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
 
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>
-            {mode === 'edit' ? 'Edit ' : 'Create '}
-          </Text>
-          <TouchableOpacity
-            style={styles.eventTypeContainer}
-            onPress={() => {
-              if (!isLoading) {
-                setShowEventTypeDropdown(!showEventTypeDropdown);
-              }
-            }}
-            disabled={isLoading}
-          >
-            <GradientText
-              style={styles.eventTypeText}
-              colors={[Colors.primaryGreen, Colors.primaryblue]}
-            >
-              {selectedEventType}
-            </GradientText>
-            <Image
-              style={styles.arrowDropdown}
-              source={require('../assets/images/CreateEventImages/arrowDropdown.png')}
-            />
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.headerTitle}>
+          {mode === 'edit' ? 'Edit task' : 'Create task'}
+        </Text>
       </View>
-      {showEventTypeDropdown && (
-        <View style={styles.eventTypeDropdown}>
-          {eventTypes.map(eventType => (
-            <TouchableOpacity
-              key={eventType.id}
-              style={styles.eventTypeItem}
-              onPress={() => {
-                if (!isLoading) {
-                  handleEventTypeSelect(eventType.name);
-                }
-              }}
-              disabled={isLoading}
-            >
-              <Text style={styles.eventTypeItemText}>{eventType.name}</Text>
-              {selectedEventType === eventType.name && (
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.eventTypeCheckmark}
-                >
-                  <FeatherIcon name="check" size={12} color="white" />
-                </LinearGradient>
-              )}
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1255,116 +1210,142 @@ const CreateTaskScreen = () => {
           style={styles.scrollView}
           scrollEnabled={!showRecurrenceDropdown}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: scaleHeight(20) }}
+          showsVerticalScrollIndicator={true}
+          bounces={false}
         >
         <View style={styles.formContainer}>
           <View 
             ref={titleInputRef}
-            style={styles.inputSection}
+            style={styles.fieldContainer}
             collapsable={false}
           >
+            <Text style={styles.labelText}>Add title</Text>
             <TextInput
-              style={styles.titleInput}
-              placeholder="Add title"
-              placeholderTextColor={colors.grey400}
+              style={[styles.titleInput, activeField === 'title' && styles.fieldActiveInput]}
+              placeholder="Write here"
+              placeholderTextColor="#A4A7AE"
               value={title}
+              onFocus={() => setActiveField('title')}
+              onBlur={() => setActiveField(null)}
               onChangeText={(text) => {
                 setTitle(text);
                 if (titleError) setTitleError('');
               }}
               editable={!isLoading}
             />
-            <View style={styles.inputUnderline} />
             {titleError ? (
               <Text style={styles.fieldErrorText}>{titleError}</Text>
             ) : null}
           </View>
 
-          {/* Pick date and time */}
+          {/* Date Field */}
           <View 
             ref={dateTimeSectionRef}
+            style={styles.fieldContainer}
             collapsable={false}
           >
+            <Text style={styles.labelText}>Date</Text>
             <TouchableOpacity
-              style={styles.datePicker}
+              style={[styles.datePicker, activeField === 'date' && styles.fieldActive]}
               onPress={() => {
                 if (!isLoading) {
+                  setActiveField('date');
+                  setCalendarModalMode('date');
                   setShowCalendarModal(true);
                 }
               }}
               disabled={isLoading}
             >
-              <FeatherIcon name="calendar" size={20} color="#6C6C6C" />
-
               <Text style={styles.selectorText}>
                 {selectedDate
-                  ? selectedDate.toLocaleDateString() + ' ' + selectedStartTime
-                  : "Pick date and time"}
+                  ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                  : "Select"}
               </Text>
-              <Image
-                style={{ marginLeft: scaleWidth(10) }}
-                source={require('../assets/images/CreateEventImages/smallArrowDropdown.png')}
-              />
+              <CalendarIcon width={20} height={20} fill="#6C6C6C" />
             </TouchableOpacity>
-            {(dateError || timeError) && (
+            {dateError && (
               <Text style={styles.fieldErrorText}>
-                {dateError || timeError}
+                {dateError}
               </Text>
             )}
           </View>
-          {/* Recurrence Dropdown - Only show when date and time are selected */}
-          {showDetailedDateTime && (
-            <View
-              style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                marginTop: spacing.md,
-              }}
-            >
-              <FeatherIcon name="repeat" size={20} color="#6C6C6C" />
-              <TouchableOpacity
-                style={styles.recurrenceContainer}
-                onPress={() => {
-                  if (!isLoading) {
-                    setShowRecurrenceDropdown(!showRecurrenceDropdown);
-                  }
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.selectorText}>{selectedRecurrence}</Text>
-                <Image
-                  style={{ marginLeft: scaleWidth(10) }}
-                  source={require('../assets/images/CreateEventImages/smallArrowDropdown.png')}
-                />
-              </TouchableOpacity>
-            </View>
-          )}
 
-          {/* Recurrence Dropdown */}
-          {showRecurrenceDropdown && (
-            <>
-              {/* Overlay to close recurrence dropdown when clicking outside */}
-              <TouchableOpacity
-                style={styles.recurrenceOverlay}
-                activeOpacity={1}
-                onPress={() => setShowRecurrenceDropdown(false)}
-              />
-              <View style={styles.recurrenceDropdown}>
+          {/* Start Time Field */}
+          <View style={styles.fieldContainer}>
+            <Text style={styles.labelText}>Start Time</Text>
+            <TouchableOpacity
+              style={[styles.datePicker, activeField === 'startTime' && styles.fieldActive]}
+              onPress={() => {
+                if (!isLoading) {
+                  setActiveField('startTime');
+                  setCalendarModalMode('startTime');
+                  setShowCalendarModal(true);
+                }
+              }}
+              disabled={isLoading}
+            >
+              <Text style={styles.selectorText}>
+                {selectedStartTime || "Select"}
+              </Text>
+              <ClockIcon width={20} height={20} fill="#6C6C6C" />
+            </TouchableOpacity>
+            {timeError && (
+              <Text style={styles.fieldErrorText}>
+                {timeError}
+              </Text>
+            )}
+          </View>
+
+          {/* End Time Field */}
+          <View style={styles.fieldContainer}>
+            <Text style={styles.labelText}>End Time</Text>
+            <TouchableOpacity
+              style={[styles.datePicker, activeField === 'endTime' && styles.fieldActive]}
+              onPress={() => {
+                if (!isLoading) {
+                  setActiveField('endTime');
+                  setCalendarModalMode('endTime');
+                  setShowCalendarModal(true);
+                }
+              }}
+              disabled={isLoading}
+            >
+              <Text style={styles.selectorText}>
+                {selectedEndTime || "Select"}
+              </Text>
+              <ClockIcon width={20} height={20} fill="#6C6C6C" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Repeat Field */}
+          <View
+            style={[styles.fieldContainer, styles.repeatFieldContainer]}
+          >
+            <Text style={styles.labelText}>Repeat</Text>
+            <TouchableOpacity
+              style={[
+                styles.recurrenceContainer,
+                (isRepeatDropdownOpen || showRecurrenceDropdown) && styles.fieldActive,
+              ]}
+              onPress={toggleRepeatDropdown}
+              disabled={isLoading}
+            >
+                <Text style={styles.selectorText}>{selectedRecurrence}</Text>
+                <ArrowDownIcon width={20} height={20} fill="#6C6C6C" />
+            </TouchableOpacity>
+            {showRecurrenceDropdown && (
+              <View style={styles.repeatDropdown}>
                 <ScrollView
-                  style={styles.recurrenceDropdownScroll}
+                  style={styles.repeatOptionsWrapper}
                   showsVerticalScrollIndicator={false}
-                  nestedScrollEnabled={true}
-                  keyboardShouldPersistTaps="handled"
-                  bounces={true}
-                  scrollEventThrottle={16}
                 >
                   {recurrenceOptions.map((option, index) => (
                     <TouchableOpacity
                       key={index}
                       style={[
-                        styles.recurrenceItem,
-                        selectedRecurrence === option &&
-                        styles.recurrenceItemSelected,
+                        styles.repeatOption,
+                        selectedRecurrence === option && styles.repeatOptionSelected,
                       ]}
                       onPress={() => {
                         if (!isLoading) {
@@ -1375,50 +1356,95 @@ const CreateTaskScreen = () => {
                     >
                       <Text
                         style={[
-                          styles.recurrenceItemText,
-                          selectedRecurrence === option &&
-                          styles.recurrenceItemTextSelected,
+                          styles.repeatOptionText,
+                          selectedRecurrence === option && styles.repeatOptionTextSelected,
                         ]}
                       >
                         {option}
                       </Text>
                       {selectedRecurrence === option && (
-                        <LinearGradient
-                          colors={['#18F06E', '#0B6DE0']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={styles.recurrenceCheckmark}
-                        >
-                          <FeatherIcon name="check" size={12} color="white" />
-                        </LinearGradient>
+                        <FeatherIcon name="check" size={16} color={colors.primaryBlue} />
                       )}
                     </TouchableOpacity>
                   ))}
                 </ScrollView>
+                <View style={styles.repeatDropdownFooter} />
               </View>
-            </>
-          )}
-          <TextInput
-            style={styles.descriptionInput}
-            placeholder="Add description"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            placeholderTextColor="#888"
-            editable={!isLoading}
-          />
+            )}
+          </View>
+
+          <View style={styles.fieldContainer}>
+            <Text style={styles.labelText}>Description</Text>
+            <TextInput
+              style={[styles.descriptionInput, activeField === 'description' && styles.fieldActiveInput]}
+              placeholder="Enter here.."
+              value={description}
+              onChangeText={setDescription}
+              onFocus={() => setActiveField('description')}
+              onBlur={() => setActiveField(null)}
+              multiline
+              placeholderTextColor="#A4A7AE"
+              editable={!isLoading}
+            />
+          </View>
+
+          {/* Create Button */}
+          <View style={styles.buttonContainer}>
+            <TouchableOpacity
+              style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+              disabled={isLoading}
+              onPress={createTask}
+            >
+              <Text style={styles.saveButtonText}>
+                {isLoading ? 'Creating...' : 'Create'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
         </ScrollView>
       </KeyboardAvoidingView>
+
+      {showRecurrenceDropdown && (
+        <TouchableOpacity
+          style={styles.recurrenceOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            setShowRecurrenceDropdown(false);
+            setIsRepeatDropdownOpen(false);
+            setActiveField(null);
+          }}
+        />
+      )}
 
       {/* Calendar with Time Modal */}
       <CalendarWithTime
         isVisible={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
-        onDateTimeSelect={handleDateTimeSelect}
-        mode="from"
-        selectedDate={selectedDate}
-        selectedTime={selectedStartTime || undefined}
+        onDateTimeSelect={(date, time) => {
+          if (calendarModalMode === 'date') {
+            setSelectedDate(date);
+            if (!selectedStartTime) {
+              setShowDetailedDateTime(true);
+            }
+          } else if (calendarModalMode === 'startTime') {
+            setSelectedStartTime(time);
+            setSelectedDate(date);
+            setShowDetailedDateTime(true);
+          } else if (calendarModalMode === 'endTime') {
+            setSelectedEndTime(time);
+            setSelectedDate(date);
+          }
+          setShowCalendarModal(false);
+        }}
+        mode={calendarModalMode === 'endTime' ? 'to' : 'from'}
+        selectedDate={selectedDate || new Date()}
+        selectedTime={
+          calendarModalMode === 'startTime' 
+            ? selectedStartTime || undefined
+            : calendarModalMode === 'endTime'
+            ? selectedEndTime || undefined
+            : undefined
+        }
       />
 
 
@@ -1751,27 +1777,6 @@ const CreateTaskScreen = () => {
         </View>
       </Modal>
 
-      <View style={styles.bottomActionBar}>
-        <TouchableOpacity
-          style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
-          disabled={isLoading}
-          onPress={createTask}
-        >
-          <LinearGradient
-            colors={
-              isLoading ? ['#CCCCCC', '#AAAAAA'] : ['#18F06E', '#0B6DE0']
-            }
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.gradient}
-          >
-            <Text style={styles.saveButtonText}>
-              {isLoading ? 'Saving...' : 'Save'}
-            </Text>
-          </LinearGradient>
-        </TouchableOpacity>
-      </View>
-
       {/* Custom Alert */}
       <CustomAlert
         visible={alertVisible}
@@ -1787,7 +1792,7 @@ const CreateTaskScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.white,
+    backgroundColor: colors.lightGrayBg, // #F5F5F5
   },
   dropdownOverlay: {
     position: 'absolute',
@@ -1800,73 +1805,20 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: scaleHeight(40),
-    paddingBottom: spacing.lg,
+    paddingTop: scaleHeight(18),
+    paddingBottom: scaleHeight(12),
+    paddingHorizontal: scaleWidth(18),
     width: '100%',
-    position: 'relative',
-    paddingLeft: scaleWidth(10),
-  },
-  headerTitleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    gap: scaleWidth(12),
   },
   headerTitle: {
-    fontSize: fontSize.textSize25,
+    fontSize: 16,
     color: colors.blackText,
-    fontWeight: '600',
-  },
-  eventTypeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: scaleWidth(5),
-  },
-  eventTypeText: {
-    fontSize: fontSize.textSize25,
-    fontWeight: '600',
-    marginRight: scaleWidth(8),
-  },
-  eventTypeItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: scaleWidth(16),
-    paddingVertical: scaleHeight(12),
-    minHeight: scaleHeight(44),
-  },
-  eventTypeItemText: {
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
-    fontWeight: '400',
-    flex: 1,
-  },
-  eventTypeDropdown: {
-    position: 'absolute',
-    top: scaleHeight(100),
-    left: scaleWidth(166),
-    width: scaleWidth(138),
-    backgroundColor: colors.white,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: '#F5F5F5',
-    shadowColor: '#0A0D12',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 4,
-    zIndex: 1000,
-    paddingVertical: scaleHeight(8),
-  },
-  eventTypeCheckmark: {
-    width: scaleWidth(16),
-    height: scaleHeight(16),
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+    fontWeight: '700',
+    fontFamily: Fonts.latoBold,
   },
   closeButton: {
     width: moderateScale(40),
@@ -1877,34 +1829,64 @@ const styles = StyleSheet.create({
   closeButtonText: {
     fontSize: fontSize.textSize17,
     color: colors.blackText,
-    fontWeight: 'bold',
-  },
-  arrowDropdown: {
-    width: 12,
-    height: 8,
-    marginTop: 4,
-    marginLeft: 1,
+    fontWeight: '700',
+    fontFamily: Fonts.latoBold,
   },
   scrollView: {
     flex: 1,
   },
   formContainer: {
-    padding: 20,
-    gap: 20,
+    padding: scaleWidth(20),
+    paddingTop: scaleHeight(20),
+    paddingBottom: scaleHeight(20),
+    overflow: 'visible',
   },
-  inputSection: {
-    marginBottom: spacing.lg,
+  buttonContainer: {
+    width: '100%',
+    alignItems: 'center',
+    marginTop: scaleHeight(32),
+    marginBottom: scaleHeight(20),
+  },
+  fieldContainer: {
+    marginBottom: scaleHeight(20),
+  },
+  repeatFieldContainer: {
+    position: 'relative',
+    zIndex: 1001,
   },
   inputUnderline: {
     height: 1,
     backgroundColor: colors.grey20,
   },
+  labelText: {
+    fontFamily: Fonts.latoMedium,
+    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 12,
+    letterSpacing: 0,
+    color: '#414651', // Gray-700
+    marginBottom: scaleHeight(8),
+  },
+  fieldActive: {
+    borderColor: colors.primaryBlue,
+  },
   titleInput: {
-    fontSize: fontSize.textSize20,
+    fontSize: 12,
+    fontFamily: Fonts.latoRegular,
+    fontWeight: '400',
+    lineHeight: 18,
+    letterSpacing: 0,
     color: colors.textPrimary,
-    paddingVertical: spacing.sm,
+    paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.sm,
-    minHeight: scaleHeight(50),
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    minHeight: scaleHeight(44),
+  },
+  fieldActiveInput: {
+    borderColor: colors.primaryBlue,
   },
   timeComponentPlaceholder: {
     height: 50,
@@ -1919,12 +1901,17 @@ const styles = StyleSheet.create({
     color: "#a0a0a0",
     fontStyle: "italic",
   },
-  datePicker:
-  {
+  datePicker: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'flex-start',
-    marginBottom: spacing.md
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: 8,
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white,
   },
   fieldErrorText: {
     fontSize: fontSize.textSize12,
@@ -1934,16 +1921,19 @@ const styles = StyleSheet.create({
     marginLeft: spacing.xs,
   },
   descriptionInput: {
-    backgroundColor: "#F6F7F9",
+    backgroundColor: colors.white,
     borderRadius: 8,
     textAlignVertical: "top", // Aligns text to the top for Android
     borderWidth: 1,
-    borderColor: "#e0e0e0",
-    fontSize: fontSize.textSize18,
+    borderColor: '#DCE0E5',
+    fontSize: 12,
+    fontFamily: Fonts.latoRegular,
+    fontWeight: '400',
+    lineHeight: 18,
+    letterSpacing: 0,
     color: colors.textPrimary,
     padding: spacing.md,
     minHeight: scaleHeight(150),
-
   },
   pickerContainer: {
     width: 165,
@@ -1956,52 +1946,33 @@ const styles = StyleSheet.create({
     height: 50,
     width: "100%",
   },
-  bottomActionBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'flex-end',
-    paddingVertical: spacing.xl,
-    marginHorizontal: scaleWidth(20),
-    paddingBottom: scaleHeight(50),
-  },
   saveButton: {
-    borderRadius: borderRadius.lg,
-    minWidth: scaleWidth(120),
+    width: '100%',
+    maxWidth: scaleWidth(335),
+    borderRadius: 12,
     alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primaryBlue, // Solid blue #00AEEF
+    paddingVertical: scaleHeight(14),
+    paddingHorizontal: spacing.xl,
     ...shadows.sm,
-    overflow: 'hidden',
   },
   saveButtonDisabled: {
     opacity: 0.6,
-  },
-  gradient: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.xl,
-    alignItems: 'center',
-    width: '100%',
   },
   saveButtonText: {
     fontSize: fontSize.textSize16,
     color: colors.white,
     fontWeight: '600',
-  },
-  buttonContainer: {
-    padding: 20,
-    alignItems: "flex-end",
-    borderTopWidth: 1,
-    borderTopColor: "#e0e0e0",
-  },
-  button: {
-    backgroundColor: "#007AFF", // A standard blue for buttons
-    paddingVertical: 12,
-    paddingHorizontal: 25,
-    borderRadius: 8,
+    fontFamily: Fonts.latoBold,
   },
   selectorText: {
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
+    fontSize: 12,
+    fontFamily: Fonts.latoRegular,
     fontWeight: '400',
-    marginLeft: spacing.sm,
+    lineHeight: 18,
+    letterSpacing: 0,
+    color: '#A4A7AE', // Placeholder color
     flex: 1,
   },
   buttonText: {
@@ -2016,60 +1987,60 @@ const styles = StyleSheet.create({
   recurrenceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    marginLeft: spacing.sm,
-  },
-  recurrenceDropdown: {
-    position: 'absolute',
-    top: scaleHeight(180),
-    left: scaleWidth(20),
-    right: scaleWidth(20),
-    backgroundColor: colors.white,
-    borderRadius: 8,
+    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: '#F5F5F5',
+    borderColor: '#DCE0E5',
+    borderRadius: 8,
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white,
+    width: '100%',
+  },
+  repeatDropdown: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    right: 0,
+    marginTop: scaleHeight(6),
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: colors.primaryBlue,
+    backgroundColor: colors.white,
+    zIndex: 1002,
     shadowColor: '#0A0D12',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.03,
-    shadowRadius: 6,
-    elevation: 4,
-    zIndex: 1001,
-    paddingVertical: scaleHeight(8),
-    maxHeight: scaleHeight(400),
+    shadowOpacity: 0.08,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 6,
+    overflow: 'hidden',
   },
-  recurrenceDropdownScroll: {
-    maxHeight: scaleHeight(380),
+  repeatOptionsWrapper: {
+    maxHeight: scaleHeight(240),
   },
-  recurrenceItem: {
+  repeatOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: scaleWidth(16),
     paddingVertical: scaleHeight(12),
-    minHeight: scaleHeight(44),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F2F4F7',
   },
-  recurrenceItemSelected: {
-    backgroundColor: '#F0F8FF',
+  repeatOptionSelected: {
+    backgroundColor: '#F0FBFF',
   },
-  recurrenceItemText: {
-    fontSize: fontSize.textSize16,
+  repeatOptionText: {
+    fontSize: 14,
     color: colors.blackText,
-    fontWeight: '400',
-    flex: 1,
+    fontFamily: Fonts.latoMedium,
   },
-  recurrenceItemTextSelected: {
-    color: Colors.primaryblue,
-    fontWeight: '500',
+  repeatOptionTextSelected: {
+    color: colors.primaryBlue,
+    fontFamily: Fonts.latoBold,
   },
-  recurrenceCheckmark: {
-    width: scaleWidth(16),
-    height: scaleHeight(16),
-    borderRadius: 8,
-    justifyContent: 'center',
-    alignItems: 'center',
+  repeatDropdownFooter: {
+    height: scaleHeight(6),
+    backgroundColor: colors.primaryBlue,
   },
   // Custom Recurrence Modal Styles
   customRecurrenceModalContainer: {

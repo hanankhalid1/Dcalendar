@@ -1,4 +1,4 @@
-import { View, Text, TouchableOpacity, Linking, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, Linking, StyleSheet, ScrollView } from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { Colors } from '../../constants/Colors';
 import { NcogWallet } from '../../assets/svgs';
@@ -10,8 +10,7 @@ import { useNavigation } from '@react-navigation/native';
 import { useWalletStore } from '../../stores/useWalletStore';
 import { handleNcogResponse } from '../../utils/ncogHandler';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import LinearGradient from 'react-native-linear-gradient';
-import Logo from '../../assets/svgs/logo.svg';
+import DIcon from '../../assets/svgs/DIcon.svg';
 
 const WalletScreen = () => {
   const ncog = new NcogIntegration('DCalendar', 'dcalendar');
@@ -26,7 +25,7 @@ const WalletScreen = () => {
       const response = handleNcogResponse(url);
       if (response === true) {
         setrefresh(!refresh);
-        navigation.navigate('account');
+        navigation.navigate('account' as never);
       }
     };
 
@@ -44,7 +43,7 @@ const WalletScreen = () => {
     console.log('wallet1234', wallet);
     if (wallet) {
       console.log('Wallet Already connected');
-      navigation.navigate('account');
+      navigation.navigate('account' as never);
     } else {
       await ncog.registerWithNcog();
     }
@@ -55,7 +54,7 @@ const WalletScreen = () => {
       const wallet = await AsyncStorage.getItem('token');
       if (wallet) {
         console.log('Wallet Already connected');
-        navigation.navigate('account');
+        navigation.navigate('account' as never);
       }
     })();
   }, []);
@@ -63,49 +62,49 @@ const WalletScreen = () => {
   return (
     <SafeAreaView style={styles.container} edges={['top', 'bottom']}>
       <View style={styles.content}>
-        {/* Top Section - App Branding */}
-     
-        {/* Middle Section - Main Content */}
-        <View style={styles.middleSection}>
-          {/* Wallet Icon Container with gradient background */}
-          <View style={styles.iconWrapper}>
-            <LinearGradient
-              colors={[Colors.primaryGreen, Colors.primaryblue]}
-              style={styles.iconGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <NcogWallet width={95} height={95} style={styles.walletIcon} />
-            </LinearGradient>
+        {/* Main Content Frame - All content inside */}
+        <View style={styles.mainContentFrame}>
+          {/* Top Calendar Icon */}
+          <View style={styles.topIconContainer}>
+            <DIcon width={scale(69.9806900024414)} height={scale(72.00009155273438)} />
           </View>
 
-          {/* Title */}
-          <Text style={styles.title}>Connect Your Wallet</Text>
+          {/* Title Container */}
+          <View style={styles.titleContainer}>
+            <Text style={styles.title}>Connect Your Wallet</Text>
+          </View>
 
           {/* Subtitle */}
           <Text style={styles.subtitle}>
-            Securely connect your NCOG Wallet to access decentralized contacts and calendar features
+            Click the Wallet icon to connect your Wallet
           </Text>
-        </View>
 
-        {/* Bottom Section - Action Button */}
-        <View style={styles.bottomSection}>
+          {/* Wallet Icon Container with dotted border */}
+          <View style={styles.walletIconContainer}>
+            <TouchableOpacity 
+              onPress={handleWalletConnect}
+              activeOpacity={0.8}
+            >
+              <View style={styles.walletIconWrapper}>
+                <NcogWallet width={54} height={54} />
+              </View>
+            </TouchableOpacity>
+            <Text style={styles.ncogText}>NCOG</Text>
+          </View>
+
+          {/* Continue Text */}
+          <Text style={styles.continueText}>
+            Connect your Wallet to continue
+          </Text>
+
+          {/* Action Button */}
           <TouchableOpacity
             onPress={handleWalletConnect}
             style={styles.connectButton}
             activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={[Colors.primaryGreen, Colors.primaryblue]}
-              style={styles.buttonGradient}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-            >
-              <Text style={styles.buttonText}>Connect NCOG Wallet</Text>
-            </LinearGradient>
+            <Text style={styles.buttonText}>Get free test tokens? (NFC Faucet)</Text>
           </TouchableOpacity>
-
-
         </View>
       </View>
     </SafeAreaView>
@@ -119,111 +118,115 @@ const styles = StyleSheet.create({
   },
   content: {
     flex: 1,
-    paddingHorizontal: 24,
+    alignItems: 'center',
   },
 
-  // Top Section
-  topSection: {
-    display: 'flex',
-    flexDirection:'row',
-    paddingTop: 20,
-    paddingBottom: 0,
-    justifyContent:'flex-start',
-    alignItems:'center'
-  },
-  appName: {
-    fontFamily: Fonts.bold,
-    fontSize: scale(24),
-    color: Colors.black,
-    marginBottom: 12,
-  },
-  decorativeLine: {
-    width: 60,
-    height: 4,
-    backgroundColor: Colors.primaryblue,
-    borderRadius: 2,
+  // Main Content Frame - All content inside with exact dimensions
+  mainContentFrame: {
+    width: scale(374),
+    alignItems: 'center',
+    marginTop: scale(134),
   },
 
-  // Middle Section
-  middleSection: {
-    flex: 1,
-    justifyContent: 'center',
+  // Top Calendar Icon
+  topIconContainer: {
+    width: scale(69.9806900024414),
+    height: scale(72.00009155273438),
     alignItems: 'center',
-    paddingBottom: 60,
-  },
-  iconWrapper: {
-    marginBottom: 32,
-  },
-  iconGradient: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
     justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: Colors.primaryblue,
-    shadowOffset: {
-      width: 0,
-      height: 8,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 16,
-    elevation: 12,
+    marginBottom: scale(16),
   },
-  walletIcon: {
-    // Icon styling if needed
+
+  // Title Container
+  titleContainer: {
+    width: scale(326),
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: scale(8),
   },
   title: {
-    fontFamily: Fonts.bold,
-    fontSize: scale(28),
+    fontFamily: Fonts.latoExtraBold,
+    fontSize: 30,
+    lineHeight: 38,
     color: Colors.black,
-    marginBottom: 16,
     textAlign: 'center',
-  },
-  subtitle: {
-    fontFamily: Fonts.regular,
-    fontSize: 16,
-    color: '#666666',
-    textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    letterSpacing: 0,
   },
 
-  // Bottom Section
-  bottomSection: {
-    paddingBottom: 40,
-    marginBottom: 40,
+  // Subtitle
+  subtitle: {
+    width: scale(326),
+    fontFamily: Fonts.latoRegular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.grey,
+    textAlign: 'center',
+    letterSpacing: 0,
+    marginBottom: scale(20),
   },
-  connectButton: {
-    width: '100%',
-    borderRadius: 16,
-    overflow: 'hidden',
-    shadowColor: Colors.primaryblue,
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
+
+  // Wallet Icon Container
+  walletIconContainer: {
+    width: scale(134),
+    alignItems: 'center',
+    marginBottom: scale(16),
   },
-  buttonGradient: {
-    paddingVertical: 18,
+  walletIconWrapper: {
+    width: scale(134),
+    height: scale(134),
+    borderRadius: scale(150),
+    backgroundColor: '#F9FAFB',
     alignItems: 'center',
     justifyContent: 'center',
+    padding: scale(40),
+  },
+  ncogText: {
+    fontFamily: Fonts.latoBold,
+    fontSize: scale(14),
+    color: Colors.black,
+    marginTop: 10,
+  },
+
+  // Continue Text
+  continueText: {
+    width: scale(326),
+    fontFamily: Fonts.latoRegular,
+    fontSize: 14,
+    lineHeight: 20,
+    color: Colors.black,
+    textAlign: 'center',
+    letterSpacing: 0,
+    marginBottom: scale(20),
+  },
+
+  // Button
+  connectButton: {
+    width: scale(300),
+    minHeight: 44,
+    backgroundColor: '#00AEEF',
+    borderRadius: 8,
+    paddingVertical: 10,
+    paddingHorizontal: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#0A0D12',
+    shadowOffset: {
+      width: 0,
+      height: 1,
+    },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
   },
   buttonText: {
-    fontFamily: Fonts.semiBold,
-    fontSize: 18,
+    fontFamily: Fonts.latoMedium,
+    fontSize: 16,
+    lineHeight: 24,
     color: Colors.white,
-    letterSpacing: 0.5,
-  },
-  helpText: {
-    fontFamily: Fonts.regular,
-    fontSize: 12,
-    color: '#999999',
     textAlign: 'center',
-    marginTop: 16,
-    lineHeight: 18,
+    letterSpacing: 0,
+    flexShrink: 1,
   },
 });
 

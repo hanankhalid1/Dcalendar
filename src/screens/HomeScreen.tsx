@@ -30,7 +30,6 @@ import RNFS from 'react-native-fs';
 import Share from 'react-native-share';
 
 // Import components
-import Header from '../components/Header';
 import DaySection from '../components/DaySection';
 import FloatingActionButton from '../components/FloatingActionButton';
 import CustomDrawer from '../components/CustomDrawer';
@@ -45,6 +44,9 @@ import { parseTimeToPST, isEventInPast } from '../utils';
 import { useSettingsStore } from '../stores/useSetting';
 import { s } from 'react-native-size-matters';
 import CustomAlert from '../components/CustomAlert';
+import { Fonts } from '../constants/Fonts';
+import CalendarIcon from '../assets/svgs/calendar.svg';
+import TaskCompleteIcon from '../assets/svgs/taskComplete.svg';
 
 
 const HomeScreen = () => {
@@ -123,6 +125,7 @@ const HomeScreen = () => {
     );
     type EventFilter = 'All' | 'EventsOnly' | 'TasksOnly';
     const [filterType, setFilterType] = useState<EventFilter>('All');
+    const [selectedTab, setSelectedTab] = useState<'All' | 'Upcoming' | 'Completed'>('All');
 
     useEffect(() => {
         // Set the initial current month dynamically based on today's date
@@ -339,6 +342,32 @@ const HomeScreen = () => {
     };
     // ------------------------------------------------
 
+    // Filter events by selectedTab (All, Upcoming, Completed)
+    const filterEventsByTab = (allEvents: any[], tab: 'All' | 'Upcoming' | 'Completed') => {
+        if (tab === 'All') {
+            return allEvents;
+        }
+        
+        return allEvents
+            .map(dayGroup => {
+                const filteredEvents = dayGroup.events.filter((event: any) => {
+                    const isPast = isEventInPast(event.originalRawEventData || event);
+                    if (tab === 'Upcoming') {
+                        return !isPast; // Show only future events
+                    } else if (tab === 'Completed') {
+                        return isPast; // Show only past events
+                    }
+                    return true;
+                });
+                
+                if (filteredEvents.length > 0) {
+                    return { ...dayGroup, events: filteredEvents };
+                }
+                return null;
+            })
+            .filter(dayGroup => dayGroup !== null);
+    };
+
     useFocusEffect(
         useCallback(() => {
             console.log('User Events in HomeScreen:', userEvents);
@@ -348,9 +377,13 @@ const HomeScreen = () => {
             transformedData = filterEventsByTaskType(transformedData, filterType);
             // -------------------------------------
 
+            // --- APPLY TAB FILTER (All, Upcoming, Completed) ---
+            transformedData = filterEventsByTab(transformedData, selectedTab);
+            // -------------------------------------
+
             const filteredData = filterEventsByView(transformedData, currentView);
             setEvents(filteredData);
-        }, [userEvents, currentView, selectedTimeZone, filterType]) // Dependency on filterType
+        }, [userEvents, currentView, selectedTimeZone, filterType, selectedTab]) // Added selectedTab dependency
     );
 
     // console.log('All Events',allEvents);
@@ -485,10 +518,65 @@ const HomeScreen = () => {
                 onMonthPress={handleMonthPress}
                 onMonthSelect={handleMonthSelect}
                 onViewSelect={handleViewSelect}
-                onAction1Press={handleAction1Press}
-                onAction2Press={handleAction2Press}
-                filterType={filterType}  // ✅ Add this line
+                onAction1Press={() => handleAction1Press(filterType === 'EventsOnly')}
+                onAction2Press={() => handleAction2Press(filterType === 'TasksOnly')}
             />
+
+            {/* Segmented Control Navigation */}
+            <View style={styles.segmentedControlContainer}>
+                <View style={styles.segmentedControl}>
+                    <TouchableOpacity
+                        style={[
+                            styles.segmentButton,
+                            selectedTab === 'All' && styles.segmentButtonActive,
+                        ]}
+                        onPress={() => setSelectedTab('All')}
+                    >
+                        <Text
+                            style={[
+                                styles.segmentText,
+                                selectedTab === 'All' && styles.segmentTextActive,
+                            ]}
+                        >
+                            All
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.segmentButton,
+                            selectedTab === 'Upcoming' && styles.segmentButtonActive,
+                        ]}
+                        onPress={() => setSelectedTab('Upcoming')}
+                    >
+                        <Text
+                            style={[
+                                styles.segmentText,
+                                selectedTab === 'Upcoming' && styles.segmentTextActive,
+                            ]}
+                        >
+                            Upcoming
+                        </Text>
+                    </TouchableOpacity>
+
+                    <TouchableOpacity
+                        style={[
+                            styles.segmentButton,
+                            selectedTab === 'Completed' && styles.segmentButtonActive,
+                        ]}
+                        onPress={() => setSelectedTab('Completed')}
+                    >
+                        <Text
+                            style={[
+                                styles.segmentText,
+                                selectedTab === 'Completed' && styles.segmentTextActive,
+                            ]}
+                        >
+                            Completed
+                        </Text>
+                    </TouchableOpacity>
+                </View>
+            </View>
 
             {/* Left edge touch area for drawer */}
             <TouchableOpacity
@@ -501,20 +589,31 @@ const HomeScreen = () => {
                 {loading ? (
                     <CustomLoader />
                 ) : events.length === 0 ? (
-                    <View
-                        style={{
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            padding: 20,
-                        }}
-                    >
-                        <Text>
-                            {filterType === 'EventsOnly'
-                                ? 'No events found'
-                                : filterType === 'TasksOnly'
-                                    ? 'No tasks found'
-                                    : 'No events or tasks found'}
-                        </Text>
+                    <View style={styles.emptyStateContainer}>
+                        <View style={styles.emptyStateIllustration}>
+                            {/* Icon based on selected tab */}
+                            <View style={styles.emptyStateIcon}>
+                                {selectedTab === 'Completed' ? (
+                                    <TaskCompleteIcon width={scaleWidth(54)} height={scaleHeight(54)} fill={colors.primaryBlue} />
+                                ) : (
+                                    <CalendarIcon width={scaleWidth(54)} height={scaleHeight(54)} fill={colors.primaryBlue} />
+                                )}
+                            </View>
+                            <Text style={styles.emptyStateTitle}>
+                                {selectedTab === 'All' 
+                                    ? 'No Activity Available'
+                                    : selectedTab === 'Upcoming'
+                                    ? 'No Upcoming Activity'
+                                    : 'No Completed Activity'}
+                            </Text>
+                            <Text style={styles.emptyStateDescription}>
+                                {selectedTab === 'All'
+                                    ? "You haven't added any Activity yet. Tap the 'create button' below to quickly set up your first task, event, or activity."
+                                    : selectedTab === 'Upcoming'
+                                    ? "You don't have any upcoming activity right now. New scheduled events will automatically appear here as soon as they are created."
+                                    : "There are no completed activity to show. After you finish or mark activity as completed, they will be listed here."}
+                            </Text>
+                        </View>
                     </View>
                 ) : (
                     events?.map((dayData, index) => (
@@ -577,12 +676,10 @@ const HomeScreen = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: "#FFF",
+        backgroundColor: colors.lightGrayBg, // Light gray background (#F5F5F5)
     },
     content: {
         flex: 1,
-        paddingTop: spacing.lg,
-
     },
     leftEdgeTouchArea: {
         position: 'absolute',
@@ -591,6 +688,90 @@ const styles = StyleSheet.create({
         width: scaleWidth(20),
         height: screenHeight - scaleHeight(80),
         zIndex: 1,
+    },
+    // Segmented Control Navigation
+    segmentedControlContainer: {
+        width: screenWidth,
+        alignItems: 'center',
+        paddingHorizontal: scaleWidth(18),
+        paddingTop: scaleHeight(12),
+        paddingBottom: scaleHeight(12),
+        marginTop: scaleHeight(8), // Gap between header and navigation
+        // No background color - transparent to show gray home screen background
+    },
+    segmentedControl: {
+        width: scaleWidth(339),
+        height: scaleHeight(48),
+        flexDirection: 'row',
+        backgroundColor: colors.white, // White navigation container
+        borderRadius: 10,
+        padding: 4,
+        gap: 3,
+    },
+    segmentButton: {
+        flex: 1,
+        height: '100%',
+        justifyContent: 'center',
+        alignItems: 'center',
+        borderRadius: 8,
+    },
+    segmentButtonActive: {
+        backgroundColor: colors.primaryBlue, // Using the same blue as calendar icon
+    },
+    segmentText: {
+        fontSize: fontSize.textSize16,
+        fontWeight: '500',
+        fontFamily: Fonts.latoMedium,
+        color: colors.grey400,
+    },
+    segmentTextActive: {
+        color: colors.white,
+        fontWeight: '600',
+        fontFamily: Fonts.latoBold,
+    },
+    // Empty State
+    emptyStateContainer: {
+        width: scaleWidth(375),
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingTop: scaleHeight(80),
+        paddingBottom: scaleHeight(80),
+    },
+    emptyStateIllustration: {
+        width: scaleWidth(331),
+        height: scaleHeight(456),
+        alignItems: 'center',
+        justifyContent: 'center',
+        gap: scaleHeight(20),
+    },
+    emptyStateIcon: {
+        width: scaleWidth(134),
+        height: scaleHeight(134),
+        borderRadius: scaleWidth(150),
+        backgroundColor: '#E5F1FF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginBottom: scaleHeight(8), // Reduced gap
+    },
+    emptyStateIconText: {
+        fontSize: scaleWidth(60),
+    },
+    emptyStateTitle: {
+        fontSize: fontSize.textSize20,
+        fontWeight: '700',
+        fontFamily: Fonts.latoBold,
+        color: colors.blackText,
+        marginTop: scaleHeight(8), // Reduced gap
+        textAlign: 'center',
+    },
+    emptyStateDescription: {
+        fontSize: fontSize.textSize14,
+        fontFamily: Fonts.latoRegular,
+        color: colors.grey400,
+        textAlign: 'center',
+        paddingHorizontal: scaleWidth(40),
+        lineHeight: fontSize.textSize20,
+        marginTop: scaleHeight(4), // Reduced gap
     },
 });
 
