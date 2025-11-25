@@ -140,6 +140,9 @@ const CreateEventScreen = () => {
   const { api } = useApiClient();
   const [isAllDayEvent, setIsAllDayEvent] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
+  const [repeatEveryError, setRepeatEveryError] = useState('');
+  const repeatEveryInputRef = React.useRef<TextInput>(null);
+  const isRepeatEveryFocused = React.useRef(false);
   const endsOptions = ['Never', 'On', 'After'];
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
   
@@ -922,6 +925,15 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     setShowGuestDropdown(false);
   };
 
+  const handleToggleGuestModal = () => {
+    if (isLoading) {
+      return;
+    }
+    // Always reset the search query whenever the modal visibility changes
+    setGuestSearchQuery('');
+    setShowGuestModal(prev => !prev);
+  };
+
   // Validate date/time and set error message
   const validateDateTime = React.useCallback(() => {
     setDateTimeError('');
@@ -1448,10 +1460,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     // Validate location format (if provided)
     if (location.trim() && location.trim().length > 0) {
       // Check for invalid characters that could cause issues
-      // Blocked: < > { } [ ] | \ ` ~ ^ /
-      const invalidChars = /[<>{}[\]|\\`~^\/]/;
+      // Blocked: < > { } [ ] | \ ` ~ ^ / @ # $ % & * + = ?
+      const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
       if (invalidChars.test(location)) {
-        setLocationError('Location contains invalid characters. Please use letters, numbers, and common punctuation.');
+        setLocationError('Location contains invalid characters. Please use letters, numbers, spaces, commas, periods, and hyphens.');
         isValid = false;
         if (!firstErrorField) firstErrorField = 'location';
       }
@@ -2566,11 +2578,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             }
           }}
           showGuestModal={showGuestModal}
-          onToggleGuestModal={() => {
-            if (!isLoading) {
-              setShowGuestModal(!showGuestModal);
-            }
-          }}
+          onToggleGuestModal={handleToggleGuestModal}
           searchQuery={guestSearchQuery}
           onSearchQueryChange={setGuestSearchQuery}
           disabled={isLoading}
@@ -2979,16 +2987,53 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   </Text>
                   <View style={styles.customRepeatEveryRow}>
                     <TextInput
-                      style={styles.customRepeatEveryInput}
+                      ref={repeatEveryInputRef}
+                      style={[
+                        styles.customRepeatEveryInput,
+                        repeatEveryError && styles.customRepeatEveryInputError,
+                      ]}
                       value={customRecurrence.repeatEvery}
                       onChangeText={text => {
-                        // Only allow positive integers (1-99)
+                        // Clear error on input
+                        if (repeatEveryError) {
+                          setRepeatEveryError('');
+                        }
+                        
                         // Remove any non-numeric characters
                         const numericOnly = text.replace(/[^0-9]/g, '');
                         
-                        // Prevent empty string or zero
-                        if (numericOnly === '' || numericOnly === '0') {
-                          // Don't update if it would be empty or zero
+                        // Allow empty temporarily for backspace
+                        if (numericOnly === '') {
+                          setCustomRecurrence(prev => ({
+                            ...prev,
+                            repeatEvery: '',
+                          }));
+                          return;
+                        }
+                        
+                        // Prevent zero
+                        if (numericOnly === '0') {
+                          return;
+                        }
+                        
+                        // Handle smart replacement when focused and typing single digit
+                        const currentValue = customRecurrence.repeatEvery;
+                        if (isRepeatEveryFocused.current && currentValue.length === 1 && numericOnly.length === 1) {
+                          // Direct replacement when typing a single digit
+                          setCustomRecurrence(prev => ({
+                            ...prev,
+                            repeatEvery: numericOnly,
+                          }));
+                          return;
+                        }
+                        
+                        // Handle case where text was appended instead of replaced
+                        if (currentValue.length === 1 && numericOnly.length === 2 && numericOnly.startsWith(currentValue)) {
+                          const newDigit = numericOnly.slice(1);
+                          setCustomRecurrence(prev => ({
+                            ...prev,
+                            repeatEvery: newDigit,
+                          }));
                           return;
                         }
                         
@@ -3000,8 +3045,25 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                           repeatEvery: limitedValue,
                         }));
                       }}
+                      onFocus={() => {
+                        isRepeatEveryFocused.current = true;
+                        setRepeatEveryError('');
+                      }}
+                      onBlur={() => {
+                        isRepeatEveryFocused.current = false;
+                        // Validate on blur
+                        const value = customRecurrence.repeatEvery.trim();
+                        if (!value || value === '' || parseInt(value, 10) < 1 || parseInt(value, 10) > 99) {
+                          setRepeatEveryError('Please enter a number between 1 and 99');
+                          setCustomRecurrence(prev => ({
+                            ...prev,
+                            repeatEvery: '1',
+                          }));
+                        }
+                      }}
                       keyboardType="numeric"
                       maxLength={2}
+                      selectTextOnFocus={true}
                     />
                     <TouchableOpacity
                       style={styles.customRepeatUnitDropdown}
@@ -3019,10 +3081,11 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                     </TouchableOpacity>
                   </View>
                 </View>
+                {repeatEveryError ? (
+                  <Text style={styles.customRepeatEveryErrorText}>{repeatEveryError}</Text>
+                ) : null}
 
-
-
-                {/* Repeat on section */}
+              {/* Repeat on section */}
                 {customRecurrence.repeatUnit === repeatUnits[1] && (
                   <View style={styles.customRecurrenceSection}>
                     <Text style={styles.customRecurrenceSectionTitle}>
@@ -3289,11 +3352,11 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 value={location}
                 onChangeText={text => {
                   // Check for invalid characters
-                  // Blocked: < > { } [ ] | \ ` ~ ^ /
-                  const invalidChars = /[<>{}[\]|\\`~^\/]/;
+                  // Blocked: < > { } [ ] | \ ` ~ ^ / @ # $ % & * + = ?
+                  const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
                   if (invalidChars.test(text)) {
                     // Show error message and don't update the location
-                    setLocationError('Special characters are not allowed. Please use letters, numbers, and common punctuation.');
+                    setLocationError('Special characters (@, #, $, %, &, *, +, =, ?, <, >, {, }, [, ], |, \\, `, ~, ^, /) are not allowed. Please use letters, numbers, spaces, commas, periods, and hyphens.');
                     return;
                   }
                   
@@ -4039,6 +4102,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     flexShrink: 0,
   },
+  customRepeatEveryInputError: {
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
+  },
+  customRepeatEveryErrorText: {
+    fontSize: fontSize.textSize12,
+    color: '#EF4444',
+    marginTop: spacing.xs,
+    marginLeft: 0,
+  },
   customRepeatUnitDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4152,7 +4225,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: spacing.sm,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   customRadioButton: {
     width: scaleWidth(20),
@@ -4162,6 +4235,7 @@ const styles = StyleSheet.create({
     borderColor: '#DCE0E5',
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   customRadioButtonSelected: {
     width: scaleWidth(10),
@@ -4174,21 +4248,22 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     fontWeight: '400',
     minWidth: scaleWidth(40),
-
+    flexShrink: 0,
   },
   customEndsInput: {
-    minWidth: scaleWidth(100),
-    width: scaleWidth(110),
+    minWidth: scaleWidth(80),
+    maxWidth: scaleWidth(100),
+    width: scaleWidth(90),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     fontSize: fontSize.textSize12,
     color: colors.blackText,
     paddingVertical: spacing.sm,
     lineHeight: scaleHeight(13),
     justifyContent: 'center',
-    flexShrink: 0,
+    flexShrink: 1,
   },
   customEndsInputDisabled: {
     backgroundColor: '#F5F5F5',
@@ -4236,6 +4311,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize14,
     color: colors.blackText,
     marginLeft: spacing.xs,
+    flexShrink: 0,
   },
   customModalActions: {
     flexDirection: 'row',

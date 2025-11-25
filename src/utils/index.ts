@@ -36,6 +36,18 @@ export const isEventInPast = (event: any): boolean => {
     return false; // If no fromTime, consider it not in past (can't determine)
   }
 
+  // Check if event is recurring - recurring events should always be editable
+  const list = event.list || event.tags || [];
+  const isRecurring = list.some((item: any) => 
+    (item.key === 'repeatEvent' && item.value) || 
+    (item.key === 'customRepeatEvent' && item.value)
+  );
+
+  // If it's a recurring event, allow editing regardless of date
+  if (isRecurring) {
+    return false;
+  }
+
   try {
     const now = new Date();
     now.setSeconds(0, 0);

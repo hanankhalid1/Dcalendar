@@ -76,6 +76,9 @@ const CreateTaskScreen = () => {
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const [showEndsDatePicker, setShowEndsDatePicker] = useState(false);
+  const [repeatEveryError, setRepeatEveryError] = useState('');
+  const repeatEveryInputRef = React.useRef<TextInput>(null);
+  const isRepeatEveryFocused = React.useRef(false);
   
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
@@ -464,25 +467,61 @@ const CreateTaskScreen = () => {
     }
   }, [mode, editEventData]);
 
-  // Real-time validation for past date/time (only for new tasks, not edit mode)
+  // Helper function to get original date/time from editEventData
+  const getOriginalDateTime = React.useCallback(() => {
+    if (mode === 'edit' && editEventData?.fromTime) {
+      try {
+        const fromTime = editEventData.fromTime;
+        if (fromTime.length >= 15) {
+          const year = parseInt(fromTime.substring(0, 4), 10);
+          const month = parseInt(fromTime.substring(4, 6), 10) - 1;
+          const day = parseInt(fromTime.substring(6, 8), 10);
+          const hour = parseInt(fromTime.substring(9, 11), 10);
+          const minute = parseInt(fromTime.substring(11, 13), 10);
+          
+          return new Date(year, month, day, hour, minute, 0);
+        }
+      } catch (error) {
+        console.error('Error parsing original date/time:', error);
+      }
+    }
+    return null;
+  }, [mode, editEventData]);
+
+  // Real-time validation for past date/time
   const validateDateTime = React.useCallback(() => {
     // Clear previous errors first
     setDateError('');
     setTimeError('');
 
-    // Only validate for new tasks, not when editing
-    if (mode === 'edit' || !selectedDate || !selectedStartTime) {
+    if (!selectedDate || !selectedStartTime) {
       return;
     }
 
-    const now = new Date();
-    now.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
+    const currentTime = new Date();
+    currentTime.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
+
+    // In edit mode, check if original task is in the past
+    if (mode === 'edit') {
+      const originalDateTime = getOriginalDateTime();
+      if (originalDateTime) {
+        // If original task is in the past, allow editing (no validation needed)
+        if (originalDateTime < currentTime) {
+          return;
+        }
+        // If original task is in the future, validate that new date/time is not in the past
+        // Continue with validation below
+      } else {
+        // If we can't parse original date/time, allow editing (safer default)
+        return;
+      }
+    }
 
     // Check if the selected month is in the past
     const selectedMonth = selectedDate.getMonth();
     const selectedYear = selectedDate.getFullYear();
-    const currentMonth = now.getMonth();
-    const currentYear = now.getFullYear();
+    const currentMonth = currentTime.getMonth();
+    const currentYear = currentTime.getFullYear();
 
     if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
       setDateError('Please select valid time and date');
@@ -492,7 +531,7 @@ const CreateTaskScreen = () => {
     // Check if the selected date is in the past
     const selectedDateOnly = new Date(selectedDate);
     selectedDateOnly.setHours(0, 0, 0, 0);
-    const today = new Date(now);
+    const today = new Date(currentTime);
     today.setHours(0, 0, 0, 0);
 
     if (selectedDateOnly < today) {
@@ -519,7 +558,7 @@ const CreateTaskScreen = () => {
           const selectedDateTime = new Date(selectedDate);
           selectedDateTime.setHours(hours, minutes, 0, 0);
 
-          if (selectedDateTime < now) {
+          if (selectedDateTime < currentTime) {
             setTimeError('Please select valid time and date');
             return;
           }
@@ -533,7 +572,7 @@ const CreateTaskScreen = () => {
             const selectedDateTime = new Date(selectedDate);
             selectedDateTime.setHours(hour24, minute24, 0, 0);
 
-            if (selectedDateTime < now) {
+            if (selectedDateTime < currentTime) {
               setTimeError('Please select valid time and date');
               return;
             }
@@ -543,7 +582,7 @@ const CreateTaskScreen = () => {
     }
     
     // If we reach here, validation passed - errors are already cleared at the start
-  }, [mode, selectedDate, selectedStartTime]);
+  }, [mode, selectedDate, selectedStartTime, getOriginalDateTime]);
 
   // Validate when date/time changes
   useEffect(() => {
@@ -598,19 +637,48 @@ const CreateTaskScreen = () => {
     
     // Validate immediately after state updates (for real-time feedback)
     setTimeout(() => {
-      // Only validate for new tasks, not when editing
-      if (mode === 'edit' || !date || !startTime) {
+      if (!date || !startTime) {
         return;
       }
 
-      const now = new Date();
-      now.setSeconds(0, 0);
+      const currentTime = new Date();
+      currentTime.setSeconds(0, 0);
+
+      // In edit mode, check if original task is in the past
+      if (mode === 'edit' && editEventData?.fromTime) {
+        try {
+          const fromTime = editEventData.fromTime;
+          if (fromTime.length >= 15) {
+            const year = parseInt(fromTime.substring(0, 4), 10);
+            const month = parseInt(fromTime.substring(4, 6), 10) - 1;
+            const day = parseInt(fromTime.substring(6, 8), 10);
+            const hour = parseInt(fromTime.substring(9, 11), 10);
+            const minute = parseInt(fromTime.substring(11, 13), 10);
+            
+            const originalDateTime = new Date(year, month, day, hour, minute, 0);
+            
+            // If original task is in the past, allow editing (no validation needed)
+            if (originalDateTime < currentTime) {
+              return;
+            }
+            // If original task is in the future, validate that new date/time is not in the past
+            // Continue with validation below
+          } else {
+            // If we can't parse original date/time, allow editing (safer default)
+            return;
+          }
+        } catch (error) {
+          console.error('Error parsing original date/time:', error);
+          // On error, allow editing (safer default)
+          return;
+        }
+      }
 
       // Check if the selected month is in the past
       const selectedMonth = date.getMonth();
       const selectedYear = date.getFullYear();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
+      const currentMonth = currentTime.getMonth();
+      const currentYear = currentTime.getFullYear();
 
       if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
         setDateError('Please select valid time and date');
@@ -620,7 +688,7 @@ const CreateTaskScreen = () => {
       // Check if the selected date is in the past
       const selectedDateOnly = new Date(date);
       selectedDateOnly.setHours(0, 0, 0, 0);
-      const today = new Date(now);
+      const today = new Date(currentTime);
       today.setHours(0, 0, 0, 0);
 
       if (selectedDateOnly < today) {
@@ -647,7 +715,7 @@ const CreateTaskScreen = () => {
             const selectedDateTime = new Date(date);
             selectedDateTime.setHours(hours, minutes, 0, 0);
 
-            if (selectedDateTime < now) {
+            if (selectedDateTime < currentTime) {
               setTimeError('Please select valid time and date');
               return;
             }
@@ -661,7 +729,7 @@ const CreateTaskScreen = () => {
               const selectedDateTime = new Date(date);
               selectedDateTime.setHours(hour24, minute24, 0, 0);
 
-              if (selectedDateTime < now) {
+              if (selectedDateTime < currentTime) {
                 setTimeError('Please select valid time and date');
                 return;
               }
@@ -725,35 +793,63 @@ const CreateTaskScreen = () => {
       if (!firstErrorField) firstErrorField = 'time';
     }
 
-    // Validate past date/time (only for new tasks, not edit mode)
-    if (mode !== 'edit' && selectedDate && selectedStartTime) {
-      const now = new Date();
-      now.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
+    // Validate past date/time
+    if (selectedDate && selectedStartTime) {
+      const currentTime = new Date();
+      currentTime.setSeconds(0, 0); // Reset seconds and milliseconds for accurate comparison
 
-      // Check if the selected month is in the past
-      const selectedMonth = selectedDate.getMonth();
-      const selectedYear = selectedDate.getFullYear();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
+      // In edit mode, check if original task is in the past
+      let shouldValidate = true;
+      if (mode === 'edit' && editEventData?.fromTime) {
+        try {
+          const fromTime = editEventData.fromTime;
+          if (fromTime.length >= 15) {
+            const year = parseInt(fromTime.substring(0, 4), 10);
+            const month = parseInt(fromTime.substring(4, 6), 10) - 1;
+            const day = parseInt(fromTime.substring(6, 8), 10);
+            const hour = parseInt(fromTime.substring(9, 11), 10);
+            const minute = parseInt(fromTime.substring(11, 13), 10);
+            
+            const originalDateTime = new Date(year, month, day, hour, minute, 0);
+            
+            // If original task is in the past, allow editing (no validation needed)
+            if (originalDateTime < currentTime) {
+              shouldValidate = false;
+            }
+            // If original task is in the future, validate that new date/time is not in the past
+          }
+        } catch (error) {
+          console.error('Error parsing original date/time:', error);
+          // On error, allow editing (safer default)
+          shouldValidate = false;
+        }
+      }
 
-      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
-        setDateError('Please select valid time and date');
-        isValid = false;
-        if (!firstErrorField) firstErrorField = 'date';
-      } else {
-        // Check if the selected date is in the past
-        const selectedDateOnly = new Date(selectedDate);
-        selectedDateOnly.setHours(0, 0, 0, 0);
-        const today = new Date(now);
-        today.setHours(0, 0, 0, 0);
+      if (shouldValidate) {
+        // Check if the selected month is in the past
+        const selectedMonth = selectedDate.getMonth();
+        const selectedYear = selectedDate.getFullYear();
+        const currentMonth = currentTime.getMonth();
+        const currentYear = currentTime.getFullYear();
 
-        if (selectedDateOnly < today) {
+        if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
           setDateError('Please select valid time and date');
           isValid = false;
           if (!firstErrorField) firstErrorField = 'date';
-        } else if (selectedDateOnly.getTime() === today.getTime()) {
-          // Same day - check if time is in the past
-          if (selectedStartTime && selectedStartTime.trim() !== '') {
+        } else {
+          // Check if the selected date is in the past
+          const selectedDateOnly = new Date(selectedDate);
+          selectedDateOnly.setHours(0, 0, 0, 0);
+          const today = new Date(currentTime);
+          today.setHours(0, 0, 0, 0);
+
+          if (selectedDateOnly < today) {
+            setDateError('Please select valid time and date');
+            isValid = false;
+            if (!firstErrorField) firstErrorField = 'date';
+          } else if (selectedDateOnly.getTime() === today.getTime()) {
+            // Same day - check if time is in the past
+            if (selectedStartTime && selectedStartTime.trim() !== '') {
             // Parse time from 12-hour format (e.g., "11:30 AM") or 24-hour format (e.g., "11:30")
             const normalizedTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
             const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -770,7 +866,7 @@ const CreateTaskScreen = () => {
               const selectedDateTime = new Date(selectedDate);
               selectedDateTime.setHours(hours, minutes, 0, 0);
 
-              if (selectedDateTime < now) {
+              if (selectedDateTime < currentTime) {
                 setTimeError('Please select valid time and date');
                 isValid = false;
                 if (!firstErrorField) firstErrorField = 'time';
@@ -785,13 +881,14 @@ const CreateTaskScreen = () => {
                 const selectedDateTime = new Date(selectedDate);
                 selectedDateTime.setHours(hour24, minute24, 0, 0);
 
-                if (selectedDateTime < now) {
+                if (selectedDateTime < currentTime) {
                   setTimeError('Please select valid time and date');
                   isValid = false;
                   if (!firstErrorField) firstErrorField = 'time';
                 }
               }
             }
+          }
           }
         }
       }
@@ -1447,16 +1544,53 @@ const CreateTaskScreen = () => {
                 </Text>
                 <View style={styles.customRepeatEveryRow}>
                   <TextInput
-                    style={styles.customRepeatEveryInput}
+                    ref={repeatEveryInputRef}
+                    style={[
+                      styles.customRepeatEveryInput,
+                      repeatEveryError && styles.customRepeatEveryInputError,
+                    ]}
                     value={customRecurrence.repeatEvery}
                     onChangeText={text => {
-                      // Only allow positive integers (1-99)
+                      // Clear error on input
+                      if (repeatEveryError) {
+                        setRepeatEveryError('');
+                      }
+                      
                       // Remove any non-numeric characters
                       const numericOnly = text.replace(/[^0-9]/g, '');
                       
-                      // Prevent empty string or zero
-                      if (numericOnly === '' || numericOnly === '0') {
-                        // Don't update if it would be empty or zero
+                      // Allow empty temporarily for backspace
+                      if (numericOnly === '') {
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          repeatEvery: '',
+                        }));
+                        return;
+                      }
+                      
+                      // Prevent zero
+                      if (numericOnly === '0') {
+                        return;
+                      }
+                      
+                      // Handle smart replacement when focused and typing single digit
+                      const currentValue = customRecurrence.repeatEvery;
+                      if (isRepeatEveryFocused.current && currentValue.length === 1 && numericOnly.length === 1) {
+                        // Direct replacement when typing a single digit
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          repeatEvery: numericOnly,
+                        }));
+                        return;
+                      }
+                      
+                      // Handle case where text was appended instead of replaced
+                      if (currentValue.length === 1 && numericOnly.length === 2 && numericOnly.startsWith(currentValue)) {
+                        const newDigit = numericOnly.slice(1);
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          repeatEvery: newDigit,
+                        }));
                         return;
                       }
                       
@@ -1468,8 +1602,25 @@ const CreateTaskScreen = () => {
                         repeatEvery: limitedValue,
                       }));
                     }}
+                    onFocus={() => {
+                      isRepeatEveryFocused.current = true;
+                      setRepeatEveryError('');
+                    }}
+                    onBlur={() => {
+                      isRepeatEveryFocused.current = false;
+                      // Validate on blur
+                      const value = customRecurrence.repeatEvery.trim();
+                      if (!value || value === '' || parseInt(value, 10) < 1 || parseInt(value, 10) > 99) {
+                        setRepeatEveryError('Please enter a number between 1 and 99');
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          repeatEvery: '1',
+                        }));
+                      }
+                    }}
                     keyboardType="numeric"
                     maxLength={2}
+                    selectTextOnFocus={true}
                     editable={!isLoading}
                   />
                   <TouchableOpacity
@@ -1487,6 +1638,9 @@ const CreateTaskScreen = () => {
                     />
                   </TouchableOpacity>
                 </View>
+                {repeatEveryError ? (
+                  <Text style={styles.customRepeatEveryErrorText}>{repeatEveryError}</Text>
+                ) : null}
               </View>
 
               {/* Repeat on section */}
@@ -2138,6 +2292,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     flexShrink: 0,
   },
+  customRepeatEveryInputError: {
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
+  },
+  customRepeatEveryErrorText: {
+    fontSize: fontSize.textSize12,
+    color: '#EF4444',
+    marginTop: spacing.xs,
+    marginLeft: 0,
+  },
   customRepeatUnitDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -2217,7 +2381,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: spacing.sm,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
   customRadioButton: {
     width: scaleWidth(20),
@@ -2227,6 +2391,7 @@ const styles = StyleSheet.create({
     borderColor: '#DCE0E5',
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   customRadioButtonSelected: {
     width: scaleWidth(10),
@@ -2239,20 +2404,22 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     fontWeight: '400',
     minWidth: scaleWidth(40),
+    flexShrink: 0,
   },
   customEndsInput: {
-    minWidth: scaleWidth(100),
-    width: scaleWidth(110),
+    minWidth: scaleWidth(80),
+    maxWidth: scaleWidth(100),
+    width: scaleWidth(90),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.sm,
+    paddingHorizontal: spacing.xs,
     fontSize: fontSize.textSize12,
     color: colors.blackText,
     paddingVertical: spacing.sm,
     lineHeight: scaleHeight(13),
     justifyContent: 'center',
-    flexShrink: 0,
+    flexShrink: 1,
   },
   customEndsInputDisabled: {
     backgroundColor: '#F5F5F5',
@@ -2300,6 +2467,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize14,
     color: colors.blackText,
     marginLeft: spacing.xs,
+    flexShrink: 0,
   },
   customModalActions: {
     flexDirection: 'row',

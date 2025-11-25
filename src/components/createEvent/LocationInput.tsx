@@ -21,7 +21,14 @@ const LocationInput: React.FC<LocationInputProps> = ({
         placeholder="Pick location"
         placeholderTextColor={colors.grey400}
         value={location}
-        onChangeText={onLocationChange}
+        onChangeText={text => {
+          // Check for invalid characters
+          // Blocked: < > { } [ ] | \ ` ~ ^ / @ # $ % & * + = ?
+          const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
+          if (!invalidChars.test(text)) {
+            onLocationChange(text);
+          }
+        }}
       />
       <Image
         source={require('../../assets/images/CreateEventImages/addIcon.png')}

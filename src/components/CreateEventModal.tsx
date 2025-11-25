@@ -483,7 +483,14 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
               placeholder="Pick location"
               placeholderTextColor={colors.grey400}
               value={location}
-              onChangeText={setLocation}
+              onChangeText={text => {
+                // Check for invalid characters
+                // Blocked: < > { } [ ] | \ ` ~ ^ / @ # $ % & * + = ?
+                const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
+                if (!invalidChars.test(text)) {
+                  setLocation(text);
+                }
+              }}
             />
             <Image
               source={require('../assets/images/CreateEventImages/addIcon.png')}

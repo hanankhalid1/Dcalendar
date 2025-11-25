@@ -93,12 +93,16 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   }, [showGuestModal, loadContacts, onSearchQueryChange]);
 
   // Filter guests based on search query
+  const normalizedQuery = searchQuery.trim().toLowerCase();
   const filteredGuests = guests.filter(
     guest =>
-      guest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      guest.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      guest.username.toLowerCase().includes(searchQuery.toLowerCase()),
+      guest.name.toLowerCase().includes(normalizedQuery) ||
+      guest.email.toLowerCase().includes(normalizedQuery) ||
+      guest.username.toLowerCase().includes(normalizedQuery),
   );
+  const hasSearchTerm = normalizedQuery.length > 0;
+  const hasNoResults = hasSearchTerm && filteredGuests.length === 0 && guests.length > 0;
+  const isAddDisabled = selectedGuests.length === 0 || disabled || hasNoResults;
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Guests</Text>
@@ -135,10 +139,20 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
             </View>
 
             {/* Search Bar */}
-            <View style={styles.searchContainer}>
-              <FeatherIcon name="search" size={20} color="#6C6C6C" />
+            <View style={[
+              styles.searchContainer,
+              hasNoResults && styles.searchContainerError,
+            ]}>
+              <FeatherIcon 
+                name="search" 
+                size={20} 
+                color={hasNoResults ? "#EF4444" : "#6C6C6C"} 
+              />
               <TextInput
-                style={styles.searchInput}
+                style={[
+                  styles.searchInput,
+                  hasNoResults && styles.searchInputError,
+                ]}
                 placeholder="Search contacts..."
                 placeholderTextColor="#9E9E9E"
                 value={searchQuery}
@@ -146,6 +160,15 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                 editable={!disabled}
               />
             </View>
+            
+            {/* Error Message for No Guest Found */}
+            {hasNoResults && (
+              <View style={styles.errorMessageContainer}>
+                <Text style={styles.errorMessageText}>
+                  No such guest found.
+                </Text>
+              </View>
+            )}
 
             {/* Guest List */}
             {isLoading ? (
@@ -164,7 +187,20 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               </View>
             ) : filteredGuests.length === 0 ? (
               <View style={styles.emptyContainer}>
-                <Text style={styles.emptyText}>No contacts found</Text>
+                {hasSearchTerm ? (
+                  <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>
+                      No such guest found
+                    </Text>
+                    <Text style={styles.errorSubtext}>
+                      Please check the spelling or try searching by email or username.
+                    </Text>
+                  </View>
+                ) : (
+                  <Text style={styles.emptyText}>
+                    No contacts available
+                  </Text>
+                )}
               </View>
             ) : (
               <FlatList
@@ -231,8 +267,16 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.addButton}
-                onPress={onToggleGuestModal}
+                style={[
+                  styles.addButton,
+                  isAddDisabled && styles.addButtonDisabled,
+                ]}
+                onPress={() => {
+                  if (!isAddDisabled) {
+                    onToggleGuestModal();
+                  }
+                }}
+                disabled={isAddDisabled}
               >
                 <LinearGradient
                   colors={['#18F06E', '#0B6DE0']}
@@ -321,6 +365,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginHorizontal: spacing.lg,
     marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  searchContainerError: {
+    borderColor: '#EF4444',
+    backgroundColor: '#FEF2F2',
   },
   searchInput: {
     flex: 1,
@@ -328,6 +378,19 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     marginLeft: spacing.sm,
     padding: 0,
+  },
+  searchInputError: {
+    color: '#EF4444',
+  },
+  errorMessageContainer: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.sm,
+  },
+  errorMessageText: {
+    fontSize: fontSize.textSize12,
+    color: '#EF4444',
+    fontWeight: '400',
   },
   guestList: {
     flex: 1,
@@ -454,6 +517,9 @@ const styles = StyleSheet.create({
     borderRadius: 10,
     overflow: 'hidden',
   },
+  addButtonDisabled: {
+    opacity: 0.5,
+  },
   addButtonGradient: {
     paddingVertical: spacing.md,
     alignItems: 'center',
@@ -480,6 +546,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize14,
     color: '#6B7280',
     textAlign: 'center',
+  },
+  errorSubtext: {
+    fontSize: fontSize.textSize14,
+    color: '#EF4444',
+    textAlign: 'center',
+    marginTop: spacing.xs,
   },
 });
 

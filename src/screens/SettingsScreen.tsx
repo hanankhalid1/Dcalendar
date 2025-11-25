@@ -150,58 +150,73 @@ const BottomSheetModal = ({ visible, onClose, children }) => {
   );
 };
 
+// Days array - moved outside component to prevent recreation on every render
+const WEEK_DAYS = [
+  'Monday',
+  'Tuesday',
+  'Wednesday',
+  'Thursday',
+  'Friday',
+  'Saturday',
+  'Sunday'
+];
+
 // Day Selection Modal Component
-const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
-  const days = [
-    'Monday',
-    'Tuesday',
-    'Wednesday',
-    'Thursday',
-    'Friday',
-    'Saturday',
-    'Sunday'
-  ];
-
+const DaySelectionModal = React.memo(({ visible, onClose, selectedDay, onSelectDay }) => {
   const { account } = useActiveAccount();
-  const blockchainService = new BlockchainService();
   const [isSaving, setIsSaving] = useState(false);
+  const [tempSelectedDay, setTempSelectedDay] = useState(selectedDay);
 
-  // Reset isSaving when modal closes
+  // Reset temporary state when modal opens/closes
   useEffect(() => {
-    if (!visible) {
-      setIsSaving(false);
-    }
-  }, [visible]);
-
-  const handleDaySelect = async (day: string) => {
-    // ✅ Update local store immediately (Zustand persist will save to AsyncStorage automatically)
-    onSelectDay(day);
-
-    // ✅ Save to blockchain as background sync (don't block UI or show errors)
-    if (account?.userName) {
-      setIsSaving(true);
-      // Don't await - let it run in background
-      blockchainService.updateSettings(
-        account.userName,
-        'startOfWeek',
-        [{ key: 'value', value: day }]
-      ).then(() => {
-        console.log('✅ Start of week synced to blockchain:', day);
-        setIsSaving(false);
-      }).catch((error) => {
-        console.error('❌ Failed to sync start of week to blockchain (non-critical):', error);
-        // Don't show error to user - local storage is working
-        setIsSaving(false);
-      });
+    if (visible) {
+      // When modal opens, initialize with current selected day
+      setTempSelectedDay(selectedDay);
     } else {
-      // If no account, ensure isSaving is false
+      // When modal closes, reset to original value
+      setTempSelectedDay(selectedDay);
       setIsSaving(false);
     }
-  };
+  }, [visible, selectedDay]);
 
-  const handleConfirm = () => {
+  // Memoize the day select handler to prevent unnecessary re-renders
+  const handleDaySelect = React.useCallback((day: string) => {
+    // Only update temporary state, don't save yet
+    setTempSelectedDay(day);
+  }, []);
+
+  // Memoize confirm handler
+  const handleConfirm = React.useCallback(async () => {
+    // Only save when Confirm is clicked
+    if (tempSelectedDay !== selectedDay) {
+      // Update local store (Zustand persist will save to AsyncStorage automatically)
+      onSelectDay(tempSelectedDay);
+
+      // Save to blockchain as background sync
+      if (account?.userName) {
+        setIsSaving(true);
+        blockchainService.updateSettings(
+          account.userName,
+          'startOfWeek',
+          [{ key: 'value', value: tempSelectedDay }]
+        ).then(() => {
+          console.log('✅ Start of week synced to blockchain:', tempSelectedDay);
+          setIsSaving(false);
+        }).catch((error) => {
+          console.error('❌ Failed to sync start of week to blockchain (non-critical):', error);
+          setIsSaving(false);
+        });
+      }
+    }
     onClose();
-  };
+  }, [tempSelectedDay, selectedDay, account?.userName, onSelectDay, onClose]);
+
+  // Memoize cancel handler
+  const handleCancel = React.useCallback(() => {
+    // Reset to original value when canceling
+    setTempSelectedDay(selectedDay);
+    onClose();
+  }, [selectedDay, onClose]);
 
   return (
     <BottomSheetModal visible={visible} onClose={onClose}>
@@ -210,34 +225,38 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
       </View>
 
       <View style={styles.modalBody}>
-        {days.map((day) => (
-          <TouchableOpacity
-            key={day}
-            style={styles.radioOption}
-            onPress={() => handleDaySelect(day)}
-            activeOpacity={0.7}
-            disabled={false}
-          >
-            <View style={styles.radioButton}>
-              {selectedDay === day && (
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.radioButtonSelected}
-                />
-              )}
-            </View>
-            <Text style={styles.radioText}>{day}</Text>
-          </TouchableOpacity>
-        ))}
+        {WEEK_DAYS.map((day) => {
+          const isSelected = tempSelectedDay === day;
+          return (
+            <TouchableOpacity
+              key={day}
+              style={styles.radioOption}
+              onPress={() => handleDaySelect(day)}
+              activeOpacity={0.7}
+              disabled={isSaving}
+            >
+              <View style={styles.radioButton}>
+                {isSelected && (
+                  <LinearGradient
+                    colors={['#18F06E', '#0B6DE0']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 1 }}
+                    style={styles.radioButtonSelected}
+                  />
+                )}
+              </View>
+              <Text style={styles.radioText}>{day}</Text>
+            </TouchableOpacity>
+          );
+        })}
       </View>
 
       <View style={styles.modalButtons}>
         <TouchableOpacity
           style={styles.cancelButton}
-          onPress={onClose}
+          onPress={handleCancel}
           activeOpacity={0.7}
+          disabled={isSaving}
         >
           <Text style={styles.cancelButtonText}>Cancel</Text>
         </TouchableOpacity>
@@ -245,20 +264,23 @@ const DaySelectionModal = ({ visible, onClose, selectedDay, onSelectDay }) => {
           style={styles.confirmButtonWrapper}
           onPress={handleConfirm}
           activeOpacity={0.8}
+          disabled={isSaving}
         >
           <LinearGradient
             colors={['#18F06E', '#0B6DE0']}
             start={{ x: 0, y: 0.5 }}
             end={{ x: 1, y: 0.5 }}
-            style={styles.confirmButton}
+            style={[styles.confirmButton, isSaving && { opacity: 0.6 }]}
           >
-            <Text style={styles.confirmButtonText}>Confirm</Text>
+            <Text style={styles.confirmButtonText}>
+              {isSaving ? 'Saving...' : 'Confirm'}
+            </Text>
           </LinearGradient>
         </TouchableOpacity>
       </View>
     </BottomSheetModal>
   );
-};
+});
 
 // Theme Selection Modal Component
 const ThemeSelectionModal = ({ visible, onClose, selectedTheme, onSelectTheme }) => {

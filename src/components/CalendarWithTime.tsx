@@ -11,7 +11,7 @@ import {
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import LinearGradient from 'react-native-linear-gradient';
-import { moderateScale, scaleWidth } from '../utils/dimensions';
+import { moderateScale, scaleWidth, scaleHeight } from '../utils/dimensions';
 import { colors, fontSize, spacing, borderRadius } from '../utils/LightTheme';
 
 interface CalendarWithTimeProps {
