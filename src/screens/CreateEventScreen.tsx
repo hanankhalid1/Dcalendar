@@ -1755,7 +1755,49 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           Alert.alert('Error', 'Failed to update Google Meet');
         }
       }
+            if (eventData.locationType === "zoom" && zoomIntegration?.isConnected) {
+        console.log("Updating Zoom meeting...");
 
+        const zoomEvent = {
+          topic: eventData.title,
+          agenda: eventData.description,
+          start_time: new Date(selectedStartDate).toISOString(),
+          duration: Math.ceil(
+            (new Date(selectedEndDate).getTime() - new Date(selectedStartDate).getTime()) / 60000
+          ),
+          timezone: "UTC",
+          settings: {
+            host_video: true,
+            participant_video: false,
+            join_before_host: false,
+            mute_upon_entry: true,
+            waiting_room: false,
+          },
+        };
+
+        try {
+          // PUT /zoom/meetings/:meetingId
+          const response = await api(
+            'PUT',
+            `/zoom/meetings/${eventData.meetingEventId}`,
+            zoomEvent
+          );
+
+          const data = response?.data?.data || response?.data;
+
+          if (data?.join_url) {
+            console.log("✅ Zoom meeting updated:", data.join_url);
+            eventData.location = data.join_url;
+            eventData.meetingEventId = data.id;
+          } else {
+            console.error("❌ Failed to update Zoom meeting:", data);
+            Alert.alert("Error", "Failed to update Zoom Meeting");
+          }
+        } catch (err) {
+          console.error("❌ Zoom update error:", err);
+          Alert.alert("Error", "Failed to update Zoom Meeting");
+        }
+      }
       console.log('Editing event payload:', eventData);
 
       const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
@@ -1880,7 +1922,50 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           Alert.alert('Error', 'Failed to create Google Meet');
         }
       }
+  // If Zoom is selected and user is connected
+      if (eventData.locationType === 'zoom' && zoomIntegration?.isConnected) {
+        console.log("Creating Zoom meeting...");
 
+        const zoomEvent = {
+          topic: eventData.title,
+          agenda: eventData.description,
+          start_time: new Date(selectedStartDate).toISOString(), // UTC ISO
+          duration: Math.ceil(
+            (new Date(selectedEndDate).getTime() - new Date(selectedStartDate).getTime()) / 60000
+          ),
+          timezone: "UTC",
+          settings: {
+            host_video: true,
+            participant_video: false,
+            join_before_host: false,
+            mute_upon_entry: true,
+            waiting_room: false,
+          },
+        };
+
+        try {
+          // Call your backend directly
+          const response = await api(
+            'POST',
+            '/zoom/meetings',
+            zoomEvent
+          );
+
+          const data = response?.data?.data || response?.data;
+
+          if (data?.join_url) {
+            console.log("✅ Zoom meeting created:", data.join_url);
+            eventData.location = data.join_url;      // add URL
+            eventData.meetingEventId = data.id;      // store zoom meeting id
+          } else {
+            console.error("❌ Zoom creation failed:", data);
+            Alert.alert("Error", "Failed to create Zoom Meeting");
+          }
+        } catch (err) {
+          console.error("❌ Zoom create error:", err);
+          Alert.alert("Error", "Failed to create Zoom Meeting");
+        }
+      }
 
       console.log("Active account: ", activeAccount.userName);
       console.log("Create event payload: ", eventData);
