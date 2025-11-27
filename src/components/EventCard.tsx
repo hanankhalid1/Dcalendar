@@ -377,13 +377,7 @@ const EventCard: React.FC<EventCardProps> = ({
                 </TouchableOpacity> */}
                 </View>
 
-                {/* Invite Button - Now shown for all events when expanded */}
-                <TouchableOpacity style={styles.compactInviteButton}>
-                  {renderIcon('share', 'MaterialIcons', 20, colors.black)}
-                  <Text style={styles.compactInviteButtonText}>
-                    Invite with link
-                  </Text>
-                </TouchableOpacity>
+              
               </View>
             </ScrollView>
           )}
@@ -485,11 +479,7 @@ const EventCard: React.FC<EventCardProps> = ({
               </TouchableOpacity>
             </View>
 
-            {/* Invite Button - Now shown for all events when expanded */}
-            <TouchableOpacity style={styles.inviteButton}>
-              {renderIcon('share', 'MaterialIcons', 16, colors.textPrimary)}
-              <Text style={styles.inviteButtonText}>Invite with link</Text>
-            </TouchableOpacity>
+          
           </View>
         )}
       </TouchableOpacity>
@@ -567,7 +557,6 @@ const styles = StyleSheet.create({
   actionIcons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: spacing.md,
     paddingHorizontal: spacing.md,
   },
   actionIcon: {
@@ -621,9 +610,7 @@ const styles = StyleSheet.create({
     overflow: 'visible', // Allow content to be visible
     alignSelf: 'stretch', // Stretch to full width when expanded
     width: '100%', // Take full width when expanded
-    minHeight: scaleHeight(200), // Minimum height
     maxHeight: scaleHeight(300), // Maximum height to prevent cutoff
-    marginBottom: spacing.lg, // Add larger bottom margin to create more space after expanded card
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.1)', // Same border as collapsed
   },
@@ -741,7 +728,6 @@ const styles = StyleSheet.create({
   compactActionIcons: {
     flexDirection: 'row',
     justifyContent: 'center',
-    marginBottom: spacing.lg,
     paddingHorizontal: spacing.sm,
     marginTop: spacing.sm,
   },
