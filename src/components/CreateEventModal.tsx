@@ -229,7 +229,13 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
     return true;
   };
 
-  const { updateEvent, getUserEvents } = useEventsStore();
+  const { 
+    optimisticallyUpdateEvent, 
+    optimisticallyAddEvent,
+    revertOptimisticUpdate,
+    getUserEvents,
+    userEvents 
+  } = useEventsStore();
   const { api } = useApiClient();
   const navigation = useNavigation();
   const { wallet } = useWalletStore();
@@ -239,7 +245,8 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
     if (!validateForm()) return;
 
-    setIsLoading(true);
+    // Don't block UI with loading state - optimistic updates handle this
+    setIsLoading(false);
 
     try {
       const payload = {
@@ -259,57 +266,80 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
       };
       console.log("modddd", mode)
       if (mode === 'edit' && eventData?.uid) {
-        const updatePayload = {
-          events: [
-            {
-              uid: eventData.uid,
-              fromTime: payload.selectedStartTime, // format: YYYYMMDDTHHmmss
-              toTime: payload.selectedEndTime,
-              repeatEvent: '',        // add logic if needed
-              customRepeatEvent: '',  // add logic if needed
-            },
-          ],
-          active: payload.activeAccount?.username,
-          type: 'update',
-        };
+        // Store current events for potential revert
+        const previousEvents = [...(userEvents || [])];
+        
+        // ✅ OPTIMISTIC UPDATE: Update UI immediately
+        optimisticallyUpdateEvent(eventData.uid, {
+          title: payload.title,
+          fromTime: payload.selectedStartTime,
+          toTime: payload.selectedEndTime,
+          description: payload.description,
+          location: payload.location,
+        });
 
-        const response = await axios.post(
-          'https://dev-api.bmail.earth/updateevents',
-          updatePayload,
-          {
-            headers: {
-              Authorization: `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
+        // ✅ NAVIGATE IMMEDIATELY - SYNCHRONOUS (NO DELAY)
+        navigation.goBack();
+        
+        // Show success alert asynchronously (non-blocking)
+        setTimeout(() => {
+          Alert.alert('Success', 'Event updated successfully!');
+        }, 100);
+
+        // ✅ BACKGROUND OPERATIONS: Run API calls in background
+        (async () => {
+          try {
+            const updatePayload = {
+              events: [
+                {
+                  uid: eventData.uid,
+                  fromTime: payload.selectedStartTime, // format: YYYYMMDDTHHmmss
+                  toTime: payload.selectedEndTime,
+                  repeatEvent: '',        // add logic if needed
+                  customRepeatEvent: '',  // add logic if needed
+                },
+              ],
+              active: payload.activeAccount?.username,
+              type: 'update',
+            };
+
+            const response = await axios.post(
+              'https://dev-api.bmail.earth/updateevents',
+              updatePayload,
+              {
+                headers: {
+                  Authorization: `Bearer ${token}`,
+                  'Content-Type': 'application/json',
+                },
+              }
+            );
+            
+            if (response.data?.success) {
+              // Refresh events in background (non-blocking)
+              if (activeAccount?.username) {
+                getUserEvents(activeAccount.username, api).catch(err => {
+                  console.error('Background event refresh failed:', err);
+                });
+              }
+            } else {
+              // Revert on failure
+              revertOptimisticUpdate(previousEvents);
+              Alert.alert('Error', response.data?.message || 'Failed to update event');
+            }
+          } catch (error: any) {
+            console.error('Error updating event in background:', error);
+            // Revert optimistic update on error
+            revertOptimisticUpdate(previousEvents);
+            Alert.alert('Error', error.message || 'Something went wrong');
           }
-        );
-        if (response.data?.success) {
-          // Update local Zustand store for immediate UI update
-          updateEvent(eventData.uid, {
-            title: payload.title,
-            fromTime: payload.selectedStartTime,
-            toTime: payload.selectedEndTime,
-            description: payload.description,
-            location: payload.location,
-          });
-
-          Alert.alert('Success', 'Event updated successfully!', [
-            { text: 'OK', onPress: () => navigation.goBack() },
-          ]);
-
-          // Optional: refresh blockchain events
-          if (activeAccount?.username) await getUserEvents(activeAccount.username, api);
-        } else {
-          Alert.alert('Error', response.data?.message || 'Failed to update event');
-        }
+        })();
       } else {
         // Handle create event (can still use Zustand addEvent or API call)
+        // TODO: Implement optimistic create if needed
       }
     } catch (error: any) {
       console.error('Error updating event:', error);
       Alert.alert('Error', error.message || 'Something went wrong');
-    } finally {
-      setIsLoading(false);
     }
   };
 

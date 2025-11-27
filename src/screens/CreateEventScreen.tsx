@@ -46,7 +46,7 @@ import {
   timezones,
 } from '../constants/dummyData';
 import { AppNavigationProp, Screen } from '../navigations/appNavigation.type';
-import { generateEventUID } from '../utils/eventUtils';
+import { generateEventUID, buildEventMetadata, prepareEventForBlockchain, encryptWithNECJS } from '../utils/eventUtils';
 
 import GuestSelector from '../components/createEvent/GuestSelector';
 import { BlockchainService } from '../services/BlockChainService';
@@ -64,7 +64,15 @@ const CreateEventScreen = () => {
   const token = useToken(state => state.token);
   const route = useRoute<any>();
   const { mode, eventData: editEventData } = route.params || {};
-  const { getUserEvents } = useEventsStore();
+  const { 
+    getUserEvents, 
+    optimisticallyAddEvent, 
+    optimisticallyUpdateEvent, 
+    optimisticallyDeleteEvent,
+    revertOptimisticUpdate,
+    setUserEvents,
+    userEvents 
+  } = useEventsStore();
   const { googleIntegration } = useAuthStore();
   const currentTimezone = useSettingsStore();
   // Initialize blockchain service and get contract instance
@@ -1684,523 +1692,536 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   };
 
   const handleEditEvent = async (eventData: any, activeAccount: any) => {
+    // Store current events for potential revert
+    const previousEvents = [...(userEvents || [])];
+    
     try {
-      // ✅ If Google Meet is selected and user is connected to Google
-      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
-        console.log('Updating Google Meet meeting...');
+      // NOTE: Optimistic update and navigation already happened in handleSaveEvent
+      // This function only handles background blockchain/API operations
 
-        const googleEvent = {
-          summary: eventData.title,
-          description: eventData.description,
-          start: {
-            dateTime: new Date(selectedStartDate).toISOString(),
-            timeZone: 'UTC', // match web
-          },
-          end: {
-            dateTime: new Date(selectedEndDate).toISOString(),
-            timeZone: 'UTC',
-          },
-          attendees: [
-            {
-              email: activeAccount.userName,
-              displayName: activeAccount.userName.split('@')[0] || 'Organizer',
-              responseStatus: 'accepted',
-            },
-            ...(eventData.guests?.map((email) => ({
-              email,
-              displayName: email.split('@')[0],
-              responseStatus: 'needsAction',
-            })) || []),
-          ],
-          conferenceData: {
-            createRequest: {
-              requestId: `meet_${Date.now()}`,
-            },
-          },
-        };
-
-        // Add recurrence if exists
-        if (eventData.recurrenceRule) {
-          googleEvent.recurrence = [eventData.recurrenceRule];
-        }
-
-        // Wrap same as web code
-        const payload = {
-          eventDetails: googleEvent,
-          user_name: activeAccount.userName,
-          eventId: eventData.meetingEventId, // must match backend parameter
-        };
-
-        console.log('Google Event Update Payload:', payload);
-
+      // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background
+      (async () => {
         try {
-          // ✅ Direct backend call for updating Google Meet event
-          const response = await api('POST', '/google/update-event', {
-            eventDetails: payload,
-            user_name: payload.user_name,
-            eventId: payload.eventId
-          });
-          const data = response?.data?.data || response?.data;
+          // ✅ If Google Meet is selected and user is connected to Google
+          if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
+            console.log('Updating Google Meet meeting...');
 
-          if (data?.hangoutLink) {
-            console.log('✅ Google Meet updated via backend:', data.hangoutLink);
-            eventData.location = data.hangoutLink;
-            eventData.meetingEventId = data.id;
-          } else {
-            console.error('❌ Failed to update Google Meet via backend:', data);
-            Alert.alert('Error', 'Failed to update Google Meet');
+            const googleEvent = {
+              summary: eventData.title,
+              description: eventData.description,
+              start: {
+                dateTime: new Date(selectedStartDate).toISOString(),
+                timeZone: 'UTC', // match web
+              },
+              end: {
+                dateTime: new Date(selectedEndDate).toISOString(),
+                timeZone: 'UTC',
+              },
+              attendees: [
+                {
+                  email: activeAccount.userName,
+                  displayName: activeAccount.userName.split('@')[0] || 'Organizer',
+                  responseStatus: 'accepted',
+                },
+                ...(eventData.guests?.map((email) => ({
+                  email,
+                  displayName: email.split('@')[0],
+                  responseStatus: 'needsAction',
+                })) || []),
+              ],
+              conferenceData: {
+                createRequest: {
+                  requestId: `meet_${Date.now()}`,
+                },
+              },
+            };
+
+            // Add recurrence if exists
+            if (eventData.recurrenceRule) {
+              googleEvent.recurrence = [eventData.recurrenceRule];
+            }
+
+            // Wrap same as web code
+            const payload = {
+              eventDetails: googleEvent,
+              user_name: activeAccount.userName,
+              eventId: eventData.meetingEventId, // must match backend parameter
+            };
+
+            console.log('Google Event Update Payload:', payload);
+
+            try {
+              // ✅ Direct backend call for updating Google Meet event
+              const response = await api('POST', '/google/update-event', {
+                eventDetails: payload,
+                user_name: payload.user_name,
+                eventId: payload.eventId
+              });
+              const data = response?.data?.data || response?.data;
+
+              if (data?.hangoutLink) {
+                console.log('✅ Google Meet updated via backend:', data.hangoutLink);
+                eventData.location = data.hangoutLink;
+                eventData.meetingEventId = data.id;
+              } else {
+                console.error('❌ Failed to update Google Meet via backend:', data);
+              }
+            } catch (err) {
+              console.error('❌ Google Meet update error via backend:', err);
+            }
           }
-        } catch (err) {
-          console.error('❌ Google Meet update error via backend:', err);
-          Alert.alert('Error', 'Failed to update Google Meet');
+
+          console.log('Editing event payload:', eventData);
+
+          const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+          const response = await blockchainService.updateEvent(
+            eventData,
+            activeAccount,
+            token,
+          );
+
+          if (response) {
+            const repeatEvents = (eventData?.list || [])
+              .filter((data: any) => data.key === 'repeatEvent')
+              .map((data: any) => data.value)
+              .filter((value: any) => value !== null);
+            const customRepeat = (eventData?.list || [])
+              .filter((data: any) => data.key === 'customRepeatEvent')
+              .map((data: any) => data.value)
+              .filter((value: any) => value !== null);
+            const meetingEventIdValue =
+              (eventData?.list || []).find((i: any) => i.key === 'meetingEventId')?.value || '';
+
+            const updatePayload = {
+              events: [
+                {
+                  uid: eventData?.uid,
+                  fromTime: eventData?.fromTime,
+                  toTime: eventData?.toTime,
+                  repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
+                  customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
+                  meetingEventId: meetingEventIdValue,
+                },
+              ],
+              active: activeAccount?.userName,
+              type: 'update',
+            };
+
+            const apiResponse = await api('POST', '/updateevents', updatePayload);
+            console.log('API response data (edit):', apiResponse.data);
+
+            // Remove optimistic flag after successful save
+            const currentEvents = useEventsStore.getState().userEvents;
+            const cleanedEvents = currentEvents.map(event => {
+              if (event.uid === eventData.uid) {
+                const cleanedList = event.list?.filter(item => item.key !== '_optimistic') || [];
+                return { ...event, list: cleanedList };
+              }
+              return event;
+            });
+            setUserEvents(cleanedEvents);
+
+            // Refresh events in background (non-blocking) - this will merge with cleaned optimistic events
+            getUserEvents(activeAccount.userName, api).catch(err => {
+              console.error('Background event refresh failed:', err);
+            });
+          
+          // Show success message after background operation completes
+          setTimeout(() => {
+            showAlert('Event Updated', 'Event updated successfully!', 'success');
+          }, 500);
+        } else {
+          // Revert on failure
+          revertOptimisticUpdate(previousEvents);
+          setTimeout(() => {
+            showAlert('Event Update Failed', 'Failed to update event. Please try again.', 'error');
+          }, 100);
         }
-      }
-
-      console.log('Editing event payload:', eventData);
-
-      const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-      const response = await blockchainService.updateEvent(
-        eventData,
-        activeAccount,
-        token,
-      );
-
-      if (response) {
-        const repeatEvents = (eventData?.list || [])
-          .filter((data: any) => data.key === 'repeatEvent')
-          .map((data: any) => data.value)
-          .filter((value: any) => value !== null);
-        const customRepeat = (eventData?.list || [])
-          .filter((data: any) => data.key === 'customRepeatEvent')
-          .map((data: any) => data.value)
-          .filter((value: any) => value !== null);
-        const meetingEventIdValue =
-          (eventData?.list || []).find((i: any) => i.key === 'meetingEventId')?.value || '';
-
-        const updatePayload = {
-          events: [
-            {
-              uid: eventData?.uid,
-              fromTime: eventData?.fromTime,
-              toTime: eventData?.toTime,
-              repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
-              customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
-              meetingEventId: meetingEventIdValue,
-            },
-          ],
-          active: activeAccount?.userName,
-          type: 'update',
-        };
-
-        const apiResponse = await api('POST', '/updateevents', updatePayload);
-        console.log('API response data (edit):', apiResponse.data);
-
-        await getUserEvents(activeAccount.userName, api);
-
-        navigation.goBack();
-        showAlert('Event Updated', 'Event updated successfully!', 'success');
-      } else {
-        showAlert('Event Update Failed', 'Failed to update event. Please try again.', 'error');
-      }
+        } catch (error: any) {
+          console.error('❌ Error in handleEditEvent background operation:', error);
+          // Revert optimistic update on error
+          revertOptimisticUpdate(previousEvents);
+          showAlert('Event Update Failed', error?.message || 'Failed to update event. Please try again.', 'error');
+        }
+      })();
     } catch (error: any) {
       console.error('❌ Error in handleEditEvent:', error);
-      // Show user-friendly error message from blockchain service
-      const errorMessage = error?.message || 'Failed to update event. Please try again.';
-      showAlert('Event Update Failed', errorMessage, 'error');
+      // Revert optimistic update on error
+      revertOptimisticUpdate(previousEvents);
+      showAlert('Event Update Failed', error?.message || 'Failed to update event. Please try again.', 'error');
     }
   };
 
 
   const handleCreateEvent = async (eventData: any, activeAccount: any) => {
+    // Store current events for potential revert
+    const previousEvents = [...(userEvents || [])];
+    
     try {
-      // If Google Meet is selected
-      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
-        console.log('Creating Google Meet meeting...');
+      // NOTE: Optimistic update and navigation already happened in handleSaveEvent
+      // This function only handles background blockchain/API operations
 
-        const googleEvent = {
-          summary: eventData.title,
-          description: eventData.description,
-          start: {
-            dateTime: new Date(selectedStartDate).toISOString(),
-            timeZone: 'UTC', // match web code
-          },
-          end: {
-            dateTime: new Date(selectedEndDate).toISOString(),
-            timeZone: 'UTC',
-          },
-          attendees: [
-            {
-              email: activeAccount.userName, // organizer / current user
-              displayName: activeAccount.userName.split('@')[0] || 'Organizer',
-              responseStatus: 'accepted',
-            },
-            ...(eventData.guests?.map((email) => ({
-              email,
-              displayName: email.split('@')[0],
-              responseStatus: 'needsAction', // default for guests
-            })) || []),
-          ],
-          conferenceData: {
-            createRequest: {
-              requestId: `meet_${Date.now()}`,
-            },
-          },
-        };
-
-        // Add recurrence if exists
-        if (eventData.recurrenceRule) {
-          googleEvent.recurrence = [eventData.recurrenceRule];
-        }
-
-        // Wrap in the same structure as web
-        const payload = {
-          user_name: activeAccount.userName,
-          eventDetails: googleEvent,
-        };
-
-        console.log('Google Event Payload:', googleEvent);
+      // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background
+      (async () => {
         try {
-          // ✅ Call backend API directly
-          const response = await api('POST', '/google/create-event', payload);
+          // If Google Meet is selected
+          if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
+            console.log('Creating Google Meet meeting...');
 
-          // ✅ Many Axios wrappers put backend data inside `response.data.data`
-          const data = response?.data?.data || response?.data;
+            const googleEvent = {
+              summary: eventData.title,
+              description: eventData.description,
+              start: {
+                dateTime: new Date(selectedStartDate).toISOString(),
+                timeZone: 'UTC', // match web code
+              },
+              end: {
+                dateTime: new Date(selectedEndDate).toISOString(),
+                timeZone: 'UTC',
+              },
+              attendees: [
+                {
+                  email: activeAccount.userName, // organizer / current user
+                  displayName: activeAccount.userName.split('@')[0] || 'Organizer',
+                  responseStatus: 'accepted',
+                },
+                ...(eventData.guests?.map((email) => ({
+                  email,
+                  displayName: email.split('@')[0],
+                  responseStatus: 'needsAction', // default for guests
+                })) || []),
+              ],
+              conferenceData: {
+                createRequest: {
+                  requestId: `meet_${Date.now()}`,
+                },
+              },
+            };
 
-          if (data?.hangoutLink) {
-            console.log('✅ Google Meet created via backend:', data.hangoutLink);
-            eventData.location = data.hangoutLink;
-            eventData.meetingEventId = data.id;
-          } else {
-            console.error('❌ Failed to create Google Meet via backend:', data);
-            Alert.alert('Error', 'Failed to create Google Meet');
+            // Add recurrence if exists
+            if (eventData.recurrenceRule) {
+              googleEvent.recurrence = [eventData.recurrenceRule];
+            }
+
+            // Wrap in the same structure as web
+            const payload = {
+              user_name: activeAccount.userName,
+              eventDetails: googleEvent,
+            };
+
+            console.log('Google Event Payload:', googleEvent);
+            try {
+              // ✅ Call backend API directly
+              const response = await api('POST', '/google/create-event', payload);
+
+              // ✅ Many Axios wrappers put backend data inside `response.data.data`
+              const data = response?.data?.data || response?.data;
+
+              if (data?.hangoutLink) {
+                console.log('✅ Google Meet created via backend:', data.hangoutLink);
+                eventData.location = data.hangoutLink;
+                eventData.meetingEventId = data.id;
+              } else {
+                console.error('❌ Failed to create Google Meet via backend:', data);
+              }
+
+            } catch (err) {
+              console.error('❌ Google Meet creation error via backend:', err);
+            }
           }
 
-        } catch (err) {
-          console.error('❌ Google Meet creation error via backend:', err);
-          Alert.alert('Error', 'Failed to create Google Meet');
+          console.log("Active account: ", activeAccount.userName);
+          console.log("Create event payload: ", eventData);
+          const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+          const response = await blockchainService.createEvent(
+            eventData,
+            activeAccount,
+            token,
+          );
+          if (response) {
+            // Build updatePayload similar to handleEditEvent
+            const repeatEvents = (eventData?.list || [])
+              .filter((data: any) => data.key === "repeatEvent")
+              .map((data: any) => data.value)
+              .filter((value: any) => value !== null);
+            const customRepeat = (eventData?.list || [])
+              .filter((data: any) => data.key === "customRepeatEvent")
+              .map((data: any) => data.value)
+              .filter((value: any) => value !== null);
+            const meetingEventIdValue = (eventData?.list || [])
+              .find((i: any) => i.key === 'meetingEventId')?.value || '';
+
+            const updatePayload = {
+              events: [{
+                uid: eventData?.uid,
+                fromTime: eventData?.fromTime,
+                toTime: eventData?.toTime,
+                repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
+                customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
+                meetingEventId: meetingEventIdValue
+              }],
+              active: activeAccount?.userName,
+              type: 'update',
+            };
+            // Call the same API as edit
+            const apiResponse = await api('POST', '/updateevents', updatePayload);
+            console.log('API response data (create):', apiResponse.data);
+
+            // Remove optimistic flag after successful save
+            const currentEventsForCreate = useEventsStore.getState().userEvents;
+            const cleanedEventsForCreate = currentEventsForCreate.map(event => {
+              if (event.uid === eventData.uid) {
+                const cleanedList = event.list?.filter(item => item.key !== '_optimistic') || [];
+                return { ...event, list: cleanedList };
+              }
+              return event;
+            });
+            setUserEvents(cleanedEventsForCreate);
+
+            // Refresh events in background (non-blocking) - this will merge with cleaned optimistic events
+            getUserEvents(activeAccount.userName, api).catch(err => {
+              console.error('Background event refresh failed:', err);
+            });
+            
+            // Show success message after background operation completes
+            setTimeout(() => {
+              showAlert('Event Created', 'Event created successfully!', 'success');
+            }, 500);
+          } else {
+            // Revert on failure
+            revertOptimisticUpdate(previousEvents);
+            setTimeout(() => {
+              showAlert('Event Creation Failed', 'Failed to create event. Please try again.', 'error');
+            }, 100);
+          }
+        } catch (error: any) {
+          console.error('Error creating event in background:', error);
+          // Revert optimistic update on error
+          revertOptimisticUpdate(previousEvents);
+          showAlert('Event Creation Failed', error?.message || 'Failed to create event. Please try again.', 'error');
         }
-      }
-
-
-      console.log("Active account: ", activeAccount.userName);
-      console.log("Create event payload: ", eventData);
-      const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-      const response = await blockchainService.createEvent(
-        eventData,
-        activeAccount,
-        token,
-      );
-      if (response) {
-        // Build updatePayload similar to handleEditEvent
-        const repeatEvents = (eventData?.list || [])
-          .filter((data: any) => data.key === "repeatEvent")
-          .map((data: any) => data.value)
-          .filter((value: any) => value !== null);
-        const customRepeat = (eventData?.list || [])
-          .filter((data: any) => data.key === "customRepeatEvent")
-          .map((data: any) => data.value)
-          .filter((value: any) => value !== null);
-        const meetingEventIdValue = (eventData?.list || [])
-          .find((i: any) => i.key === 'meetingEventId')?.value || '';
-
-        const updatePayload = {
-          events: [{
-            uid: eventData?.uid,
-            fromTime: eventData?.fromTime,
-            toTime: eventData?.toTime,
-            repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
-            customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
-            meetingEventId: meetingEventIdValue
-          }],
-          active: activeAccount?.userName,
-          type: 'update',
-        };
-        // Call the same API as edit
-        const apiResponse = await api('POST', '/updateevents', updatePayload);
-        console.log('API response data (create):', apiResponse.data);
-
-        await getUserEvents(activeAccount.userName, api);
-
-        navigation.goBack();
-
-        showAlert('Event Created', 'Event created successfully!', 'success');
-      } else {
-        showAlert('Event Creation Failed', 'Failed to create event. Please try again.', 'error');
-      }
+      })();
     } catch (error: any) {
       console.error('Error creating event:', error);
+      // Revert optimistic update on error
+      revertOptimisticUpdate(previousEvents);
       // Show user-friendly error message from blockchain service
       const errorMessage = error?.message || 'Failed to create event. Please try again.';
       showAlert('Event Creation Failed', errorMessage, 'error');
     }
   };
 
-  const handleSaveEvent = async () => {
+  const handleSaveEvent = () => {
+    // ✅ FAST VALIDATION - Return immediately if invalid
     if (!validateForm()) return;
-
-    setIsLoading(true);
-    // const storedAccount = await AsyncStorage.getItem('currentAccount');
-    // const storedToken = await AsyncStorage.getItem('token');
 
     if (!activeAccount || !token) {
       Alert.alert('Error', 'Authentication data not found');
-      setIsLoading(false);
       return;
     }
 
-    try {
-      // Convert date and time to timestamp format (YYYYMMDDTHHMMSS)
-      const formatToISO8601Local = (date: Date, time: string, isAllDay: boolean = false
-      ): string => {
-        console.log('DEBUG - Input date:', date);
-        console.log('DEBUG - Input time:', time);
-
-        // Validate inputs
-        if (!date || !time) {
-          console.error('DEBUG - Invalid inputs:', { date, time });
-          return '';
-        }
-
-        if (isAllDay) {
-          const year = date.getFullYear();
-          const month = String(date.getMonth() + 1).padStart(2, '0');
-          const day = String(date.getDate()).padStart(2, '0');
-          const result = `${year}${month}${day}T000000`;
-          console.log('DEBUG - All-day format result:', result);
-          return result;
-        }
-
-        // For timed events, time is required
-        if (!time) {
-          console.error('DEBUG - Time required for non-all-day event');
-          return '';
-        }
-        // Handle AM/PM format properly - normalize whitespace first (including non-breaking spaces)
-        const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-        console.log('DEBUG - Original time:', JSON.stringify(time));
-        console.log('DEBUG - Normalized time:', JSON.stringify(normalizedTime));
-
-        // Use regex to extract time components (more robust than split)
-        const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-
-        if (!timeMatch) {
-          // Fallback: try splitting by whitespace
-          const timeParts = normalizedTime.split(/\s+/);
-          console.log('DEBUG - Split result (fallback):', timeParts);
-
-          if (timeParts.length < 2) {
-            console.error('DEBUG - Time format should be "HH:MM AM/PM", got:', normalizedTime);
-            return '';
-          }
-
-          const timePart = timeParts[0];
-          const period = timeParts[timeParts.length - 1].toUpperCase();
-          console.log('DEBUG - timePart:', timePart, 'period:', period);
-
-          if (!timePart || !period || (period !== 'AM' && period !== 'PM')) {
-            console.error('DEBUG - Invalid time format:', time);
-            return '';
-          }
-
-          const [hours, minutes] = timePart.split(':').map(Number);
-          console.log('DEBUG - hours:', hours, 'minutes:', minutes);
-
-          if (isNaN(hours) || isNaN(minutes)) {
-            console.error('DEBUG - Invalid hours/minutes:', { hours, minutes });
-            return '';
-          }
-
-          // Use the parsed values
-          let finalHours = hours;
-          if (period === 'PM' && hours !== 12) {
-            finalHours = hours + 12;
-          } else if (period === 'AM' && hours === 12) {
-            finalHours = 0;
-          }
-
-          console.log('DEBUG - finalHours:', finalHours);
-
-          const newDate = new Date(date);
-          newDate.setHours(finalHours, minutes, 0, 0);
-
-          console.log('DEBUG - newDate after setHours:', newDate);
-
-          // Format as YYYYMMDDTHHMMSS
-          const year = newDate.getFullYear();
-          const month = String(newDate.getMonth() + 1).padStart(2, '0');
-          const day = String(newDate.getDate()).padStart(2, '0');
-          const hour = String(newDate.getHours()).padStart(2, '0');
-          const minute = String(newDate.getMinutes()).padStart(2, '0');
-          const second = String(newDate.getSeconds()).padStart(2, '0');
-
-          const result = `${year}${month}${day}T${hour}${minute}${second}`;
-          console.log('DEBUG - Final result (fallback):', result);
-
-          // Validate the result
-          if (result.includes('NaN') || result.length !== 15) {
-            console.error('DEBUG - Invalid result generated:', result);
-            return '';
-          }
-
-          return result;
-        }
-
-        // Extract from regex match
-        const hours = parseInt(timeMatch[1], 10);
-        const minutes = parseInt(timeMatch[2], 10);
-        const period = timeMatch[3].toUpperCase();
-        console.log('DEBUG - Regex match - hours:', hours, 'minutes:', minutes, 'period:', period);
-
+    // ✅ PREPARE MINIMAL DATA FOR OPTIMISTIC UPDATE (SYNCHRONOUS - NO AWAIT)
+    const formatToISO8601Local = (date: Date, time: string, isAllDay: boolean = false): string => {
+      if (!date) return '';
+      if (isAllDay) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}${month}${day}T000000`;
+      }
+      if (!time) return '';
+      const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (!timeMatch) {
+        const timeParts = normalizedTime.split(/\s+/);
+        if (timeParts.length < 2) return '';
+        const timePart = timeParts[0];
+        const period = timeParts[timeParts.length - 1].toUpperCase();
+        if (!timePart || !period || (period !== 'AM' && period !== 'PM')) return '';
+        const [hours, minutes] = timePart.split(':').map(Number);
+        if (isNaN(hours) || isNaN(minutes)) return '';
         let finalHours = hours;
-
-        // Convert to 24-hour format
-        if (period === 'PM' && hours !== 12) {
-          finalHours = hours + 12;
-        } else if (period === 'AM' && hours === 12) {
-          finalHours = 0;
-        }
-
-        console.log('DEBUG - finalHours:', finalHours);
-
+        if (period === 'PM' && hours !== 12) finalHours = hours + 12;
+        else if (period === 'AM' && hours === 12) finalHours = 0;
         const newDate = new Date(date);
         newDate.setHours(finalHours, minutes, 0, 0);
-
-        console.log('DEBUG - newDate after setHours:', newDate);
-
-        // Format as YYYYMMDDTHHMMSS
         const year = newDate.getFullYear();
         const month = String(newDate.getMonth() + 1).padStart(2, '0');
         const day = String(newDate.getDate()).padStart(2, '0');
         const hour = String(newDate.getHours()).padStart(2, '0');
         const minute = String(newDate.getMinutes()).padStart(2, '0');
-        const second = String(newDate.getSeconds()).padStart(2, '0');
-
-        const result = `${year}${month}${day}T${hour}${minute}${second}`;
-        console.log('DEBUG - Final result:', result);
-
-        // Validate the result
-        if (result.includes('NaN') || result.length !== 15) {
-          console.error('DEBUG - Invalid result generated:', result);
-          return '';
-        }
-
-        return result;
-      };
-
-      const getNextDay = (date: Date): Date => {
-        const nextDay = new Date(date);
-        nextDay.setDate(nextDay.getDate() + 1);
-        return nextDay;
-      };
-
-      console.log('CreateEventScreen: Event data ==>', editEventData);
-
-      // Helper function to convert a value to seconds based on unit
-      function convertToSeconds(value: number, unit: string) {
-        switch (unit) {
-          case 'Minutes':
-            return value * 60;
-          case 'Hours':
-            return value * 3600;
-          case 'Days':
-            return value * 86400;
-          case 'Weeks':
-            return value * 604800;
-          default:
-            return value; // fallback, assume already in seconds
-        }
+        return `${year}${month}${day}T${hour}${minute}00`;
       }
+      const hours = parseInt(timeMatch[1], 10);
+      const minutes = parseInt(timeMatch[2], 10);
+      const period = timeMatch[3].toUpperCase();
+      let finalHours = hours;
+      if (period === 'PM' && hours !== 12) finalHours = hours + 12;
+      else if (period === 'AM' && hours === 12) finalHours = 0;
+      const newDate = new Date(date);
+      newDate.setHours(finalHours, minutes, 0, 0);
+      const year = newDate.getFullYear();
+      const month = String(newDate.getMonth() + 1).padStart(2, '0');
+      const day = String(newDate.getDate()).padStart(2, '0');
+      const hour = String(newDate.getHours()).padStart(2, '0');
+      const minute = String(newDate.getMinutes()).padStart(2, '0');
+      return `${year}${month}${day}T${hour}${minute}00`;
+    };
 
-      // Creating your event object
-      const numericValue = parseInt(notificationMinutes || '0', 10);
+    const getNextDay = (date: Date): Date => {
+      const nextDay = new Date(date);
+      nextDay.setDate(nextDay.getDate() + 1);
+      return nextDay;
+    };
 
-      const secondsValue = convertToSeconds(numericValue, selectedTimeUnit);
+    // ✅ MINIMAL EVENT DATA FOR IMMEDIATE UI UPDATE
+    const minimalEventData = {
+      uuid: editEventData?.uuid || '',
+      uid: editEventData?.id || editEventData?.uid || generateEventUID(),
+      title: title.trim(),
+      description: description.trim(),
+      fromTime: formatToISO8601Local(
+        selectedStartDate!,
+        selectedStartTime || '12:00 AM',
+        isAllDayEvent
+      ),
+      toTime: formatToISO8601Local(
+        isAllDayEvent ? getNextDay(selectedEndDate!) : selectedEndDate!,
+        selectedEndTime || '12:00 AM',
+        isAllDayEvent
+      ),
+      list: [],
+    };
 
-      const triggerISO = (() => {
-        switch (selectedTimeUnit) {
-          case 'Minutes':
-            return `PT${numericValue}M`;
-          case 'Hours':
-            return `PT${numericValue}H`;
-          case 'Days':
-            return `P${numericValue}D`;
-          case 'Weeks':
-            return `P${numericValue}W`;
-          default:
-            return `PT${numericValue}S`; // fallback to seconds
+    // Store for potential revert
+    const previousEvents = [...(userEvents || [])];
+
+    // ✅ STEP 1: OPTIMISTIC UPDATE - INSTANT UI UPDATE (SYNCHRONOUS)
+    if (mode === 'edit') {
+      optimisticallyUpdateEvent(minimalEventData.uid, minimalEventData);
+    } else {
+      optimisticallyAddEvent(minimalEventData as any);
+    }
+    
+    // ✅ STEP 2: PREPARE ALL DATA FOR ENCRYPTION (BEFORE NAVIGATION)
+    // Pre-compute everything needed for encryption to minimize delay
+    const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+    
+    // Helper function to convert a value to seconds based on unit
+    function convertToSeconds(value: number, unit: string) {
+      switch (unit) {
+        case 'Minutes': return value * 60;
+        case 'Hours': return value * 3600;
+        case 'Days': return value * 86400;
+        case 'Weeks': return value * 604800;
+        default: return value;
+      }
+    }
+
+    const numericValue = parseInt(notificationMinutes || '0', 10);
+    const secondsValue = convertToSeconds(numericValue, selectedTimeUnit);
+    const triggerISO = (() => {
+      switch (selectedTimeUnit) {
+        case 'Minutes': return `PT${numericValue}M`;
+        case 'Hours': return `PT${numericValue}H`;
+        case 'Days': return `P${numericValue}D`;
+        case 'Weeks': return `P${numericValue}W`;
+        default: return `PT${numericValue}S`;
+      }
+    })();
+
+    // Prepare full event data NOW (before navigation)
+    const fullEventData = {
+      ...minimalEventData,
+      organizer: activeAccount?.email || activeAccount?.userName || activeAccount?.address || '',
+      guests: selectedGuests,
+      location: location.trim(),
+      locationType: selectedVideoConferencing,
+      meetingEventId: meetingEventId || '',
+      busy: selectedStatus || 'Busy',
+      visibility: selectedVisibility || 'Default Visibility',
+      notification: selectedNotificationType,
+      seconds: secondsValue,
+      trigger: triggerISO,
+      guest_permission: selectedPermission || 'Modify event',
+      timezone: selectedTimezone || 'UTC',
+      repeatEvent: selectedRecurrence !== 'Does not repeat' ? selectedRecurrence : undefined,
+      customRepeatEvent: undefined,
+    };
+
+    // ✅ PRE-FETCH CRITICAL DATA IN PARALLEL (BEFORE NAVIGATION)
+    // 1. Public key (needed for encryption)
+    const publicKeyPromise = blockchainService.hostContract.methods
+      .getPublicKeyOfUser(activeAccount?.userName)
+      .call()
+      .catch(err => {
+        console.warn('Pre-fetch public key failed, will fetch later:', err);
+        return null;
+      });
+
+    // 2. For edit mode: Pre-fetch all events to get UUID (critical for encryption)
+    let uuidPromise: Promise<string | null> = Promise.resolve(null);
+    if (mode === 'edit' && minimalEventData.uid) {
+      uuidPromise = blockchainService.getAllEvents(activeAccount?.userName)
+        .then(allEventsData => {
+          const eventToUpdate = allEventsData.events?.find((event: any) => event.uid === minimalEventData.uid);
+          return eventToUpdate?.uuid || null;
+        })
+        .catch(err => {
+          console.warn('Pre-fetch UUID failed, will fetch later:', err);
+          return null;
+        });
+    }
+    
+    // ✅ STEP 3: NAVIGATE IMMEDIATELY - SYNCHRONOUS (NO DELAY)
+    // Navigate immediately - React Native handles the UI update
+    navigation.goBack();
+
+    // ✅ STEP 4: TRIGGER AUTHENTICATION IMMEDIATELY (NON-BLOCKING)
+    // Start encryption/auth as soon as possible after navigation
+    (async () => {
+        try {
+          // ✅ CRITICAL: Wait for public key and UUID in parallel (already fetching)
+          // These should be ready or almost ready by now - this is the FASTEST path
+          const [publicKey, uuid] = await Promise.all([publicKeyPromise, uuidPromise]);
+          
+          // ✅ OPTIMIZATION: Prepare encryption data NOW (synchronous, no await)
+          const conferencingData = null;
+          const metadata = buildEventMetadata(fullEventData as any, conferencingData);
+          const eventParams = prepareEventForBlockchain(fullEventData as any, metadata, fullEventData.uid);
+          const encryptionData = JSON.stringify(eventParams);
+
+          // ✅ TRIGGER WALLET AUTHENTICATION IMMEDIATELY (don't wait for other operations)
+          // Start encryption as soon as we have public key - this shows the wallet modal FAST
+          // We do this BEFORE calling blockchain service methods to trigger auth immediately
+          if (publicKey) {
+            // Start encryption immediately - this triggers wallet auth modal
+            // Don't await - let it run in parallel with blockchain operations
+            encryptWithNECJS(
+              encryptionData,
+              publicKey,
+              token,
+              mode === 'edit' && uuid ? [uuid] : []
+            ).catch(err => {
+              console.error('Early encryption failed (will retry in blockchain service):', err);
+            });
+          }
+
+          // ✅ Continue with blockchain operations (they will also encrypt, but auth is already triggered)
+          // Wallet auth modal should already be showing from the early encryption call above
+          if (mode === 'edit') {
+            await handleEditEvent(fullEventData, activeAccount);
+          } else {
+            await handleCreateEvent(fullEventData, activeAccount);
+          }
+        } catch (error: any) {
+          console.error('Error in background event operation:', error);
+          revertOptimisticUpdate(previousEvents);
+          setTimeout(() => {
+            showAlert('Error', error?.message || 'Failed to save event. Please try again.', 'error');
+          }, 100);
         }
       })();
-      // Prepare event data in the new format
-      const eventData = {
-        uuid: editEventData?.uuid || '', // Keep uuid if editing
-        uid: editEventData?.id || editEventData?.uid || generateEventUID(), // Generate UID using the utility method
-        title: title.trim(),
-        description: description.trim(),
-        fromTime: formatToISO8601Local(
-          selectedStartDate,
-          selectedStartTime || '12:00 AM',  // Use midnight if no time
-          isAllDayEvent
-        ),
-        toTime: formatToISO8601Local(
-          isAllDayEvent ? getNextDay(selectedEndDate) : selectedEndDate,  // ✅ Add 1 day for all-day
-          selectedEndTime || '12:00 AM',  // Use midnight if no time
-          isAllDayEvent
-        ),
-        organizer:
-          activeAccount?.email ||
-          activeAccount?.userName ||
-          activeAccount?.address ||
-          '',
-        guests: selectedGuests,
-        location: location.trim(),
-        locationType: selectedVideoConferencing,
-        meetingEventId: meetingEventId || '',
-        busy: selectedStatus || 'Busy',
-        visibility: selectedVisibility || 'Default Visibility',
-        notification: selectedNotificationType,
-        seconds: secondsValue,
-        trigger: triggerISO,
-        guest_permission: selectedPermission || 'Modify event',
-        timezone: selectedTimezone || 'UTC',
-        repeatEvent:
-          selectedRecurrence !== 'Does not repeat'
-            ? selectedRecurrence
-            : undefined,
-        customRepeatEvent: undefined,
-        list: [],
-      };
-
-
-
-
-      console.log('>>>>>>>> START DATE/TIME <<<<<<<<', {
-        startDate: selectedStartDate?.toISOString(),
-        startDateFormatted: selectedStartDate?.toLocaleDateString(),
-        startTime: selectedStartTime
-      });
-      console.log('>>>>>>>> END DATE/TIME <<<<<<<<', {
-        endDate: selectedEndDate?.toISOString(),
-        endDateFormatted: selectedEndDate?.toLocaleDateString(),
-        endTime: selectedEndTime
-      });
-      console.log('>>>>>>>> EDIT EVENT DATA <<<<<<<<', eventData);
-      // return;
-      if (mode == 'edit') {
-        await handleEditEvent(eventData, activeAccount);
-        return;
-      } else {
-        await handleCreateEvent(eventData, activeAccount);
-      }
-    } catch (error: any) {
-      console.error('Error creating event:', error);
-      Alert.alert(
-        'Error',
-        error.message || 'Failed to create event. Please try again.',
-      );
-    } finally {
-      setIsLoading(false);
-      return;
-    }
   };
 
   const handleClose = () => {

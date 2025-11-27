@@ -45,7 +45,13 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const navigation = useNavigation();
   const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
   const { account } = useActiveAccount();
-  const { userEvents, userEventsLoading, getUserEvents, setUserEvents } = useEventsStore();
+  const { 
+    userEvents, 
+    userEventsLoading, 
+    getUserEvents, 
+    optimisticallyDeleteEvent,
+    revertOptimisticUpdate
+  } = useEventsStore();
   const { selectedDate, setSelectedDate } = useCalendarStore();
   // ✅ Get start of week setting from store
 
@@ -815,34 +821,35 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       }
 
       handleCloseEventModal();
-
-      setIsDeleting(true);
       
       // Store current events for potential revert
       const currentEvents = [...(userEvents || [])];
       
-      // Optimistically remove event from UI immediately for better UX
-      if (userEvents && Array.isArray(userEvents)) {
-        const filteredEvents = userEvents.filter((ev: any) => ev.uid !== event.uid);
-        setUserEvents(filteredEvents);
-      }
+      // ✅ OPTIMISTIC UPDATE: Remove event from UI immediately
+      optimisticallyDeleteEvent(event.uid);
 
-      // Delete on blockchain (this will take time, but UI already updated)
-      await blockchainService.deleteEventSoft(event.uid, account, token, api);
-      
-      // Refresh events in background (non-blocking) for sync
-      getUserEvents(account.userName, api).catch(err => {
-        console.error('Background event refresh failed:', err);
-        // If refresh fails, revert optimistic update
-        setUserEvents(currentEvents);
-      });
+      // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background
+      (async () => {
+        try {
+          // Delete on blockchain (this will take time, but UI already updated)
+          await blockchainService.deleteEventSoft(event.uid, account, token, api);
+          
+          // Refresh events in background (non-blocking) for sync
+          getUserEvents(account.userName, api).catch(err => {
+            console.error('Background event refresh failed:', err);
+            // If refresh fails, revert optimistic update
+            revertOptimisticUpdate(currentEvents);
+          });
+        } catch (err) {
+          console.error("Delete Event Failed:", err);
+          // Revert optimistic update on error
+          revertOptimisticUpdate(currentEvents);
+          Alert.alert("Error", "Failed to move the event to the trash");
+        }
+      })();
     } catch (err) {
       console.error("Delete Event Failed:", err);
-      // Revert optimistic update on error
-      setUserEvents(currentEvents);
       Alert.alert("Error", "Failed to move the event to the trash");
-    } finally {
-      setIsDeleting(false);
     }
   };
 

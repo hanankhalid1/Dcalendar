@@ -57,6 +57,12 @@ type EventsStore = {
         ncog?: { appId: string; returnScheme: string },
     ) => Promise<void>;
     clearAllEventsData: () => void;
+    
+    // Optimistic update methods for instant UI updates
+    optimisticallyAddEvent: (event: UserEvent) => void;
+    optimisticallyUpdateEvent: (uid: string, updates: Partial<UserEvent>) => void;
+    optimisticallyDeleteEvent: (uid: string) => void;
+    revertOptimisticUpdate: (previousEvents: UserEvent[]) => void;
 };
 
 export const useEventsStore = create<EventsStore>()(
@@ -77,6 +83,12 @@ export const useEventsStore = create<EventsStore>()(
             // User events actions
             setUserEvents: events => {
                 console.log('>>>>>>> events', events);
+
+                // Get current optimistic events (events marked with _optimistic flag)
+                const currentEvents = get().userEvents;
+                const optimisticEvents = currentEvents.filter(event => 
+                    event.list?.some(item => item.key === '_optimistic')
+                );
 
                 // Filter events by isDeleted key in list array
                 const activeEvents = events.filter(event => {
@@ -99,9 +111,24 @@ export const useEventsStore = create<EventsStore>()(
                     return isDeletedItem && isDeletedItem.value === 'true';
                 });
 
+                // Merge optimistic events with fetched events
+                // Optimistic events take precedence (they're newer)
+                const mergedEvents = [...activeEvents];
+                optimisticEvents.forEach(optimisticEvent => {
+                    const existingIndex = mergedEvents.findIndex(e => e.uid === optimisticEvent.uid);
+                    if (existingIndex >= 0) {
+                        // Replace with optimistic version (it's more recent)
+                        mergedEvents[existingIndex] = optimisticEvent;
+                    } else {
+                        // Add optimistic event if it doesn't exist in fetched events
+                        mergedEvents.push(optimisticEvent);
+                    }
+                });
+
                 console.log("deleted events in event store:", deletedEvents);
+                console.log("✅ Merged events (including optimistic):", mergedEvents.length);
                 set({
-                    userEvents: activeEvents,
+                    userEvents: mergedEvents,
                     deletedUserEvents: deletedEvents
                 });
             },
@@ -172,6 +199,83 @@ export const useEventsStore = create<EventsStore>()(
                             : 'Failed to fetch user events';
                     set({ userEventsError: errorMessage, userEventsLoading: false });
                 }
+            },
+            
+            // Optimistic update methods for instant UI feedback
+            optimisticallyAddEvent: (event: UserEvent) => {
+                const currentEvents = get().userEvents;
+                // Check if event already exists (avoid duplicates)
+                const exists = currentEvents.some(e => e.uid === event.uid);
+                if (!exists) {
+                    // Mark as optimistic so it's preserved during getUserEvents
+                    const optimisticEvent = {
+                        ...event,
+                        list: [
+                            ...(event.list || []),
+                            { key: '_optimistic', value: 'true' }
+                        ]
+                    };
+                    const newEvents = [...currentEvents, optimisticEvent];
+                    // Filter and set events (bypassing setUserEvents to avoid recursion)
+                    const activeEvents = newEvents.filter(ev => {
+                        if (!ev.list) return true;
+                        const isDeletedItem = ev.list.find(item => item.key === 'isDeleted');
+                        return !isDeletedItem || isDeletedItem.value !== 'true';
+                    });
+                    set({ userEvents: activeEvents });
+                    console.log('✅ Optimistically added event:', event.uid, '- Total events:', activeEvents.length);
+                }
+            },
+            
+            optimisticallyUpdateEvent: (uid: string, updates: Partial<UserEvent>) => {
+                const currentEvents = get().userEvents;
+                const updatedEvents = currentEvents.map(event => {
+                    if (event.uid === uid) {
+                        // Preserve optimistic flag if it exists
+                        const hasOptimistic = event.list?.some(item => item.key === '_optimistic');
+                        const updatedList = hasOptimistic 
+                            ? event.list 
+                            : [...(event.list || []), { key: '_optimistic', value: 'true' }];
+                        return { 
+                            ...event, 
+                            ...updates,
+                            list: updatedList
+                        };
+                    }
+                    return event;
+                });
+                // Filter and set events (bypassing setUserEvents to avoid recursion)
+                const activeEvents = updatedEvents.filter(ev => {
+                    if (!ev.list) return true;
+                    const isDeletedItem = ev.list.find(item => item.key === 'isDeleted');
+                    return !isDeletedItem || isDeletedItem.value !== 'true';
+                });
+                set({ userEvents: activeEvents });
+                console.log('✅ Optimistically updated event:', uid, '- Total events:', activeEvents.length);
+            },
+            
+            optimisticallyDeleteEvent: (uid: string) => {
+                const currentEvents = get().userEvents;
+                const filteredEvents = currentEvents.filter(event => event.uid !== uid);
+                // Filter and set events (bypassing setUserEvents to avoid recursion)
+                const activeEvents = filteredEvents.filter(ev => {
+                    if (!ev.list) return true;
+                    const isDeletedItem = ev.list.find(item => item.key === 'isDeleted');
+                    return !isDeletedItem || isDeletedItem.value !== 'true';
+                });
+                set({ userEvents: activeEvents });
+                console.log('✅ Optimistically deleted event:', uid, '- Total events:', activeEvents.length);
+            },
+            
+            revertOptimisticUpdate: (previousEvents: UserEvent[]) => {
+                // Filter and set events (bypassing setUserEvents to avoid recursion)
+                const activeEvents = previousEvents.filter(ev => {
+                    if (!ev.list) return true;
+                    const isDeletedItem = ev.list.find(item => item.key === 'isDeleted');
+                    return !isDeletedItem || isDeletedItem.value !== 'true';
+                });
+                set({ userEvents: activeEvents });
+                console.log('↩️ Reverted optimistic update');
             },
         }),
         {
