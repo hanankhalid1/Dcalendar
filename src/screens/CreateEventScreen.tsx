@@ -4,6 +4,7 @@ import {
   Alert,
   FlatList,
   Image,
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -145,6 +146,9 @@ const CreateEventScreen = () => {
   const titleInputRef = useRef<View>(null);
   const dateTimeSectionRef = useRef<View>(null);
   const locationSectionRef = useRef<View>(null);
+  const descriptionInputRef = useRef<TextInput>(null);
+  const descriptionContainerRef = useRef<View>(null);
+  const [descriptionYPosition, setDescriptionYPosition] = useState(0);
   const { api } = useApiClient();
   const [isAllDayEvent, setIsAllDayEvent] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
@@ -1815,20 +1819,8 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           Alert.alert("Error", "Failed to update Zoom Meeting");
         }
       }
-      console.log('Editing event payload:', eventData);
-              if (data?.hangoutLink) {
-                console.log('✅ Google Meet updated via backend:', data.hangoutLink);
-                eventData.location = data.hangoutLink;
-                eventData.meetingEventId = data.id;
-              } else {
-                console.error('❌ Failed to update Google Meet via backend:', data);
-              }
-            } catch (err) {
-              console.error('❌ Google Meet update error via backend:', err);
-            }
-          }
 
-          console.log('Editing event payload:', eventData);
+      console.log('Editing event payload:', eventData);
 
           const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
           const response = await blockchainService.updateEvent(
@@ -2031,12 +2023,8 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           Alert.alert("Error", "Failed to create Zoom Meeting");
         }
       }
-            } catch (err) {
-              console.error('❌ Google Meet creation error via backend:', err);
-            }
-          }
 
-          console.log("Active account: ", activeAccount.userName);
+      console.log("Active account: ", activeAccount.userName);
           console.log("Create event payload: ", eventData);
           const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
           const response = await blockchainService.createEvent(
@@ -2414,16 +2402,22 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       )}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        enabled={Platform.OS === 'ios'}
       >
         <ScrollView
           ref={scrollViewRef}
           style={styles.content}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 200 }}
+          keyboardDismissMode="interactive"
+          scrollEventThrottle={16}
+          decelerationRate="normal"
+          bounces={true}
+          nestedScrollEnabled={true}
         >
         {/* Title Input */}
         <View
@@ -2936,8 +2930,17 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         )}
 
         {/* Add description */}
-        <View style={styles.descriptionContainer}>
+        <View 
+          ref={descriptionContainerRef}
+          style={styles.descriptionContainer}
+          collapsable={false}
+          onLayout={(event) => {
+            const { y } = event.nativeEvent.layout;
+            setDescriptionYPosition(y);
+          }}
+        >
           <TextInput
+            ref={descriptionInputRef}
             style={styles.descriptionInput}
             placeholder="Add description"
             placeholderTextColor={colors.grey400}
@@ -2946,6 +2949,26 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             value={description}
             onChangeText={setDescription}
             editable={!isLoading}
+            onFocus={() => {
+              // Scroll to description input when focused - use requestAnimationFrame for smoother animation
+              requestAnimationFrame(() => {
+                setTimeout(() => {
+                  if (scrollViewRef.current) {
+                    // Try to scroll to the description position, fallback to end
+                    if (descriptionYPosition > 0) {
+                      scrollViewRef.current.scrollTo({
+                        y: descriptionYPosition - 100,
+                        animated: true,
+                      });
+                    } else {
+                      // Fallback: scroll to end to ensure input is visible
+                      scrollViewRef.current.scrollToEnd({ animated: true });
+                    }
+                  }
+                }, 100);
+              });
+            }}
+            blurOnSubmit={false}
           />
         </View>
         </ScrollView>

@@ -10,6 +10,7 @@ import {
   StatusBar,
   Modal,
   Alert,
+  Keyboard,
   KeyboardAvoidingView,
   Platform
 } from "react-native";
@@ -137,6 +138,9 @@ const CreateTaskScreen = () => {
   const scrollViewRef = useRef<ScrollView>(null);
   const titleInputRef = useRef<View>(null);
   const dateTimeSectionRef = useRef<View>(null);
+  const descriptionInputRef = useRef<TextInput>(null);
+  const descriptionContainerRef = useRef<View>(null);
+  const [descriptionYPosition, setDescriptionYPosition] = useState(0);
   const [showEventTypeDropdown, setShowEventTypeDropdown] =
     useState(false);
   const [selectedEventType, setSelectedEventType] = useState(
@@ -1343,16 +1347,22 @@ const CreateTaskScreen = () => {
       )}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
+        enabled={Platform.OS === 'ios'}
       >
         <ScrollView 
           ref={scrollViewRef}
           style={styles.scrollView}
           scrollEnabled={!showRecurrenceDropdown}
           keyboardShouldPersistTaps="handled"
-          contentContainerStyle={{ paddingBottom: 100 }}
+          contentContainerStyle={{ paddingBottom: 200 }}
+          keyboardDismissMode="interactive"
+          scrollEventThrottle={16}
+          decelerationRate="normal"
+          bounces={true}
+          nestedScrollEnabled={true}
         >
         <View style={styles.formContainer}>
           <View 
@@ -1495,15 +1505,45 @@ const CreateTaskScreen = () => {
               </View>
             </>
           )}
-          <TextInput
-            style={styles.descriptionInput}
-            placeholder="Add description"
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            placeholderTextColor="#888"
-            editable={!isLoading}
-          />
+          <View
+            ref={descriptionContainerRef}
+            collapsable={false}
+            onLayout={(event) => {
+              const { y } = event.nativeEvent.layout;
+              setDescriptionYPosition(y);
+            }}
+          >
+            <TextInput
+              ref={descriptionInputRef}
+              style={styles.descriptionInput}
+              placeholder="Add description"
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              placeholderTextColor="#888"
+              editable={!isLoading}
+              onFocus={() => {
+                // Scroll to description input when focused - use requestAnimationFrame for smoother animation
+                requestAnimationFrame(() => {
+                  setTimeout(() => {
+                    if (scrollViewRef.current) {
+                      // Try to scroll to the description position, fallback to end
+                      if (descriptionYPosition > 0) {
+                        scrollViewRef.current.scrollTo({
+                          y: descriptionYPosition - 100,
+                          animated: true,
+                        });
+                      } else {
+                        // Fallback: scroll to end to ensure input is visible
+                        scrollViewRef.current.scrollToEnd({ animated: true });
+                      }
+                    }
+                  }, 100);
+                });
+              }}
+              blurOnSubmit={false}
+            />
+          </View>
         </View>
         </ScrollView>
       </KeyboardAvoidingView>

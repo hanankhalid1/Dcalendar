@@ -78,12 +78,13 @@ const CalendarWithTime: React.FC<CalendarWithTimeProps> = ({
     }
   }, [propSelectedDate, propSelectedTime]);
 
-  // Generate time slots from 12:00 AM to 11:30 PM in 30-minute intervals (full 24-hour range)
+  // Generate time slots from 12:00 AM to 11:55 PM in 5-minute intervals (full 24-hour range)
+  // This includes all valid time intervals: 12:00, 12:05, 12:10, 12:15, 12:20, 12:25, etc.
   const generateTimeSlots = () => {
     const slots = [];
-    // Generate all 24 hours (0 to 23) with 30-minute intervals
+    // Generate all 24 hours (0 to 23) with 5-minute intervals
     for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
+      for (let minute = 0; minute < 60; minute += 5) {
         const time = new Date();
         time.setHours(hour, minute, 0, 0);
         const timeString = time.toLocaleTimeString('en-US', {
