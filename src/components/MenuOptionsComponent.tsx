@@ -7,9 +7,6 @@ import {
   Modal,
   Animated,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import Feather from 'react-native-vector-icons/Feather';
 import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
 import {
   colors,
@@ -18,6 +15,9 @@ import {
   borderRadius,
   shadows,
 } from '../utils/LightTheme';
+import EventIcon from '../assets/svgs/eventIcon.svg';
+import TaskIcon from '../assets/svgs/taskIcon.svg';
+import CrossIcon from '../assets/svgs/crossIcon.svg';
 
 interface MenuOptionsComponentProps {
   isVisible: boolean;
@@ -28,9 +28,7 @@ interface MenuOptionsComponentProps {
 interface MenuOption {
   id: string;
   label: string;
-  icon: string;
-  iconType: 'MaterialIcons' | 'Feather';
-  gradient: string[];
+  iconType: 'calendar' | 'task' | 'birthday';
 }
 
 const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
@@ -42,20 +40,20 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
   const slideAnim = React.useRef(new Animated.Value(20)).current;
 
   const menuOptions: MenuOption[] = [
-   
-    {
-      id: 'task',
-      label: 'Task',
-      icon: 'check-circle',
-      iconType: 'Feather',
-      gradient: ['#18F06E', '#00AEEF'],
-    },
     {
       id: 'event',
-      label: 'Event',
-      icon: 'event-available',
-      iconType: 'MaterialIcons',
-      gradient: ['#18F06E', '#00AEEF'],
+      label: 'Create event',
+      iconType: 'calendar',
+    },
+    {
+      id: 'task',
+      label: 'Create task',
+      iconType: 'task',
+    },
+    {
+      id: 'birthday',
+      label: 'Birthday',
+      iconType: 'birthday',
     },
   ];
 
@@ -95,30 +93,31 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
   };
 
   const renderIcon = (option: MenuOption) => {
-    const iconSize = moderateScale(24);
+    const iconSize = moderateScale(20);
+    const iconColor = '#717680'; // Light gray color to match event and birthday icons
 
-    if (option.id === 'event') {
-      // Special case for Event - filled gradient background with white plus
-      return (
-        <View style={styles.eventIconContainer}>
-          <MaterialIcons
-            name="add"
-            size={iconSize}
-            color={colors.white}
-          />
-        </View>
-      );
-    } else {
-      // Other icons - outlined with gradient stroke
-      return (
-        <View style={styles.iconContainer}>
-          <Feather
-            name={option.icon}
-            size={iconSize}
-            color={option.gradient[0]}
-          />
-        </View>
-      );
+    switch (option.iconType) {
+      case 'calendar':
+        return (
+          <View style={styles.iconContainer}>
+            <EventIcon width={iconSize} height={iconSize} />
+          </View>
+        );
+      case 'task':
+        return (
+          <View style={styles.iconContainer}>
+            <TaskIcon width={iconSize} height={iconSize} color={iconColor} />
+          </View>
+        );
+      case 'birthday':
+        // Using event icon as placeholder for birthday - can be replaced with cake icon if available
+        return (
+          <View style={styles.iconContainer}>
+            <EventIcon width={iconSize} height={iconSize} />
+          </View>
+        );
+      default:
+        return null;
     }
   };
 
@@ -128,16 +127,14 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
     <Modal
       transparent
       visible={isVisible}
-      animationType="none"
+      animationType="fade"
       onRequestClose={onClose}
     >
-      <View style={styles.overlay}>
-        <TouchableOpacity
-          style={styles.backdrop}
-          activeOpacity={1}
-          onPress={onClose}
-        />
-
+      <TouchableOpacity
+        style={styles.overlay}
+        activeOpacity={1}
+        onPress={onClose}
+      >
         <Animated.View
           style={[
             styles.menuContainer,
@@ -146,23 +143,50 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
               transform: [{ translateY: slideAnim }],
             },
           ]}
+          pointerEvents="box-none"
         >
-          {menuOptions.map((option, index) => (
-            <TouchableOpacity
-              key={option.id}
-              style={[
-                styles.menuItem,
-                index === menuOptions.length - 1 && styles.lastMenuItem,
-              ]}
-              onPress={() => handleOptionPress(option)}
-              activeOpacity={0.7}
-            >
-              <View style={styles.iconWrapper}>{renderIcon(option)}</View>
-              <Text style={styles.menuLabel}>{option.label}</Text>
-            </TouchableOpacity>
-          ))}
+          {menuOptions.map((option, index) => {
+            let itemStyle = styles.menuItem;
+            if (option.id === 'event') {
+              itemStyle = [styles.menuItem, styles.eventItem];
+            } else if (option.id === 'task') {
+              itemStyle = [styles.menuItem, styles.taskItem];
+            } else if (option.id === 'birthday') {
+              itemStyle = [styles.menuItem, styles.birthdayItem];
+            }
+            
+            return (
+              <TouchableOpacity
+                key={option.id}
+                style={[
+                  itemStyle,
+                  index === menuOptions.length - 1 && styles.lastMenuItem,
+                ]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleOptionPress(option);
+                }}
+                activeOpacity={0.7}
+              >
+                <View style={styles.iconWrapper}>{renderIcon(option)}</View>
+                <Text style={styles.menuLabel}>{option.label}</Text>
+              </TouchableOpacity>
+            );
+          })}
+          
+          {/* Close Button */}
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            activeOpacity={0.7}
+          >
+            <CrossIcon width={moderateScale(20)} height={moderateScale(20)} />
+          </TouchableOpacity>
         </Animated.View>
-      </View>
+      </TouchableOpacity>
     </Modal>
   );
 };
@@ -170,73 +194,68 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)', // Semi-transparent backdrop
+    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Darker backdrop to match image
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
     paddingBottom: scaleHeight(100), // Position above the FAB
-    paddingRight: scaleWidth(24), // Align with FAB position
-  },
-  backdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
+    paddingRight: scaleWidth(20), // Align with FAB position (303 - 52/2 = 277, but using 20 for padding)
   },
   menuContainer: {
-    backgroundColor: colors.white,
-    borderRadius: moderateScale(16),
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.xs,
-    minWidth: scaleWidth(200),
-    maxWidth: scaleWidth(250),
-    ...shadows.lg, // Enhanced shadow for better visibility
-    borderWidth: 1,
-    borderColor: colors.lightGrayishBlue,
+    backgroundColor: 'transparent',
+    alignItems: 'flex-end',
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    backgroundColor: 'transparent',
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(11),
+    backgroundColor: colors.white,
     borderRadius: moderateScale(12),
-    marginBottom: spacing.xs,
+    marginBottom: scaleHeight(12),
+    height: scaleHeight(42),
+    ...shadows.sm,
+  },
+  eventItem: {
+    width: scaleWidth(160), // Increased width to show full "Create event" text
+  },
+  taskItem: {
+    width: scaleWidth(150), // Width for "Create task"
+  },
+  birthdayItem: {
+    width: scaleWidth(120), // Width for "Birthday"
   },
   lastMenuItem: {
-    marginBottom: 0,
+    marginBottom: scaleHeight(24), // Space before close button
   },
   menuLabel: {
-    fontSize: fontSize.textSize16,
-    color: colors.textSecondary,
+    fontSize: moderateScale(14), // Smaller text size as requested
+    color: colors.blackText,
     fontWeight: '500',
-    marginLeft: spacing.md,
+    marginLeft: scaleWidth(12),
     flex: 1,
+    fontFamily: 'Lato-Medium',
+    includeFontPadding: false, // Remove extra padding for better text visibility
+    lineHeight: moderateScale(18), // Adjusted line height for smaller text
   },
   iconWrapper: {
-    width: moderateScale(40),
-    height: moderateScale(40),
+    width: moderateScale(24),
+    height: moderateScale(24),
     justifyContent: 'center',
     alignItems: 'center',
   },
   iconContainer: {
-    width: moderateScale(40),
-    height: moderateScale(40),
+    width: moderateScale(24),
+    height: moderateScale(24),
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.white,
-    borderRadius: moderateScale(12),
-    borderWidth: 1,
-    borderColor: colors.lightGrayishBlue,
-    ...shadows.sm,
   },
-  eventIconContainer: {
-    width: moderateScale(40),
-    height: moderateScale(40),
-    borderRadius: moderateScale(12),
+  closeButton: {
+    width: scaleWidth(56),
+    height: scaleWidth(56),
+    borderRadius: scaleWidth(28),
+    backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: colors.figmaAccent,
     ...shadows.sm,
   },
 });

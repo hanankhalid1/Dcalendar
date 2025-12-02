@@ -647,6 +647,10 @@ const HomeScreen = () => {
                         case 'event':
                             navigation.navigate(Screen.CreateEventScreen);
                             break;
+                        case 'birthday':
+                            // Navigate to CreateEventScreen for birthday
+                            navigation.navigate(Screen.CreateEventScreen);
+                            break;
                         default:
                             break;
                     }

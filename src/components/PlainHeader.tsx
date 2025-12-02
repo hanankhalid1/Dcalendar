@@ -1,4 +1,6 @@
-import { StatusBar, TouchableOpacity, View, Image,StyleSheet,Text } from "react-native";
+import { StatusBar, TouchableOpacity, View, StyleSheet, Text } from "react-native";
+import SearchIcon from '../assets/svgs/search.svg';
+import MenuIcon from '../assets/svgs/menu.svg';
 
 import {
     colors,
@@ -7,9 +9,9 @@ import {
     borderRadius,
     shadows,
 } from '../utils/LightTheme';
-import { moderateScale, scaleHeight } from "../utils/dimensions";
+import { moderateScale, scaleHeight, scaleWidth } from "../utils/dimensions";
 
-const PlainHeader: React.FC<{ onMenuPress: () => void; title: string }> = ({ onMenuPress, title }) => {
+const PlainHeader: React.FC<{ onMenuPress: () => void; title: string; onSearchPress?: () => void }> = ({ onMenuPress, title, onSearchPress }) => {
     return (
         <View style={headerStyles.container}>
             <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
@@ -21,16 +23,21 @@ const PlainHeader: React.FC<{ onMenuPress: () => void; title: string }> = ({ onM
                     activeOpacity={0.7}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                    <Image
-                        source={require('../assets/images/HeaderImages/HeaderDrawer.png')}
-                    />
+                    <MenuIcon width={24} height={24} />
                 </TouchableOpacity>
 
-                {/* 2. Title of the Screen (to the right of the menu icon) */}
+                {/* 2. Title of the Screen (centered) */}
                 <Text style={headerStyles.titleText}>{title}</Text>
 
-                {/* Optional: If you need space between title and right-side content, add <View style={headerStyles.spacer} /> here */}
-                
+                {/* 3. Search Icon Button */}
+                <TouchableOpacity
+                    style={headerStyles.searchButton}
+                    onPress={onSearchPress}
+                    activeOpacity={0.7}
+                    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+                >
+                    <SearchIcon width={24} height={24} />
+                </TouchableOpacity>
             </View>
         </View>
     );
@@ -61,15 +68,22 @@ const headerStyles = StyleSheet.create({
         height: moderateScale(40),
         justifyContent: 'center',
         alignItems: 'center',
-        marginRight: spacing.md, // Spacing between the icon and the title
         padding: spacing.xs,
     },
     // --- NEW STYLE FOR THE TITLE ---
     titleText: {
         fontSize: fontSize.textSize20,
         fontWeight: '700',
-        color: colors.blackText, // Using the color you defined in the original `title` style
-        // flex: 1, // Optional: useful if the title should take up all remaining space
+        color: colors.blackText,
+        marginLeft: scaleWidth(12),
+        flex: 1,
+    },
+    searchButton: {
+        width: moderateScale(40),
+        height: moderateScale(40),
+        justifyContent: 'center',
+        alignItems: 'center',
+        padding: spacing.xs,
     },
     // The original `title` style from your snippet, renamed to `titleText` for usage
     title: { 

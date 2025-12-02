@@ -101,7 +101,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   );
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Guests</Text>
+      <Text style={styles.sectionTitle}>Add people</Text>
       <TouchableOpacity
         style={styles.guestInputContainer}
         onPress={onToggleGuestModal}

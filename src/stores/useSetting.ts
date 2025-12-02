@@ -12,6 +12,7 @@ export type SettingsStore = {
   showDeclinedEvents: boolean;
   calendarNotifications: boolean;
   taskNotifications: boolean;
+  birthdayNotifications: boolean;
   taskOverdueNotification: boolean;
 
   // ====== Actions ======
@@ -22,6 +23,7 @@ export type SettingsStore = {
   toggleShowDeclinedEvents: () => void;
   toggleCalendarNotifications: () => void;
   toggleTaskNotifications: () => void;
+  toggleBirthdayNotifications: () => void;
   toggleTaskOverdueNotification: () => void;
 };
 
@@ -37,6 +39,7 @@ export const useSettingsStore = create<SettingsStore>()(
       showDeclinedEvents: false,
       calendarNotifications: true,
       taskNotifications: true,
+      birthdayNotifications: true,
       taskOverdueNotification: false,
 
       // ====== Actions ======
@@ -55,6 +58,9 @@ export const useSettingsStore = create<SettingsStore>()(
 
       toggleTaskNotifications: () =>
         set((state) => ({ taskNotifications: !state.taskNotifications })),
+
+      toggleBirthdayNotifications: () =>
+        set((state) => ({ birthdayNotifications: !state.birthdayNotifications })),
 
       toggleTaskOverdueNotification: () =>
         set((state) => ({ taskOverdueNotification: !state.taskOverdueNotification })),

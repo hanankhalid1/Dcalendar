@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useMemo } from "react";
 import {
   View,
   Text,
@@ -10,7 +10,8 @@ import {
   Modal,
   Alert,
   KeyboardAvoidingView,
-  Platform
+  Platform,
+  Dimensions
 } from "react-native";
 import LinearGradient from 'react-native-linear-gradient';
 import CalendarWithTime from '../components/CalendarWithTime';
@@ -65,7 +66,7 @@ const CreateTaskScreen = () => {
   const [selectedValue, setSelectedValue] = useState(null);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const [showEndsDatePicker, setShowEndsDatePicker] = useState(false);
-  
+
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -106,7 +107,7 @@ const CreateTaskScreen = () => {
   };
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(getInitialDate());
-  
+
   // Initialize customRecurrence after selectedDate is defined
   const [customRecurrence, setCustomRecurrence] = useState(() => {
     const weekday =
@@ -134,7 +135,7 @@ const CreateTaskScreen = () => {
   const [showDetailedDateTime, setShowDetailedDateTime] = useState(
     !!editEventData,
   );
-  
+
   // Update customRecurrence when selectedDate changes
   useEffect(() => {
     if (selectedDate) {
@@ -145,16 +146,18 @@ const CreateTaskScreen = () => {
       }));
     }
   }, [selectedDate]);
-  
+
   // Error states
   const [titleError, setTitleError] = useState<string>('');
   const [dateError, setDateError] = useState<string>('');
   const [timeError, setTimeError] = useState<string>('');
-  
+
   // Refs for scrolling
   const scrollViewRef = useRef<ScrollView>(null);
   const titleInputRef = useRef<View>(null);
   const dateTimeSectionRef = useRef<View>(null);
+  const repeatDropdownScrollRef = useRef<ScrollView>(null);
+  const repeatFieldRef = useRef<View>(null);
   const [labelList, setLabelList] = useState([
     { label: "My Tasks", value: "1" },
     { label: "Work", value: "2" },
@@ -222,7 +225,7 @@ const CreateTaskScreen = () => {
       "Every Weekday (Monday to Friday)",
       "Custom...",
     );
-    
+
     return options;
   };
 
@@ -247,7 +250,7 @@ const CreateTaskScreen = () => {
   const handleCustomRecurrenceDone = () => {
     // Validate repeatEvery value
     const repeatEveryNum = parseInt(customRecurrence.repeatEvery, 10);
-    
+
     // Check if repeatEvery is valid (must be a positive integer between 1-99)
     if (isNaN(repeatEveryNum) || repeatEveryNum < 1 || repeatEveryNum > 99) {
       // Show error alert
@@ -258,7 +261,7 @@ const CreateTaskScreen = () => {
       );
       return;
     }
-    
+
     // Generate custom recurrence text based on settings
     const { repeatEvery, repeatUnit, repeatOn, endsType } = customRecurrence;
     let customText = `Every ${repeatEvery} ${repeatUnit.toLowerCase()}`;
@@ -287,9 +290,69 @@ const CreateTaskScreen = () => {
       return;
     }
 
-    setShowRecurrenceDropdown(prev => !prev);
-    setIsRepeatDropdownOpen(prev => !prev);
-    setActiveField(prev => (prev === 'repeat' ? null : 'repeat'));
+    const willOpen = !isRepeatDropdownOpen;
+    setShowRecurrenceDropdown(willOpen);
+    setIsRepeatDropdownOpen(willOpen);
+    setActiveField(willOpen ? 'repeat' : null);
+    
+    // Scroll main screen to show dropdown when opening
+    if (willOpen && scrollViewRef.current && repeatFieldRef.current) {
+      setTimeout(() => {
+        // Measure the repeat field position
+        repeatFieldRef.current?.measureLayout(
+          scrollViewRef.current as any,
+          (x, y) => {
+            if (scrollViewRef.current) {
+              // Calculate scroll position: field position + dropdown height + some padding
+              // Dropdown max height is ~450, so we need to ensure it's visible
+              const dropdownHeight = scaleHeight(450);
+              const screenHeight = Dimensions.get('window').height;
+              const scrollPosition = Math.max(0, y - (screenHeight - dropdownHeight - 100));
+              
+              scrollViewRef.current.scrollTo({
+                y: scrollPosition,
+                animated: true,
+              });
+            }
+          },
+          () => {
+            // Fallback: try scrolling after a delay
+            setTimeout(() => {
+              if (scrollViewRef.current && repeatFieldRef.current) {
+                repeatFieldRef.current.measureLayout(
+                  scrollViewRef.current as any,
+                  (x, y) => {
+                    if (scrollViewRef.current) {
+                      const dropdownHeight = scaleHeight(450);
+                      const screenHeight = Dimensions.get('window').height;
+                      const scrollPosition = Math.max(0, y - (screenHeight - dropdownHeight - 100));
+                      scrollViewRef.current.scrollTo({
+                        y: scrollPosition,
+                        animated: true,
+                      });
+                    }
+                  },
+                  () => {}
+                );
+              }
+            }, 200);
+          }
+        );
+      }, 100);
+    }
+    
+    // Scroll to selected option in dropdown when opening
+    if (willOpen && repeatDropdownScrollRef.current) {
+      setTimeout(() => {
+        const selectedIndex = recurrenceOptions.findIndex(opt => opt === selectedRecurrence);
+        if (selectedIndex >= 0 && repeatDropdownScrollRef.current) {
+          repeatDropdownScrollRef.current.scrollTo({
+            y: selectedIndex * scaleHeight(44),
+            animated: false,
+          });
+        }
+      }, 200);
+    }
   };
 
   const handleDayToggle = (day: string) => {
@@ -301,16 +364,12 @@ const CreateTaskScreen = () => {
     }));
   };
 
-  const recurrenceOptions = selectedDate ? getRecurrenceOptions(selectedDate) : [
-    "Does not repeat",
-    "Daily",
-    "Weekly on Thursday",
-    "Monthly on the first Thursday",
-    "Monthly on the last Thursday",
-    "Annually on January 1",
-    "Every Weekday (Monday to Friday)",
-    "Custom...",
-  ];
+  // Always use dynamic recurrence options based on selected date (same as CreateEventScreen)
+  // Use current date as fallback if selectedDate is not set yet
+  // Recalculate when selectedDate changes
+  const recurrenceOptions = useMemo(() => {
+    return getRecurrenceOptions(selectedDate || new Date());
+  }, [selectedDate]);
 
 
 
@@ -475,8 +534,8 @@ const CreateTaskScreen = () => {
         // Fallback: parse from date and time strings if fromTime is not available
         const parsedDate = new Date(editEventData.date);
         if (!isNaN(parsedDate.getTime())) {
-        setSelectedDate(parsedDate);
-      }
+          setSelectedDate(parsedDate);
+        }
 
         // Store in 12-hour format (like CreateEventScreen)
         setSelectedStartTime(editEventData.time);
@@ -536,7 +595,7 @@ const CreateTaskScreen = () => {
         // Parse time from 12-hour format (e.g., "11:30 AM") or 24-hour format (e.g., "11:30")
         const normalizedTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
         const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-        
+
         if (timeMatch) {
           // 12-hour format
           let hours = parseInt(timeMatch[1], 10);
@@ -571,7 +630,7 @@ const CreateTaskScreen = () => {
         }
       }
     }
-    
+
     // If we reach here, validation passed - errors are already cleared at the start
   }, [mode, selectedDate, selectedStartTime]);
 
@@ -588,22 +647,22 @@ const CreateTaskScreen = () => {
     // Clear errors first
     setDateError('');
     setTimeError('');
-    
+
     // Normalize time to prevent AM/PM duplication
     // Remove any duplicate AM/PM patterns (e.g., "10:00 AM AM" -> "10:00 AM")
     let normalizedTime = startTime.trim();
-    
+
     // Extract the time part (HH:MM) and the period (AM/PM)
     // Match pattern: HH:MM followed by optional spaces and AM/PM (possibly duplicated)
     const timeMatch = normalizedTime.match(/^(\d{1,2}:\d{2})\s*(AM|PM).*$/i);
-    
+
     if (timeMatch) {
       // Extract clean time and the last AM/PM (in case of duplicates)
       const timePart = timeMatch[1];
       // Find the last AM or PM in the string (handles duplicates)
       const lastPeriodMatch = normalizedTime.match(/(AM|PM)\s*$/i);
       const period = lastPeriodMatch ? lastPeriodMatch[1].toUpperCase() : '';
-      
+
       normalizedTime = period ? `${timePart} ${period}` : timePart;
     } else {
       // If format doesn't match expected pattern, try to clean it
@@ -613,20 +672,21 @@ const CreateTaskScreen = () => {
         const lastMatch = match.match(/(AM|PM)\s*$/i);
         return lastMatch ? ` ${lastMatch[1].toUpperCase()}` : '';
       });
-      
+
       // Also handle cases where AM/PM might be concatenated without spaces
       normalizedTime = normalizedTime.replace(/(AM|PM)(AM|PM)+$/gi, (match) => {
         const lastMatch = match.match(/(AM|PM)$/i);
         return lastMatch ? lastMatch[1].toUpperCase() : '';
       });
     }
-    
+
     setSelectedDate(date);
     setSelectedStartTime(normalizedTime);
     setShowDetailedDateTime(true);
-    setSelectedRecurrence("Does not repeat");
+    // Don't reset recurrence when date/time changes - let user keep their selection
+    // setSelectedRecurrence("Does not repeat");
     setActiveField(null);
-    
+
     // Validate immediately after state updates (for real-time feedback)
     setTimeout(() => {
       // Only validate for new tasks, not when editing
@@ -665,7 +725,7 @@ const CreateTaskScreen = () => {
           // Parse time from 12-hour format (e.g., "11:30 AM") or 24-hour format (e.g., "11:30")
           const normalizedTime = startTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
           const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-          
+
           if (timeMatch) {
             // 12-hour format
             let hours = parseInt(timeMatch[1], 10);
@@ -700,10 +760,10 @@ const CreateTaskScreen = () => {
           }
         }
       }
-      
+
       // If we reach here, validation passed - ensure errors are cleared
-    setDateError('');
-    setTimeError('');
+      setDateError('');
+      setTimeError('');
     }, 0);
   };
   const handleClose = () => {
@@ -713,7 +773,7 @@ const CreateTaskScreen = () => {
   const validateForm = () => {
     let isValid = true;
     let firstErrorField: 'title' | 'date' | 'time' | null = null;
-    
+
     // Clear previous errors
     setTitleError('');
     setDateError('');
@@ -772,7 +832,7 @@ const CreateTaskScreen = () => {
             // Parse time from 12-hour format (e.g., "11:30 AM") or 24-hour format (e.g., "11:30")
             const normalizedTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
             const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-            
+
             if (timeMatch) {
               // 12-hour format
               let hours = parseInt(timeMatch[1], 10);
@@ -826,15 +886,15 @@ const CreateTaskScreen = () => {
             setTimeout(() => scrollToField(ref), 100);
             return;
           }
-          
+
           try {
             ref.current.measureLayout(
               scrollViewRef.current as any,
               (x, y) => {
                 if (scrollViewRef.current) {
-                  scrollViewRef.current.scrollTo({ 
-                    y: Math.max(0, y - 40), 
-                    animated: true 
+                  scrollViewRef.current.scrollTo({
+                    y: Math.max(0, y - 40),
+                    animated: true
                   });
                 }
               },
@@ -846,13 +906,13 @@ const CreateTaskScreen = () => {
                       scrollViewRef.current as any,
                       (x, y) => {
                         if (scrollViewRef.current) {
-                          scrollViewRef.current.scrollTo({ 
-                            y: Math.max(0, y - 40), 
-                            animated: true 
+                          scrollViewRef.current.scrollTo({
+                            y: Math.max(0, y - 40),
+                            animated: true
                           });
                         }
                       },
-                      () => {}
+                      () => { }
                     );
                   }
                 }, 300);
@@ -900,15 +960,15 @@ const CreateTaskScreen = () => {
         if (!time12h || time12h.trim() === '') return '';
         const normalizedTime = time12h.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
         const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-        
+
         if (timeMatch) {
           let hours = parseInt(timeMatch[1], 10);
           const minutes = parseInt(timeMatch[2], 10);
           const period = timeMatch[3].toUpperCase();
-          
+
           if (period === 'PM' && hours !== 12) hours += 12;
           if (period === 'AM' && hours === 12) hours = 0;
-          
+
           return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
         }
         return time12h; // Fallback: assume it's already 24-hour
@@ -928,7 +988,7 @@ const CreateTaskScreen = () => {
 
       // Build recurrence data from current state (exactly like CreateEventScreen)
       const repeatEventValue = selectedRecurrence !== 'Does not repeat' ? selectedRecurrence : '';
-      
+
       // Build custom recurrence string if it's a custom recurrence (exactly like CreateEventScreen)
       let customRepeatEventValue = '';
       if (selectedRecurrence.startsWith('Every ') && selectedRecurrence !== 'Every Weekday (Monday to Friday)') {
@@ -996,9 +1056,9 @@ const CreateTaskScreen = () => {
         }
       } else {
         // For new tasks, build list from scratch (exactly like CreateEventScreen pattern)
-      const entries = [
-        { key: "task", value: "true" },
-        { key: "LabelName", value: "My Tasks" },
+        const entries = [
+          { key: "task", value: "true" },
+          { key: "LabelName", value: "My Tasks" },
           { key: "organizer", value: activeAccount?.userName || '' }
         ];
 
@@ -1029,8 +1089,11 @@ const CreateTaskScreen = () => {
             ? selectedRecurrence
             : undefined,
         list: list,
-        organizer: activeAccount?.userName
+        organizer: activeAccount?.userName || activeAccount?.username || ''
       };
+      
+      console.log('📋 Task data being saved:', JSON.stringify(taskData, null, 2));
+      console.log('📋 Task list:', JSON.stringify(list, null, 2));
 
       // 4. Handle Edit vs. Create
       if (mode === 'edit') {
@@ -1039,7 +1102,7 @@ const CreateTaskScreen = () => {
         await handleCreateTask(taskData, activeAccount);
       }
 
-      // Navigate immediately for better UX (don't wait for refresh)
+      // Navigate after successful save
       navigation.goBack();
 
       // Note: getUserEvents is not called here to avoid showing "Loading Events" indicator
@@ -1059,12 +1122,27 @@ const CreateTaskScreen = () => {
   const handleCreateTask = async (taskData, activeAccount) => {
     try {
       console.log("Creating task on blockchain:", taskData);
+      console.log("Active account:", activeAccount);
+      console.log("Token available:", !!token);
+      
+      // Ensure organizer is set correctly
+      if (!taskData.organizer) {
+        taskData.organizer = activeAccount?.userName || activeAccount?.username || '';
+        console.log("Organizer was missing, set to:", taskData.organizer);
+      }
+      
       const response = await blockchainService.createEvent(
         taskData,
         activeAccount,
         token,
       );
       
+      if (!response) {
+        throw new Error('Blockchain transaction returned no response');
+      }
+      
+      console.log("✅ Task created successfully on blockchain:", response);
+
       // Extract recurrence data from list (exactly like CreateEventScreen)
       const repeatEvents = (taskData?.list || [])
         .filter((data: any) => data.key === "repeatEvent")
@@ -1074,7 +1152,7 @@ const CreateTaskScreen = () => {
         .filter((data: any) => data.key === "customRepeatEvent")
         .map((data: any) => data.value)
         .filter((value: any) => value !== null);
-      
+
       const updatePayload = {
         events: [{
           uid: taskData?.uid,
@@ -1087,7 +1165,7 @@ const CreateTaskScreen = () => {
         active: activeAccount?.userName,
         type: 'update',
       };
-      
+
       // Call the same API as edit
       await api('POST', '/updateevents', updatePayload);
 
@@ -1172,7 +1250,7 @@ const CreateTaskScreen = () => {
 
         // Show success and navigate immediately
         showAlert('Task Updated', 'Task has been successfully updated.', 'success');
-        
+
         // Note: getUserEvents is not called here to avoid showing "Loading Events" indicator
         // The optimistic UI update already updates the local state
       } else {
@@ -1205,206 +1283,222 @@ const CreateTaskScreen = () => {
         style={{ flex: 1 }}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
-        <ScrollView 
+        <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
-          scrollEnabled={!showRecurrenceDropdown}
+          scrollEnabled={!showRecurrenceDropdown && !isRepeatDropdownOpen}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: scaleHeight(20) }}
           showsVerticalScrollIndicator={true}
           bounces={false}
         >
-        <View style={styles.formContainer}>
-          <View 
-            ref={titleInputRef}
-            style={styles.fieldContainer}
-            collapsable={false}
-          >
-            <Text style={styles.labelText}>Add title</Text>
-            <TextInput
-              style={[styles.titleInput, activeField === 'title' && styles.fieldActiveInput]}
-              placeholder="Write here"
-              placeholderTextColor="#A4A7AE"
-              value={title}
-              onFocus={() => setActiveField('title')}
-              onBlur={() => setActiveField(null)}
-              onChangeText={(text) => {
-                setTitle(text);
-                if (titleError) setTitleError('');
-              }}
-              editable={!isLoading}
-            />
-            {titleError ? (
-              <Text style={styles.fieldErrorText}>{titleError}</Text>
-            ) : null}
-          </View>
-
-          {/* Date Field */}
-          <View 
-            ref={dateTimeSectionRef}
-            style={styles.fieldContainer}
-            collapsable={false}
-          >
-            <Text style={styles.labelText}>Date</Text>
-            <TouchableOpacity
-              style={[styles.datePicker, activeField === 'date' && styles.fieldActive]}
-              onPress={() => {
-                if (!isLoading) {
-                  setActiveField('date');
-                  setCalendarModalMode('date');
-                  setShowCalendarModal(true);
-                }
-              }}
-              disabled={isLoading}
+          <View style={styles.formContainer}>
+            <View
+              ref={titleInputRef}
+              style={styles.fieldContainer}
+              collapsable={false}
             >
-              <Text style={styles.selectorText}>
-                {selectedDate
-                  ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                  : "Select"}
-              </Text>
-              <CalendarIcon width={20} height={20} fill="#6C6C6C" />
-            </TouchableOpacity>
-            {dateError && (
-              <Text style={styles.fieldErrorText}>
-                {dateError}
-              </Text>
-            )}
-          </View>
+              <Text style={styles.labelText}>Add title</Text>
+              <TextInput
+                style={[styles.titleInput, activeField === 'title' && styles.fieldActiveInput]}
+                placeholder="Write here"
+                placeholderTextColor="#A4A7AE"
+                value={title}
+                onFocus={() => setActiveField('title')}
+                onBlur={() => setActiveField(null)}
+                onChangeText={(text) => {
+                  setTitle(text);
+                  if (titleError) setTitleError('');
+                }}
+                editable={!isLoading}
+              />
+              {titleError ? (
+                <Text style={styles.fieldErrorText}>{titleError}</Text>
+              ) : null}
+            </View>
 
-          {/* Start Time Field */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.labelText}>Start Time</Text>
-            <TouchableOpacity
-              style={[styles.datePicker, activeField === 'startTime' && styles.fieldActive]}
-              onPress={() => {
-                if (!isLoading) {
-                  setActiveField('startTime');
-                  setCalendarModalMode('startTime');
-                  setShowCalendarModal(true);
-                }
-              }}
-              disabled={isLoading}
+            {/* Date Field */}
+            <View
+              ref={dateTimeSectionRef}
+              style={styles.fieldContainer}
+              collapsable={false}
             >
-              <Text style={styles.selectorText}>
-                {selectedStartTime || "Select"}
-              </Text>
-              <ClockIcon width={20} height={20} fill="#6C6C6C" />
-            </TouchableOpacity>
-            {timeError && (
-              <Text style={styles.fieldErrorText}>
-                {timeError}
-              </Text>
-            )}
-          </View>
+              <Text style={styles.labelText}>Date</Text>
+              <TouchableOpacity
+                style={[styles.datePicker, activeField === 'date' && styles.fieldActive]}
+                onPress={() => {
+                  if (!isLoading) {
+                    setActiveField('date');
+                    setCalendarModalMode('date');
+                    setShowCalendarModal(true);
+                  }
+                }}
+                disabled={isLoading}
+              >
+                <Text style={styles.selectorText}>
+                  {selectedDate
+                    ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+                    : "Select"}
+                </Text>
+                <CalendarIcon width={20} height={20} fill="#6C6C6C" />
+              </TouchableOpacity>
+              {dateError && (
+                <Text style={styles.fieldErrorText}>
+                  {dateError}
+                </Text>
+              )}
+            </View>
 
-          {/* End Time Field */}
-          <View style={styles.fieldContainer}>
-            <Text style={styles.labelText}>End Time</Text>
-            <TouchableOpacity
-              style={[styles.datePicker, activeField === 'endTime' && styles.fieldActive]}
-              onPress={() => {
-                if (!isLoading) {
-                  setActiveField('endTime');
-                  setCalendarModalMode('endTime');
-                  setShowCalendarModal(true);
-                }
-              }}
-              disabled={isLoading}
-            >
-              <Text style={styles.selectorText}>
-                {selectedEndTime || "Select"}
-              </Text>
-              <ClockIcon width={20} height={20} fill="#6C6C6C" />
-            </TouchableOpacity>
-          </View>
+            {/* Start Time Field */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.labelText}>Start Time</Text>
+              <TouchableOpacity
+                style={[styles.datePicker, activeField === 'startTime' && styles.fieldActive]}
+                onPress={() => {
+                  if (!isLoading) {
+                    setActiveField('startTime');
+                    setCalendarModalMode('startTime');
+                    setShowCalendarModal(true);
+                  }
+                }}
+                disabled={isLoading}
+              >
+                <Text style={styles.selectorText}>
+                  {selectedStartTime || "Select"}
+                </Text>
+                <ClockIcon width={20} height={20} fill="#6C6C6C" />
+              </TouchableOpacity>
+              {timeError && (
+                <Text style={styles.fieldErrorText}>
+                  {timeError}
+                </Text>
+              )}
+            </View>
 
-          {/* Repeat Field */}
-          <View
-            style={[styles.fieldContainer, styles.repeatFieldContainer]}
-          >
-            <Text style={styles.labelText}>Repeat</Text>
-            <TouchableOpacity
-              style={[
-                styles.recurrenceContainer,
-                (isRepeatDropdownOpen || showRecurrenceDropdown) && styles.fieldActive,
-              ]}
-              onPress={toggleRepeatDropdown}
-              disabled={isLoading}
+            {/* End Time Field */}
+            <View style={styles.fieldContainer}>
+              <Text style={styles.labelText}>End Time</Text>
+              <TouchableOpacity
+                style={[styles.datePicker, activeField === 'endTime' && styles.fieldActive]}
+                onPress={() => {
+                  if (!isLoading) {
+                    setActiveField('endTime');
+                    setCalendarModalMode('endTime');
+                    setShowCalendarModal(true);
+                  }
+                }}
+                disabled={isLoading}
+              >
+                <Text style={styles.selectorText}>
+                  {selectedEndTime || "Select"}
+                </Text>
+                <ClockIcon width={20} height={20} fill="#6C6C6C" />
+              </TouchableOpacity>
+            </View>
+
+            {/* Repeat Field - Fixed dropdown positioning */}
+            <View
+              ref={repeatFieldRef}
+              style={[styles.fieldContainer, styles.repeatFieldContainer]}
+              collapsable={false}
             >
+              <Text style={styles.labelText}>Repeat</Text>
+              <TouchableOpacity
+                style={[
+                  styles.recurrenceContainer,
+                  (isRepeatDropdownOpen || showRecurrenceDropdown) && styles.fieldActive,
+                ]}
+                onPress={toggleRepeatDropdown}
+                disabled={isLoading}
+              >
                 <Text style={styles.selectorText}>{selectedRecurrence}</Text>
-                <ArrowDownIcon width={20} height={20} fill="#6C6C6C" />
-            </TouchableOpacity>
-            {showRecurrenceDropdown && (
-              <View style={styles.repeatDropdown}>
-                <ScrollView
-                  style={styles.repeatOptionsWrapper}
-                  showsVerticalScrollIndicator={false}
-                >
-                  {recurrenceOptions.map((option, index) => (
-                    <TouchableOpacity
-                      key={index}
-                      style={[
-                        styles.repeatOption,
-                        selectedRecurrence === option && styles.repeatOptionSelected,
-                      ]}
-                      onPress={() => {
-                        if (!isLoading) {
-                          handleRecurrenceSelect(option);
-                        }
-                      }}
-                      disabled={isLoading}
-                    >
-                      <Text
+                <ArrowDownIcon
+                  width={20}
+                  height={20}
+                  fill="#6C6C6C"
+                />
+              </TouchableOpacity>
+
+              {isRepeatDropdownOpen && (
+                <View style={styles.repeatDropdown}>
+                  <ScrollView
+                    ref={repeatDropdownScrollRef}
+                    style={styles.repeatOptionsWrapper}
+                    contentContainerStyle={styles.repeatOptionsContent}
+                    showsVerticalScrollIndicator={true}
+                    nestedScrollEnabled={true}
+                    bounces={false}
+                    scrollEnabled={true}
+                    keyboardShouldPersistTaps="handled"
+                    alwaysBounceVertical={false}
+                    removeClippedSubviews={false}
+                  >
+                    {recurrenceOptions.map((option, index) => (
+                      <TouchableOpacity
+                        key={`${option}-${index}`}
                         style={[
-                          styles.repeatOptionText,
-                          selectedRecurrence === option && styles.repeatOptionTextSelected,
+                          styles.repeatOption,
+                          selectedRecurrence === option && styles.repeatOptionSelected,
                         ]}
+                        onPress={() => {
+                          if (!isLoading) {
+                            handleRecurrenceSelect(option);
+                          }
+                        }}
+                        disabled={isLoading}
+                        activeOpacity={0.7}
                       >
-                        {option}
-                      </Text>
-                      {selectedRecurrence === option && (
-                        <FeatherIcon name="check" size={16} color={colors.primaryBlue} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
-                <View style={styles.repeatDropdownFooter} />
-              </View>
-            )}
-          </View>
+                        <Text
+                          style={[
+                            styles.repeatOptionText,
+                            selectedRecurrence === option && styles.repeatOptionTextSelected,
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {option}
+                        </Text>
+                        {selectedRecurrence === option && (
+                          <FeatherIcon name="check" size={18} color={colors.primaryBlue} />
+                        )}
+                      </TouchableOpacity>
+                    ))}
+                  </ScrollView>
+                </View>
+              )}
+            </View>
 
-          <View style={styles.fieldContainer}>
-            <Text style={styles.labelText}>Description</Text>
-            <TextInput
-              style={[styles.descriptionInput, activeField === 'description' && styles.fieldActiveInput]}
-              placeholder="Enter here.."
-              value={description}
-              onChangeText={setDescription}
-              onFocus={() => setActiveField('description')}
-              onBlur={() => setActiveField(null)}
-              multiline
-              placeholderTextColor="#A4A7AE"
-              editable={!isLoading}
-            />
-          </View>
+            <View style={styles.fieldContainer}>
+              <Text style={styles.labelText}>Description</Text>
+              <TextInput
+                style={[styles.descriptionInput, activeField === 'description' && styles.fieldActiveInput]}
+                placeholder="Enter here.."
+                value={description}
+                onChangeText={setDescription}
+                onFocus={() => setActiveField('description')}
+                onBlur={() => setActiveField(null)}
+                multiline
+                placeholderTextColor="#A4A7AE"
+                editable={!isLoading}
+              />
+            </View>
 
-          {/* Create Button */}
-          <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
-              disabled={isLoading}
-              onPress={createTask}
-            >
-              <Text style={styles.saveButtonText}>
-                {isLoading ? 'Creating...' : 'Create'}
-              </Text>
-            </TouchableOpacity>
+            {/* Create Button */}
+            <View style={styles.buttonContainer}>
+              <TouchableOpacity
+                style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+                disabled={isLoading}
+                onPress={createTask}
+              >
+                <Text style={styles.saveButtonText}>
+                  {isLoading ? 'Creating...' : 'Create'}
+                </Text>
+              </TouchableOpacity>
+            </View>
           </View>
-        </View>
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {showRecurrenceDropdown && (
+      {(showRecurrenceDropdown || isRepeatDropdownOpen) && (
         <TouchableOpacity
           style={styles.recurrenceOverlay}
           activeOpacity={1}
@@ -1439,11 +1533,11 @@ const CreateTaskScreen = () => {
         mode={calendarModalMode === 'endTime' ? 'to' : 'from'}
         selectedDate={selectedDate || new Date()}
         selectedTime={
-          calendarModalMode === 'startTime' 
+          calendarModalMode === 'startTime'
             ? selectedStartTime || undefined
             : calendarModalMode === 'endTime'
-            ? selectedEndTime || undefined
-            : undefined
+              ? selectedEndTime || undefined
+              : undefined
         }
       />
 
@@ -1465,146 +1559,146 @@ const CreateTaskScreen = () => {
               showsVerticalScrollIndicator={false}
               contentContainerStyle={{ paddingBottom: spacing.lg }}
             >
-            <View style={styles.customRecurrenceContent}>
-              {/* Repeat every section */}
-              <View style={styles.customRecurrenceSection}>
-                <Text style={styles.customRecurrenceSectionTitle}>
-                  Repeat every
-                </Text>
-                <View style={styles.customRepeatEveryRow}>
-                  <TextInput
-                    style={styles.customRepeatEveryInput}
-                    value={customRecurrence.repeatEvery}
-                    onChangeText={text => {
-                      // Only allow positive integers (1-99)
-                      // Remove any non-numeric characters
-                      const numericOnly = text.replace(/[^0-9]/g, '');
-                      
-                      // Prevent empty string or zero
-                      if (numericOnly === '' || numericOnly === '0') {
-                        // Don't update if it would be empty or zero
-                        return;
-                      }
-                      
-                      // Limit to 2 digits (1-99)
-                      const limitedValue = numericOnly.length > 2 ? numericOnly.slice(0, 2) : numericOnly;
-                      
-                      setCustomRecurrence(prev => ({
-                        ...prev,
-                        repeatEvery: limitedValue,
-                      }));
-                    }}
-                    keyboardType="numeric"
-                    maxLength={2}
-                    editable={!isLoading}
-                  />
-                  <TouchableOpacity
-                    style={styles.customRepeatUnitDropdown}
-                    onPress={() => setShowUnitDropdown(prev => !prev)}
-                  >
-                    <Text style={styles.customRepeatUnitText}>
-                      {customRecurrence.repeatUnit}
-                    </Text>
-                    <FeatherIcon
-                      name="chevron-down"
-                      size={14}
-                      color="#6C6C6C"
-                      style={{ paddingTop: 3 }}
-                    />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
-              {/* Repeat on section */}
-              {customRecurrence.repeatUnit === repeatUnits[1] && (
+              <View style={styles.customRecurrenceContent}>
+                {/* Repeat every section */}
                 <View style={styles.customRecurrenceSection}>
                   <Text style={styles.customRecurrenceSectionTitle}>
-                    Repeat on
+                    Repeat every
                   </Text>
-                  <ScrollView horizontal={true}
-                    showsHorizontalScrollIndicator={false}
-                    contentContainerStyle={{ alignItems: 'center' }}
-                  >
-                  <View style={styles.customDaysRow}>
-                    {dayAbbreviations.map((day, index) => (
-                      <TouchableOpacity
-                        key={index}
-                        style={[
-                          styles.customDayButton,
-                          customRecurrence.repeatOn.includes(dayNames[index]) &&
-                          styles.customDayButtonSelected,
-                        ]}
-                          onPress={() => handleDayToggle(dayNames[index])}
-                      >
-                        <Text
-                          style={[
-                            styles.customDayButtonText,
-                            customRecurrence.repeatOn.includes(
-                              dayNames[index],
-                            ) && styles.customDayButtonTextSelected,
-                          ]}
-                        >
-                          {day}
-                        </Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                  </ScrollView>
-                </View>
-              )}
+                  <View style={styles.customRepeatEveryRow}>
+                    <TextInput
+                      style={styles.customRepeatEveryInput}
+                      value={customRecurrence.repeatEvery}
+                      onChangeText={text => {
+                        // Only allow positive integers (1-99)
+                        // Remove any non-numeric characters
+                        const numericOnly = text.replace(/[^0-9]/g, '');
 
-              {/* Ends section */}
-              <View style={styles.customRecurrenceSection}>
-                <Text style={styles.customRecurrenceSectionTitle}>Ends</Text>
+                        // Prevent empty string or zero
+                        if (numericOnly === '' || numericOnly === '0') {
+                          // Don't update if it would be empty or zero
+                          return;
+                        }
 
-                <TouchableOpacity
-                  style={styles.customEndsOption}
-                  onPress={() => {
-                    if (!isLoading) {
-                      setCustomRecurrence(prev => ({
-                        ...prev,
-                        endsType: endsOptions[0],
-                      }));
-                    }
-                  }}
-                  disabled={isLoading}
-                >
-                  <View style={styles.customRadioButton}>
-                    {customRecurrence.endsType === endsOptions[0] && (
-                      <View style={styles.customRadioButtonSelected} />
-                    )}
-                  </View>
-                  <Text style={styles.customEndsOptionText}>
-                    {endsOptions[0]}
-                  </Text>
-                </TouchableOpacity>
+                        // Limit to 2 digits (1-99)
+                        const limitedValue = numericOnly.length > 2 ? numericOnly.slice(0, 2) : numericOnly;
 
-                <TouchableOpacity
-                  style={styles.customEndsOption}
-                  onPress={() => {
-                    if (!isLoading) {
-                      setCustomRecurrence(prev => ({
-                        ...prev,
-                        endsType: endsOptions[1],
-                      }));
-                    }
-                  }}
-                  disabled={isLoading}
-                >
-                  <View style={styles.customRadioButton}>
-                    {customRecurrence.endsType === endsOptions[1] && (
-                      <View style={styles.customRadioButtonSelected} />
-                    )}
-                  </View>
-                  <Text style={styles.customEndsOptionText}>
-                    {endsOptions[1]}
-                  </Text>
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          repeatEvery: limitedValue,
+                        }));
+                      }}
+                      keyboardType="numeric"
+                      maxLength={2}
+                      editable={!isLoading}
+                    />
                     <TouchableOpacity
-                    style={[
-                      styles.customEndsInput,
-                      customRecurrence.endsType !== endsOptions[1] &&
-                      styles.customEndsInputDisabled,
-                    ]}
+                      style={styles.customRepeatUnitDropdown}
+                      onPress={() => setShowUnitDropdown(prev => !prev)}
+                    >
+                      <Text style={styles.customRepeatUnitText}>
+                        {customRecurrence.repeatUnit}
+                      </Text>
+                      <FeatherIcon
+                        name="chevron-down"
+                        size={14}
+                        color="#6C6C6C"
+                        style={{ paddingTop: 3 }}
+                      />
+                    </TouchableOpacity>
+                  </View>
+                </View>
+
+                {/* Repeat on section */}
+                {customRecurrence.repeatUnit === repeatUnits[1] && (
+                  <View style={styles.customRecurrenceSection}>
+                    <Text style={styles.customRecurrenceSectionTitle}>
+                      Repeat on
+                    </Text>
+                    <ScrollView horizontal={true}
+                      showsHorizontalScrollIndicator={false}
+                      contentContainerStyle={{ alignItems: 'center' }}
+                    >
+                      <View style={styles.customDaysRow}>
+                        {dayAbbreviations.map((day, index) => (
+                          <TouchableOpacity
+                            key={index}
+                            style={[
+                              styles.customDayButton,
+                              customRecurrence.repeatOn.includes(dayNames[index]) &&
+                              styles.customDayButtonSelected,
+                            ]}
+                            onPress={() => handleDayToggle(dayNames[index])}
+                          >
+                            <Text
+                              style={[
+                                styles.customDayButtonText,
+                                customRecurrence.repeatOn.includes(
+                                  dayNames[index],
+                                ) && styles.customDayButtonTextSelected,
+                              ]}
+                            >
+                              {day}
+                            </Text>
+                          </TouchableOpacity>
+                        ))}
+                      </View>
+                    </ScrollView>
+                  </View>
+                )}
+
+                {/* Ends section */}
+                <View style={styles.customRecurrenceSection}>
+                  <Text style={styles.customRecurrenceSectionTitle}>Ends</Text>
+
+                  <TouchableOpacity
+                    style={styles.customEndsOption}
+                    onPress={() => {
+                      if (!isLoading) {
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          endsType: endsOptions[0],
+                        }));
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <View style={styles.customRadioButton}>
+                      {customRecurrence.endsType === endsOptions[0] && (
+                        <View style={styles.customRadioButtonSelected} />
+                      )}
+                    </View>
+                    <Text style={styles.customEndsOptionText}>
+                      {endsOptions[0]}
+                    </Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity
+                    style={styles.customEndsOption}
+                    onPress={() => {
+                      if (!isLoading) {
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          endsType: endsOptions[1],
+                        }));
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <View style={styles.customRadioButton}>
+                      {customRecurrence.endsType === endsOptions[1] && (
+                        <View style={styles.customRadioButtonSelected} />
+                      )}
+                    </View>
+                    <Text style={styles.customEndsOptionText}>
+                      {endsOptions[1]}
+                    </Text>
+                    <TouchableOpacity
+                      style={[
+                        styles.customEndsInput,
+                        customRecurrence.endsType !== endsOptions[1] &&
+                        styles.customEndsInputDisabled,
+                      ]}
                       onPress={() => {
                         if (customRecurrence.endsType === endsOptions[1] && !isLoading) {
                           setShowEndsDatePicker(true);
@@ -1620,59 +1714,59 @@ const CreateTaskScreen = () => {
                       >
                         {customRecurrence.endsDate
                           ? (() => {
-                              const date = customRecurrence.endsDate;
-                              const month = String(date.getMonth() + 1).padStart(2, '0');
-                              const day = String(date.getDate()).padStart(2, '0');
-                              const year = date.getFullYear();
-                              return `${month}/${day}/${year}`;
-                            })()
+                            const date = customRecurrence.endsDate;
+                            const month = String(date.getMonth() + 1).padStart(2, '0');
+                            const day = String(date.getDate()).padStart(2, '0');
+                            const year = date.getFullYear();
+                            return `${month}/${day}/${year}`;
+                          })()
                           : '04/09/2025'}
                       </Text>
                     </TouchableOpacity>
-                </TouchableOpacity>
+                  </TouchableOpacity>
 
-                <TouchableOpacity
-                  style={styles.customEndsOption}
-                  onPress={() => {
-                    if (!isLoading) {
-                      setCustomRecurrence(prev => ({
-                        ...prev,
-                        endsType: endsOptions[2],
-                      }));
-                    }
-                  }}
-                  disabled={isLoading}
-                >
-                  <View style={styles.customRadioButton}>
-                    {customRecurrence.endsType === endsOptions[2] && (
-                      <View style={styles.customRadioButtonSelected} />
-                    )}
-                  </View>
-                  <Text style={styles.customEndsOptionText}>
-                    {endsOptions[2]}
-                  </Text>
-                  <TextInput
-                    style={[
-                      styles.customEndsInput,
-                      customRecurrence.endsType !== endsOptions[2] &&
-                      styles.customEndsInputDisabled,
-                    ]}
-                    value={customRecurrence.endsAfter}
-                    onChangeText={text =>
-                      setCustomRecurrence(prev => ({
-                        ...prev,
-                        endsAfter: text,
-                      }))
-                    }
-                    keyboardType="numeric"
-                    editable={customRecurrence.endsType === endsOptions[2] && !isLoading}
-                  />
-                  <Text style={styles.customEndsOccurrencesText}>
-                    occurrences
-                  </Text>
-                </TouchableOpacity>
+                  <TouchableOpacity
+                    style={styles.customEndsOption}
+                    onPress={() => {
+                      if (!isLoading) {
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          endsType: endsOptions[2],
+                        }));
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <View style={styles.customRadioButton}>
+                      {customRecurrence.endsType === endsOptions[2] && (
+                        <View style={styles.customRadioButtonSelected} />
+                      )}
+                    </View>
+                    <Text style={styles.customEndsOptionText}>
+                      {endsOptions[2]}
+                    </Text>
+                    <TextInput
+                      style={[
+                        styles.customEndsInput,
+                        customRecurrence.endsType !== endsOptions[2] &&
+                        styles.customEndsInputDisabled,
+                      ]}
+                      value={customRecurrence.endsAfter}
+                      onChangeText={text =>
+                        setCustomRecurrence(prev => ({
+                          ...prev,
+                          endsAfter: text,
+                        }))
+                      }
+                      keyboardType="numeric"
+                      editable={customRecurrence.endsType === endsOptions[2] && !isLoading}
+                    />
+                    <Text style={styles.customEndsOccurrencesText}>
+                      occurrences
+                    </Text>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View>
               {showUnitDropdown && (
                 <View style={styles.dropdownOverlay}>
                   <View style={styles.dropdownContainer}>
@@ -1689,7 +1783,7 @@ const CreateTaskScreen = () => {
                 </View>
               )}
             </ScrollView>
-            
+
             {/* Date Picker Modal for Ends Date */}
             <Modal
               visible={showEndsDatePicker}
@@ -1718,11 +1812,11 @@ const CreateTaskScreen = () => {
                     markedDates={
                       customRecurrence.endsDate
                         ? {
-                            [customRecurrence.endsDate.toISOString().split('T')[0]]: {
-                              selected: true,
-                              selectedColor: '#0B6DE0',
-                            },
-                          }
+                          [customRecurrence.endsDate.toISOString().split('T')[0]]: {
+                            selected: true,
+                            selectedColor: '#0B6DE0',
+                          },
+                        }
                         : {}
                     }
                     theme={{
@@ -1967,12 +2061,12 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.latoBold,
   },
   selectorText: {
-    fontSize: 12,
+    fontSize: 14,
     fontFamily: Fonts.latoRegular,
     fontWeight: '400',
     lineHeight: 18,
     letterSpacing: 0,
-    color: '#A4A7AE', // Placeholder color
+    color: colors.blackText, // Text color for selected value
     flex: 1,
   },
   buttonText: {
@@ -1983,7 +2077,12 @@ const styles = StyleSheet.create({
 
   //Recurrence Styles
 
-  // Recurrence Dropdown Styles
+  repeatFieldContainer: {
+    position: 'relative',
+    zIndex: 1006, // Higher z-index to ensure dropdown appears above everything
+    marginBottom: scaleHeight(20),
+  },
+
   recurrenceContainer: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -1995,66 +2094,86 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     backgroundColor: colors.white,
     width: '100%',
+    minHeight: scaleHeight(44),
   },
+
+  fieldActive: {
+    borderColor: '#B3E5FC', // Light blue border when active
+  },
+
   repeatDropdown: {
     position: 'absolute',
     top: '100%',
     left: 0,
     right: 0,
-    marginTop: scaleHeight(6),
-    borderRadius: 10,
+    marginTop: scaleHeight(4),
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: colors.primaryBlue,
+    borderColor: '#E0F2F1', // Light border for dropdown
     backgroundColor: colors.white,
-    zIndex: 1002,
-    shadowColor: '#0A0D12',
-    shadowOpacity: 0.08,
+    zIndex: 1005, // Higher z-index than overlay
+    shadowColor: '#000',
+    shadowOpacity: 0.1,
     shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 6,
-    overflow: 'hidden',
+    shadowOffset: { width: 0, height: 2 },
+    elevation: 15, // Higher elevation for Android
+    maxHeight: scaleHeight(300), // Fixed max height to force scrolling
+    overflow: 'hidden', // Ensure content doesn't overflow
   },
+
   repeatOptionsWrapper: {
-    maxHeight: scaleHeight(240),
+    height: scaleHeight(300), // Fixed height - CRITICAL for scrolling to work
   },
+
+  repeatOptionsContent: {
+    paddingBottom: scaleHeight(20), // Add padding at bottom for last item
+    paddingTop: scaleHeight(8), // Add padding at top
+  },
+
   repeatOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: scaleWidth(16),
-    paddingVertical: scaleHeight(12),
+    paddingVertical: scaleHeight(14),
     borderBottomWidth: 1,
     borderBottomColor: '#F2F4F7',
+    minHeight: scaleHeight(44),
+    backgroundColor: colors.white,
   },
+
   repeatOptionSelected: {
-    backgroundColor: '#F0FBFF',
+    backgroundColor: '#F0FBFF', // Light blue background for selected option
   },
+
   repeatOptionText: {
     fontSize: 14,
     color: colors.blackText,
     fontFamily: Fonts.latoMedium,
+    flex: 1,
+    marginRight: scaleWidth(8),
   },
+
   repeatOptionTextSelected: {
     color: colors.primaryBlue,
     fontFamily: Fonts.latoBold,
   },
-  repeatDropdownFooter: {
-    height: scaleHeight(6),
-    backgroundColor: colors.primaryBlue,
+
+  recurrenceOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 1004, // Below dropdown (1005) but above container
+    pointerEvents: 'auto', // Allow overlay to capture touches for closing
   },
-  // Custom Recurrence Modal Styles
-  customRecurrenceModalContainer: {
-    backgroundColor: colors.white,
-    borderRadius: 20,
-    width: '100%',
-    maxHeight: '75%',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
-  },
-  customRecurrenceContent: {
+
+  // Make sure the ScrollView allows scrolling
+  scrollView: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    overflow: 'visible',
+    zIndex: 1,
   },
 
   // Custom Modal Styles
@@ -2315,6 +2434,57 @@ const styles = StyleSheet.create({
     bottom: 0,
     zIndex: 1000,
   },
+  repeatContainer: {
+    marginTop: scaleHeight(24),
+    marginBottom: scaleHeight(24),
+  },
+  repeatHeader: {
+    marginBottom: scaleHeight(12),
+  },
+  repeatTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: Fonts.latoSemiBold,
+    color: colors.blackText,
+  },
+  repeatButtonsContainer: {
+    flexDirection: 'column',
+    gap: scaleHeight(8),
+  },
+  repeatButtonRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    gap: scaleWidth(8),
+  },
+  repeatButton: {
+    flex: 1,
+    minWidth: 0, // Allows flexbox to properly distribute space
+    height: scaleHeight(44),
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: 8,
+    backgroundColor: colors.white,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  repeatButtonSelected: {
+    borderColor: colors.primaryBlue,
+    backgroundColor: '#F0FBFF',
+  },
+  repeatButtonText: {
+    fontSize: 14,
+    fontFamily: Fonts.latoRegular,
+    fontWeight: '400',
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  repeatButtonTextSelected: {
+    color: colors.primaryBlue,
+    fontWeight: '600',
+    fontFamily: Fonts.latoSemiBold,
+  },
+
+  // ... rest of your styles ...
 });
 
 export default CreateTaskScreen;
