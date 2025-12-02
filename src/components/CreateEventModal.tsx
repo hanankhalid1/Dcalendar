@@ -121,9 +121,6 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
   const eventTypes = [
     { id: '1', name: 'Event', icon: '✓' },
     { id: '2', name: 'Task', icon: '' },
-    { id: '3', name: 'Out of office', icon: '' },
-    { id: '4', name: 'Birthday', icon: '' },
-    { id: '5', name: 'Working Location', icon: '' },
   ];
 
   // Sample guest data
