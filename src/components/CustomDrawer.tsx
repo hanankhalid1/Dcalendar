@@ -180,9 +180,14 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             console.warn('⚠️ No token received from login API response');
             await AsyncStorage.removeItem('ac');
           }
-          await getUserEvents(selectedAccount.userName || account.userName, api);
-
+          
+          // Close drawer immediately (non-blocking)
           onClose();
+          
+          // Load events in background after closing (non-blocking, skip loading screen)
+          getUserEvents(selectedAccount.userName || account.userName, api, undefined, { skipLoading: true }).catch(err => {
+            console.error('Background event load failed:', err);
+          });
         } else {
           console.warn('❌ Authentication failed:', {
             isAuth,

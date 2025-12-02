@@ -74,7 +74,7 @@ const CreateEventScreen = () => {
     setUserEvents,
     userEvents 
   } = useEventsStore();
-  const { googleIntegration } = useAuthStore();
+  const { googleIntegration, zoomIntegration } = useAuthStore();
   const currentTimezone = useSettingsStore();
   // Initialize blockchain service and get contract instance
   // Form state
@@ -157,6 +157,7 @@ const CreateEventScreen = () => {
   const isRepeatEveryFocused = React.useRef(false);
   const endsOptions = ['Never', 'On', 'After'];
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
+  const [integrationType, setIntegrationType] = useState<'google' | 'zoom'>('google');
   
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
@@ -625,10 +626,22 @@ const CreateEventScreen = () => {
   const handleGoogleMeetClick = () => {
     if (!googleIntegration.isConnected) {
       // Show modal first, then navigate on Continue
+      setIntegrationType('google');
       setShowIntegrationModal(true);
     } else {
       // Google is connected, allow selecting Google Meet
       setSelectedVideoConferencing('google');
+    }
+  };
+
+  const handleZoomClick = () => {
+    if (!zoomIntegration.isConnected) {
+      // Show modal first, then navigate on Continue
+      setIntegrationType('zoom');
+      setShowIntegrationModal(true);
+    } else {
+      // Zoom is connected, allow selecting Zoom
+      setSelectedVideoConferencing('zoom');
     }
   };
 
@@ -1814,9 +1827,30 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             console.error("❌ Failed to update Zoom meeting:", data);
             Alert.alert("Error", "Failed to update Zoom Meeting");
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("❌ Zoom update error:", err);
-          Alert.alert("Error", "Failed to update Zoom Meeting");
+          
+          // Handle 401 Unauthorized - token expired or invalid
+          if (err.response?.status === 401) {
+            Alert.alert(
+              "Zoom Authentication Error",
+              "Your Zoom connection has expired. Please reconnect your Zoom account in Settings.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { 
+                  text: "Go to Settings", 
+                  onPress: () => {
+                    navigation.navigate(Screen.SettingsScreen, {
+                      expandIntegration: true,
+                    });
+                  }
+                }
+              ]
+            );
+          } else {
+            const errorMsg = err.response?.data?.message || err.message || "Failed to update Zoom Meeting";
+            Alert.alert("Error", errorMsg);
+          }
         }
       }
 
@@ -2018,9 +2052,30 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             console.error("❌ Zoom creation failed:", data);
             Alert.alert("Error", "Failed to create Zoom Meeting");
           }
-        } catch (err) {
+        } catch (err: any) {
           console.error("❌ Zoom create error:", err);
-          Alert.alert("Error", "Failed to create Zoom Meeting");
+          
+          // Handle 401 Unauthorized - token expired or invalid
+          if (err.response?.status === 401) {
+            Alert.alert(
+              "Zoom Authentication Error",
+              "Your Zoom connection has expired. Please reconnect your Zoom account in Settings.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { 
+                  text: "Go to Settings", 
+                  onPress: () => {
+                    navigation.navigate(Screen.SettingsScreen, {
+                      expandIntegration: true,
+                    });
+                  }
+                }
+              ]
+            );
+          } else {
+            const errorMsg = err.response?.data?.message || err.message || "Failed to create Zoom Meeting";
+            Alert.alert("Error", errorMsg);
+          }
         }
       }
 
@@ -2106,13 +2161,31 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   };
 
   const handleSaveEvent = () => {
-    // ✅ FAST VALIDATION - Return immediately if invalid
-    if (!validateForm()) return;
+    // ✅ Set loading state IMMEDIATELY - FIRST THING, before ANY other code
+    // This ensures the button grays out instantly on click
+    setIsLoading(true);
+    
+    // ✅ Auto-hide loading after 1.5 seconds (save operation continues in background)
+    const loadingTimeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 1500);
+    
+    // ✅ Use requestAnimationFrame to ensure React processes the state update first
+    // Then do validation and processing in the next frame
+    requestAnimationFrame(() => {
+      // ✅ FAST VALIDATION - Return immediately if invalid
+      if (!validateForm()) {
+        clearTimeout(loadingTimeout);
+        setIsLoading(false);
+        return;
+      }
 
-    if (!activeAccount || !token) {
-      Alert.alert('Error', 'Authentication data not found');
-      return;
-    }
+      if (!activeAccount || !token) {
+        clearTimeout(loadingTimeout);
+        setIsLoading(false);
+        Alert.alert('Error', 'Authentication data not found');
+        return;
+      }
 
     // ✅ PREPARE MINIMAL DATA FOR OPTIMISTIC UPDATE (SYNCHRONOUS - NO AWAIT)
     const formatToISO8601Local = (date: Date, time: string, isAllDay: boolean = false): string => {
@@ -2267,8 +2340,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         });
     }
     
-    // ✅ STEP 3: NAVIGATE IMMEDIATELY - SYNCHRONOUS (NO DELAY)
-    // Navigate immediately - React Native handles the UI update
+    // ✅ STEP 3: NAVIGATE IMMEDIATELY (loading will auto-hide after 1.5s)
     navigation.goBack();
 
     // ✅ STEP 4: TRIGGER AUTHENTICATION IMMEDIATELY (NON-BLOCKING)
@@ -2310,12 +2382,15 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           }
         } catch (error: any) {
           console.error('Error in background event operation:', error);
+          clearTimeout(loadingTimeout);
           revertOptimisticUpdate(previousEvents);
+          setIsLoading(false); // Reset loading state on error
           setTimeout(() => {
             showAlert('Error', error?.message || 'Failed to save event. Please try again.', 'error');
           }, 100);
         }
       })();
+    }); // Close requestAnimationFrame
   };
 
   const handleClose = () => {
@@ -2762,17 +2837,21 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 In-person
               </Text>
             </TouchableOpacity>
-            {/* 
             <TouchableOpacity
               style={[
                 styles.videoConferencingButton,
                 selectedVideoConferencing === 'zoom' &&
                 styles.videoConferencingButtonSelected,
               ]}
-              onPress={() => setSelectedVideoConferencing('zoom')}
+              onPress={() => {
+                if (!isLoading) {
+                  handleZoomClick();
+                }
+              }}
+              disabled={isLoading}
             >
               <View style={styles.videoConferencingIconContainer}>
-                <FeatherIcon name="video" size={16} color="#0B6DE0" />
+                <FeatherIcon name="video" size={16} color="#2D8CFF" />
               </View>
               <Text
                 style={[
@@ -2783,7 +2862,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               >
                 Zoom
               </Text>
-            </TouchableOpacity> */}
+            </TouchableOpacity>
 
             <TouchableOpacity
               style={[
@@ -3001,7 +3080,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               end={{ x: 1, y: 0.5 }}
               style={styles.gradient}
             >
-              <Text style={styles.saveButtonText}>
+              <Text style={[styles.saveButtonText, isLoading && styles.saveButtonTextDisabled]}>
                 {isLoading ? 'Saving...' : 'Save'}
               </Text>
             </LinearGradient>
@@ -3593,7 +3672,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
             <View style={styles.integrationModalContent}>
               <Text style={styles.integrationModalDescription}>
-                To use Google Meet, you need to integrate Google
+                To use {integrationType === 'zoom' ? 'Zoom' : 'Google Meet'}, you need to integrate {integrationType === 'zoom' ? 'Zoom' : 'Google'}
               </Text>
             </View>
 
@@ -3953,6 +4032,9 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: {
     opacity: 0.6,
+  },
+  saveButtonTextDisabled: {
+    color: '#666666',
   },
   gradient: {
     paddingVertical: spacing.md,

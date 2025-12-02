@@ -55,6 +55,7 @@ type EventsStore = {
         userName: string,
         apiClient: any,
         ncog?: { appId: string; returnScheme: string },
+        options?: { skipLoading?: boolean },
     ) => Promise<void>;
     clearAllEventsData: () => void;
     
@@ -62,7 +63,10 @@ type EventsStore = {
     optimisticallyAddEvent: (event: UserEvent) => void;
     optimisticallyUpdateEvent: (uid: string, updates: Partial<UserEvent>) => void;
     optimisticallyDeleteEvent: (uid: string) => void;
+    optimisticallyRestoreEvent: (uid: string) => void;
+    optimisticallyPermanentDeleteEvent: (uid: string) => void;
     revertOptimisticUpdate: (previousEvents: UserEvent[]) => void;
+    revertOptimisticDeletedUpdate: (previousDeletedEvents: UserEvent[]) => void;
 };
 
 export const useEventsStore = create<EventsStore>()(
@@ -145,15 +149,17 @@ export const useEventsStore = create<EventsStore>()(
                 loading: false,
                 error: null,
             }),
-            getUserEvents: async (userName: string, apiClient: any) => {
-                set({ userEventsLoading: true, userEventsError: null });
+            getUserEvents: async (userName: string, apiClient: any, ncog?: { appId: string; returnScheme: string }, options?: { skipLoading?: boolean }) => {
+                if (!options?.skipLoading) {
+                    set({ userEventsLoading: true, userEventsError: null });
+                }
 
                 try {
                     const hostContract = new BlockchainService(Config.NECJSPK);
                     const blockchainEvents = await hostContract.getAllEvents(userName);
 
                     if (blockchainEvents.uuids.length === 0) {
-                        set({ userEvents: [], userEncryptedEvents: [], userEventsLoading: false });
+                        set({ userEvents: [], userEncryptedEvents: [], ...(options?.skipLoading ? {} : { userEventsLoading: false }) });
                         console.log('No events found for user:', userName);
                         return;
                     }
@@ -168,7 +174,7 @@ export const useEventsStore = create<EventsStore>()(
                     console.log('API response for user events:', res);
                     if (res?.data?.value) {
                         const encrypted = res?.data?.value;
-                        set({ userEncryptedEvents: encrypted, userEventsLoading: false });
+                        set({ userEncryptedEvents: encrypted, ...(options?.skipLoading ? {} : { userEventsLoading: false }) });
                         console.log('User events fetched successfully:', encrypted);
 
                         // Trigger bulk decryption with Wallet App
@@ -197,7 +203,7 @@ export const useEventsStore = create<EventsStore>()(
                         error instanceof Error
                             ? error.message
                             : 'Failed to fetch user events';
-                    set({ userEventsError: errorMessage, userEventsLoading: false });
+                    set({ userEventsError: errorMessage, ...(options?.skipLoading ? {} : { userEventsLoading: false }) });
                 }
             },
             
@@ -267,6 +273,55 @@ export const useEventsStore = create<EventsStore>()(
                 console.log('✅ Optimistically deleted event:', uid, '- Total events:', activeEvents.length);
             },
             
+            optimisticallyRestoreEvent: (uid: string) => {
+                const currentDeletedEvents = get().deletedUserEvents;
+                const currentEvents = get().userEvents;
+                
+                // Find the event in deleted events
+                const eventToRestore = currentDeletedEvents.find(event => event.uid === uid);
+                if (!eventToRestore) {
+                    console.warn('Event not found in deleted events:', uid);
+                    return;
+                }
+                
+                // Remove from deleted events
+                const updatedDeletedEvents = currentDeletedEvents.filter(event => event.uid !== uid);
+                
+                // Add to active events with optimistic flag
+                const restoredEvent = {
+                    ...eventToRestore,
+                    list: [
+                        ...(eventToRestore.list || []).filter(item => 
+                            item.key !== 'isDeleted' && 
+                            item.key !== 'deletedTime' && 
+                            item.key !== '_optimistic'
+                        ),
+                        { key: 'isDeleted', value: 'false' },
+                        { key: '_optimistic', value: 'true' }
+                    ]
+                };
+                
+                const updatedEvents = [...currentEvents, restoredEvent];
+                const activeEvents = updatedEvents.filter(ev => {
+                    if (!ev.list) return true;
+                    const isDeletedItem = ev.list.find(item => item.key === 'isDeleted');
+                    return !isDeletedItem || isDeletedItem.value !== 'true';
+                });
+                
+                set({ 
+                    userEvents: activeEvents,
+                    deletedUserEvents: updatedDeletedEvents
+                });
+                console.log('✅ Optimistically restored event:', uid, '- Deleted events:', updatedDeletedEvents.length);
+            },
+            
+            optimisticallyPermanentDeleteEvent: (uid: string) => {
+                const currentDeletedEvents = get().deletedUserEvents;
+                const filteredDeletedEvents = currentDeletedEvents.filter(event => event.uid !== uid);
+                set({ deletedUserEvents: filteredDeletedEvents });
+                console.log('✅ Optimistically permanently deleted event:', uid, '- Deleted events:', filteredDeletedEvents.length);
+            },
+            
             revertOptimisticUpdate: (previousEvents: UserEvent[]) => {
                 // Filter and set events (bypassing setUserEvents to avoid recursion)
                 const activeEvents = previousEvents.filter(ev => {
@@ -276,6 +331,11 @@ export const useEventsStore = create<EventsStore>()(
                 });
                 set({ userEvents: activeEvents });
                 console.log('↩️ Reverted optimistic update');
+            },
+            
+            revertOptimisticDeletedUpdate: (previousDeletedEvents: UserEvent[]) => {
+                set({ deletedUserEvents: previousDeletedEvents });
+                console.log('↩️ Reverted optimistic deleted events update');
             },
         }),
         {

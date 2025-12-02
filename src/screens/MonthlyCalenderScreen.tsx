@@ -834,12 +834,14 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
           // Delete on blockchain (this will take time, but UI already updated)
           await blockchainService.deleteEventSoft(event.uid, account, token, api);
           
-          // Refresh events in background (non-blocking) for sync
-          getUserEvents(account.userName, api).catch(err => {
-            console.error('Background event refresh failed:', err);
-            // If refresh fails, revert optimistic update
-            revertOptimisticUpdate(currentEvents);
-          });
+          // Delayed refresh in background (non-blocking, skip loading screen)
+          setTimeout(() => {
+            getUserEvents(account.userName, api, undefined, { skipLoading: true }).catch(err => {
+              console.error('Background event refresh failed:', err);
+              // If refresh fails, revert optimistic update
+              revertOptimisticUpdate(currentEvents);
+            });
+          }, 2000);
         } catch (err) {
           console.error("Delete Event Failed:", err);
           // Revert optimistic update on error

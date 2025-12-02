@@ -150,12 +150,14 @@ const EventCard: React.FC<EventCardProps> = ({
           // Call the service to modify data, re-encrypt, and submit the transaction.
           await blockchainService.deleteEventSoft(eventId, account, token, api);
 
-          // Refresh events in background (non-blocking) for sync
-          getUserEvents(account.userName, api).catch(err => {
-            console.error('Background event refresh failed:', err);
-            // If refresh fails, revert optimistic update
-            revertOptimisticUpdate(currentEvents);
-          });
+          // Delayed refresh in background (non-blocking, skip loading screen)
+          setTimeout(() => {
+            getUserEvents(account.userName, api, undefined, { skipLoading: true }).catch(err => {
+              console.error('Background event refresh failed:', err);
+              // If refresh fails, revert optimistic update
+              revertOptimisticUpdate(currentEvents);
+            });
+          }, 2000);
         } catch (err) {
           console.error("Delete Event Failed:", err);
           // Revert optimistic update on error

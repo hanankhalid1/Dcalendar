@@ -6,15 +6,17 @@ import {
   StyleSheet,
   Alert,
   ActivityIndicator,
+  Linking,
+  AppState,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
+import InAppBrowser from 'react-native-inappbrowser-reborn';
 import { useAuthStore } from '../stores/useAuthStore';
 import { useApiClient } from '../hooks/useApi';
 import { useActiveAccount } from '../stores/useActiveAccount';
-import GoogleOAuthWebView from '../components/GoogleOAuthWebView';
 import { colors } from '../utils/LightTheme';
 import { scaleWidth } from '../utils/dimensions';
 
@@ -40,8 +42,6 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
   } = useAuthStore();
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingZoom, setIsLoadingZoom] = useState(false);
-  const [showWebView, setShowWebView] = useState(false);
-  const [authUrl, setAuthUrl] = useState('');
 
   // Configure Google Sign-In on mount
   useEffect(() => {
@@ -214,7 +214,7 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
     }
   };
 
-  // Zoom Integration Handlers
+  // Zoom Integration Handlers (Following Google pattern)
   const handleZoomConnect = async () => {
     try {
       if (zoomIntegration.isConnected) {
@@ -226,48 +226,135 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
 
       setIsLoadingZoom(true);
 
+      // Get username from activeAccount (same as Google)
+      const userName = account?.userName ||
+        account?.user_name ||
+        account?.username ||
+        account?.name;
+
+      if (!userName) {
+        Alert.alert('Error', 'Cannot find username. Please ensure you are logged in.');
+        setIsLoadingZoom(false);
+        return;
+      }
+
       try {
-        const response = await api('GET', `/zoom/auth`, undefined);
-        console.log('Zoom API Response:', safeStringify(response.data));
-
+        // Get Zoom OAuth deep link from backend (returns ncog://zoom/auth?user=335)
+        const response = await api('GET', `/zoom/auth?platform=mobile`);
         const url = response.data?.data || response.data;
-
-        if (url?.statusCode === 400 || url?.status === false) {
-          Alert.alert('Error', url?.message || 'Backend returned an error');
-          setIsLoadingZoom(false);
-          return;
-        }
-
         const zoomAuthUrl = typeof url === 'string' ? url : url?.authUrl || url?.url;
 
-        if (!zoomAuthUrl || !zoomAuthUrl.startsWith('http')) {
+        if (!zoomAuthUrl) {
           Alert.alert('Error', 'No valid Zoom auth URL found');
           setIsLoadingZoom(false);
           return;
         }
 
-        setAuthUrl(zoomAuthUrl);
-        setShowWebView(true);
+        console.log('Opening Zoom auth deep link:', zoomAuthUrl);
 
-      } catch (error: any) {
-        console.error('Zoom OAuth API error:', error);
+        // COMMENTED OUT: Zoom OAuth callback handling
+        // Handle ncog:// deep link (similar to Google's serverAuthCode pattern)
+        // let subscription: any = null;
+        // let callbackHandled = false;
 
-        if (error.response?.status === 404) {
-          Alert.alert(
-            'Zoom Integration Not Available',
-            'The Zoom OAuth endpoint is not configured on the backend yet.',
-            [{ text: 'OK' }]
-          );
-        } else {
-          const errorMsg = error.response?.data?.message || error.message || 'API call failed';
-          Alert.alert('Error', `Failed to connect Zoom: ${errorMsg}`);
+        // COMMENTED OUT: Listen for OAuth callback URL with code
+        // const handleCallback = async (event: { url: string }) => {
+        //   if (callbackHandled) return;
+        //   
+        //   const callbackUrl = event.url;
+        //   console.log('🔗 Zoom OAuth callback received:', callbackUrl);
+
+        //   // Extract code from callback URL (Zoom redirects with ?code=...)
+        //   if (callbackUrl.includes('zoom-callback') || callbackUrl.includes('code=')) {
+        //     callbackHandled = true;
+        //     
+        //     if (subscription) {
+        //       subscription.remove();
+        //     }
+        //     
+        //     try {
+        //       // Parse code from URL
+        //       const urlObj = new URL(callbackUrl);
+        //       const params = new URLSearchParams(urlObj.search);
+        //       const code = params.get('code');
+        //       const error = params.get('error');
+
+        //       if (error) {
+        //         Alert.alert('Authentication Error', params.get('error_description') || error);
+        //         setIsLoadingZoom(false);
+        //         return;
+        //       }
+
+        //       if (!code) {
+        //         Alert.alert('Error', 'Failed to get authorization code from Zoom');
+        //         setIsLoadingZoom(false);
+        //         return;
+        //       }
+
+        //       console.log('Calling Zoom callback API...');
+
+        //       // Send code to backend (same pattern as Google)
+        //       const callbackResponse = await api('POST', '/zoom/callback', {
+        //         code: code,
+        //         username: userName,
+        //       });
+
+        //       console.log('Zoom Callback API Response:', safeStringify(callbackResponse.data));
+
+        //       // Check if the response was successful
+        //       if (callbackResponse.data.status && callbackResponse.data.data) {
+        //         const { access_token, refresh_token, email, fullName } = callbackResponse.data.data;
+
+        //         // Store tokens in state (same as Google)
+        //         connectZoom({
+        //           accessToken: access_token,
+        //           refreshToken: refresh_token,
+        //           email: email,
+        //           fullName: fullName,
+        //         });
+
+        //         Alert.alert('Success', 'Zoom account connected successfully!');
+        //       } else {
+        //         Alert.alert('Failed', 'Could not connect Zoom account');
+        //       }
+        //     } catch (err: any) {
+        //       console.error('Zoom callback error:', err);
+        //       Alert.alert('Error', err.response?.data?.message || 'Failed to connect Zoom account');
+        //     } finally {
+        //       setIsLoadingZoom(false);
+        //     }
+        //   }
+        // };
+
+        // COMMENTED OUT: Set up deep link listener for callback
+        // subscription = Linking.addEventListener('url', handleCallback);
+
+        // Open ncog:// deep link (this will open NCOG app or handle Zoom auth)
+        // Try to open directly - canOpenURL might not recognize custom schemes
+        try {
+          await Linking.openURL(zoomAuthUrl);
+          console.log('✅ Opened Zoom auth deep link:', zoomAuthUrl);
+          console.log('⚠️ NOTE: Callback handling is disabled - connection status will not update automatically');
+          // COMMENTED OUT: Keep listener active - callback will come back via deep link
+          
+          // Reset loading after opening (since callback won't be handled)
+          setTimeout(() => {
+            setIsLoadingZoom(false);
+          }, 2000);
+        } catch (error: any) {
+          console.error('Failed to open Zoom auth URL:', error);
+          // COMMENTED OUT: if (subscription) { subscription.remove(); }
+          Alert.alert('Error', 'Unable to open Zoom authentication. Please make sure the NCOG app is installed.');
+          setIsLoadingZoom(false);
         }
-      } finally {
+      } catch (error: any) {
+        console.error('Zoom OAuth error:', error);
+        Alert.alert('Error', error.message || 'Failed to connect Zoom');
         setIsLoadingZoom(false);
       }
     } catch (error: any) {
-      console.error('Zoom OAuth error:', error);
-      Alert.alert('Error', error.message || 'Failed to connect Zoom');
+      console.error('Zoom error:', error);
+      Alert.alert('Error', 'Failed to connect Zoom');
       setIsLoadingZoom(false);
     }
   };
@@ -287,64 +374,6 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
     }
   };
 
-  const handleOAuthSuccess = async (data: {
-    accessToken?: string;
-    refreshToken?: string;
-    email?: string;
-    name?: string;
-    photo?: string;
-  }) => {
-    try {
-      setShowWebView(false);
-
-      if (data.accessToken) {
-        connectZoom({
-          accessToken: data.accessToken,
-          refreshToken: data.refreshToken,
-          email: data.email,
-          fullName: data.name,
-          photo: data.photo,
-        });
-        Alert.alert('✅ Connected', 'Zoom account connected successfully!');
-        return;
-      }
-
-      setIsLoadingZoom(true);
-
-      try {
-        const statusResponse = await api('GET', '/calendarIntgrationStatus', undefined);
-        const integrations = statusResponse.data?.data || statusResponse.data || {};
-
-        if (integrations.isZoomConnected) {
-          connectZoom({
-            email: integrations.zoomEmail,
-            fullName: integrations.zoomName,
-          });
-          Alert.alert('✅ Connected', 'Zoom account connected successfully!');
-        } else {
-          Alert.alert('Backend Error', 'Zoom OAuth completed but backend returned an error.');
-        }
-      } catch (err: any) {
-        console.error('Error checking integration status:', err);
-        Alert.alert('Status Check Failed', 'Could not verify OAuth status from backend.');
-      } finally {
-        setIsLoadingZoom(false);
-      }
-    } catch (error) {
-      console.error('Error saving zoom integration:', error);
-      Alert.alert('Error', 'Failed to save connection');
-      setIsLoadingZoom(false);
-    }
-  };
-
-  const handleOAuthError = (error: string) => {
-    setShowWebView(false);
-    Alert.alert('Authentication Error', error || 'Failed to authenticate with Zoom');
-  };
-
-  const handleOAuthCancel = () => {
-    setShowWebView(false);
-  };
 
   return (
     <>
@@ -430,7 +459,7 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
             </View>
 
             {/* Zoom Integration Card */}
-            {/* <View style={[styles.integrationCard, { marginRight: 0 }]}>
+            <View style={[styles.integrationCard, { marginRight: 0 }]}>
               <View style={styles.integrationContent}>
                 <View style={styles.integrationTitleRow}>
                   <View style={styles.integrationLogoContainer}>
@@ -486,19 +515,9 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
                   </LinearGradient>
                 )}
               </TouchableOpacity>
-            </View> */}
+            </View>
           </View>
         </View>
-      )}
-
-      {/* OAuth WebView Modal (for Zoom) */}
-      {showWebView && authUrl && (
-        <GoogleOAuthWebView
-          authUrl={authUrl}
-          onSuccess={handleOAuthSuccess}
-          onError={handleOAuthError}
-          onCancel={handleOAuthCancel}
-        />
       )}
     </>
   );

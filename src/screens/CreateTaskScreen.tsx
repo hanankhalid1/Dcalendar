@@ -965,13 +965,24 @@ const CreateTaskScreen = () => {
   };
 
   const createTask = async () => {
-    // 1. Validate Form
-    if (!validateForm()) {
-      return;
-    }
-
-    // 2. Set Loading State
+    // ✅ Set loading state IMMEDIATELY - FIRST THING, before ANY other code
+    // This ensures the button grays out instantly on click
     setIsLoading(true);
+    
+    // ✅ Auto-hide loading after 1.5 seconds (save operation continues in background)
+    const loadingTimeout = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+    
+    // ✅ Use requestAnimationFrame to ensure React processes the state update first
+    // Then do validation and processing in the next frame
+    requestAnimationFrame(async () => {
+      // 1. Validate Form
+      if (!validateForm()) {
+        clearTimeout(loadingTimeout);
+        setIsLoading(false);
+        return;
+      }
     console.log("Processing task...");
 
     try {
@@ -1133,13 +1144,18 @@ const CreateTaskScreen = () => {
 
     } catch (error: any) {
       console.error('Error saving task:', error);
+      clearTimeout(loadingTimeout);
       // Show user-friendly error message from blockchain service
       const errorMessage = error?.message || 'Failed to save task. Please try again.';
       showAlert('Task Save Failed', errorMessage, 'error');
-    } finally {
-      // 5. Hide Loader
       setIsLoading(false);
+    } finally {
+      // 5. Hide Loader (only if not already hidden by timeout)
+      clearTimeout(loadingTimeout);
+      // Don't set to false here if timeout already cleared it
+      // The timeout will handle it automatically after 1.5s
     }
+    }); // Close requestAnimationFrame
   };
 
   const handleCreateTask = async (taskData, activeAccount) => {
@@ -1959,7 +1975,7 @@ const CreateTaskScreen = () => {
             end={{ x: 1, y: 0.5 }}
             style={styles.gradient}
           >
-            <Text style={styles.saveButtonText}>
+            <Text style={[styles.saveButtonText, isLoading && styles.saveButtonTextDisabled]}>
               {isLoading ? 'Saving...' : 'Save'}
             </Text>
           </LinearGradient>
@@ -2167,6 +2183,9 @@ const styles = StyleSheet.create({
   },
   saveButtonDisabled: {
     opacity: 0.6,
+  },
+  saveButtonTextDisabled: {
+    color: '#666666',
   },
   gradient: {
     paddingVertical: spacing.md,

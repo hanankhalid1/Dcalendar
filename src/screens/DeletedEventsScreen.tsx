@@ -33,11 +33,20 @@ import { useToken } from '../stores/useTokenStore';
 import { useApiClient } from '../hooks/useApi';
 import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import PlainHeader from '../components/PlainHeader';
+import { buildEventMetadata, prepareEventForBlockchain, encryptWithNECJS } from '../utils/eventUtils';
+import moment from 'moment';
 
 
 const DeletedEventsScreen: React.FC = () => {
     const navigation = useNavigation();
-    const { deletedUserEvents, userEventsLoading, getUserEvents } = useEventsStore();
+    const { 
+        deletedUserEvents, 
+        userEventsLoading, 
+        getUserEvents,
+        optimisticallyRestoreEvent,
+        optimisticallyPermanentDeleteEvent,
+        revertOptimisticDeletedUpdate
+    } = useEventsStore();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const activeAccount = useActiveAccount(state => state.account);
     const blockchainService = React.useMemo(() => new BlockchainService(), []);
@@ -123,10 +132,35 @@ const DeletedEventsScreen: React.FC = () => {
                 {
                     text: 'Restore',
                     style: 'default',
-                    onPress: () => {
-                        blockchainService.restoreEvent(event, activeAccount, token, api);
-                        console.log('Restoring event:', event);
-
+                    onPress: async () => {
+                        // Store current deleted events for potential revert
+                        const previousDeletedEvents = [...(deletedUserEvents || [])];
+                        
+                        try {
+                            // ✅ OPTIMISTIC UPDATE: Remove from deleted events immediately
+                            optimisticallyRestoreEvent(event.uid);
+                            
+                            // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background (non-blocking)
+                            (async () => {
+                                try {
+                                    // Restore event on blockchain (this will take time, but UI already updated)
+                                    await blockchainService.restoreEvent(event, activeAccount, token, api);
+                                    
+                                    // No immediate refresh needed - optimistic update already updated UI
+                                    // Skip getUserEvents to avoid loading screen - UI is already correct
+                                } catch (err) {
+                                    console.error("Restore Event Failed:", err);
+                                    // Revert optimistic update on error
+                                    revertOptimisticDeletedUpdate(previousDeletedEvents);
+                                    Alert.alert("Error", "Failed to restore event. Please try again.");
+                                }
+                            })();
+                        } catch (error: any) {
+                            console.error('❌ Error in handleRestoreEvent:', error);
+                            // Revert optimistic update on error
+                            revertOptimisticDeletedUpdate(previousDeletedEvents);
+                            Alert.alert('Error', error?.message || 'Failed to restore event. Please try again.');
+                        }
                     },
                 },
             ]
@@ -146,10 +180,101 @@ const DeletedEventsScreen: React.FC = () => {
                     text: 'Delete Forever',
                     style: 'destructive',
                     onPress: async () => {
-                        blockchainService.deleteEventPermanent(event.uid, activeAccount, token, api);
-                        // await getUserEvents(activeAccount.userName, api);
-                        // navigation.goBack();
-                        console.log('Permanently deleting event:', event);
+                        // Store current deleted events for potential revert
+                        const previousDeletedEvents = [...(deletedUserEvents || [])];
+                        
+                        // ✅ START CONTRACT CALLS IMMEDIATELY (before optimistic update) for wallet auth
+                        // Pre-fetch data in parallel to trigger wallet auth as fast as possible
+                        const publicKeyPromise = blockchainService.hostContract.methods
+                            .getPublicKeyOfUser(activeAccount?.userName)
+                            .call()
+                            .catch(err => {
+                                console.warn('Pre-fetch public key failed, will fetch later:', err);
+                                return null;
+                            });
+
+                        const allEventsPromise = blockchainService.getAllEvents(activeAccount.userName)
+                            .catch(err => {
+                                console.warn('Pre-fetch events failed, will fetch later:', err);
+                                return { events: [] };
+                            });
+
+                        // ✅ OPTIMISTIC UPDATE: Remove from deleted events immediately (instant UI update)
+                        optimisticallyPermanentDeleteEvent(event.uid);
+                        
+                        // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background (non-blocking)
+                        (async () => {
+                            try {
+                                // ✅ Wait for pre-fetched data in parallel
+                                const [publicKey, allEvents] = await Promise.all([publicKeyPromise, allEventsPromise]);
+                                
+                                // Find the event and its UUID
+                                const selected = (allEvents.events || []).find((ev: any) =>
+                                    ev && (ev.uid === event.uid)
+                                );
+
+                                if (!selected) {
+                                    throw new Error('Event not found');
+                                }
+
+                                // Prepare event data for permanent delete (same as blockchain service)
+                                const listValue = (selected.list || []).filter((data: any) =>
+                                    !(data.key === "isDeleted" || data.key === "deletedTime")
+                                );
+
+                                const updatedEvent = {
+                                    ...selected,
+                                    list: [
+                                        ...listValue,
+                                        { key: "isDeleted", value: "true" },
+                                        { key: "isPermanentDelete", value: "true" },
+                                        { key: "deletedTime", value: moment.utc().format("YYYYMMDDTHHmmss") }
+                                    ]
+                                };
+
+                                const uid = updatedEvent.uid;
+                                const uuid = selected.uuid;
+
+                                // Prepare encryption data
+                                const conferencingData = null;
+                                const metadata = buildEventMetadata(updatedEvent as any, conferencingData);
+                                const eventParams = prepareEventForBlockchain(updatedEvent as any, metadata, uid);
+                                const encryptionData = JSON.stringify(eventParams);
+
+                                // ✅ TRIGGER WALLET AUTHENTICATION IMMEDIATELY (like create/update)
+                                // Start encryption as soon as we have public key - this shows the wallet modal FAST
+                                // This triggers wallet authentication modal immediately
+                                if (publicKey) {
+                                    console.log('🔐 Triggering wallet authentication for permanent delete...');
+                                    // Start encryption immediately - this triggers wallet auth modal
+                                    // Don't await - let it run in parallel with blockchain operations
+                                    encryptWithNECJS(
+                                        encryptionData,
+                                        publicKey,
+                                        token,
+                                        [uuid] // Use the existing UUID
+                                    ).then(() => {
+                                        console.log('✅ Wallet authentication triggered for permanent delete');
+                                    }).catch(err => {
+                                        console.error('❌ Early encryption failed (will retry in blockchain service):', err);
+                                    });
+                                } else {
+                                    console.warn('⚠️ No public key available for wallet authentication');
+                                }
+
+                                // ✅ Continue with blockchain operations (they will also encrypt, but auth is already triggered)
+                                // Wallet auth modal should already be showing from the early encryption call above
+                                await blockchainService.deleteEventPermanent(event.uid, activeAccount, token, api);
+                                
+                                // No refresh needed - optimistic update already removed it from UI
+                                // Skip getUserEvents to avoid loading screen - UI is already correct
+                            } catch (err) {
+                                console.error("Permanent Delete Event Failed:", err);
+                                // Revert optimistic update on error
+                                revertOptimisticDeletedUpdate(previousDeletedEvents);
+                                Alert.alert("Error", "Failed to permanently delete event. Please try again.");
+                            }
+                        })();
                     },
                 },
             ]
