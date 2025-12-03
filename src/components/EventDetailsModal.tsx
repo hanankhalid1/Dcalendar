@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
     Modal,
     View,
@@ -7,7 +7,9 @@ import {
     StyleSheet,
     ScrollView,
     Dimensions,
+    Alert,
 } from 'react-native';
+import Clipboard from '@react-native-clipboard/clipboard';
 import LinearGradient from 'react-native-linear-gradient';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Feather from 'react-native-vector-icons/Feather';
@@ -90,7 +92,37 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     const getLocation = () => {
         if (!event.list) return null;
         const locationItem = event.list.find((item: any) => item.key === 'location');
+        const locationType = event.list.find((item: any) => item.key === 'locationType');
+        // Only return location if it's not a meeting link (not google or zoom)
+        if (locationItem && locationType && (locationType.value === 'google' || locationType.value === 'zoom')) {
+            return null; // This is a meeting link, not a physical location
+        }
         return locationItem ? locationItem.value : null;
+    };
+
+    const getMeetingLink = () => {
+        if (!event.list) return null;
+        const locationType = event.list.find((item: any) => item.key === 'locationType');
+        if (locationType && (locationType.value === 'google' || locationType.value === 'zoom')) {
+            const locationItem = event.list.find((item: any) => item.key === 'location');
+            return locationItem ? locationItem.value : null;
+        }
+        return null;
+    };
+
+    const getMeetingLinkType = () => {
+        if (!event.list) return null;
+        const locationType = event.list.find((item: any) => item.key === 'locationType');
+        return locationType ? locationType.value : null;
+    };
+
+    const handleCopyLink = async (link: string) => {
+        try {
+            await Clipboard.setString(link);
+            Alert.alert('Copied', 'Meeting link copied to clipboard');
+        } catch (error) {
+            Alert.alert('Error', 'Failed to copy link');
+        }
     };
 
     const getOrganizer = () => {
@@ -134,6 +166,34 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
             </View>
         </View>
     );
+
+    const renderMeetingLinkRow = (link: string, linkType: string) => {
+        const isGoogleMeet = linkType === 'google' || link.includes('meet.google.com');
+        const isZoom = linkType === 'zoom' || link.includes('zoom.us');
+        const iconName = isGoogleMeet ? 'video-call' : isZoom ? 'video' : 'link';
+        
+        return (
+            <View style={styles.detailRow}>
+                <View style={styles.iconWrapper}>
+                    {renderIconWithGradient(iconName, 18)}
+                </View>
+                <View style={styles.detailContent}>
+                    <Text style={styles.detailLabel}>Meeting Link</Text>
+                    <View style={styles.meetingLinkContainer}>
+                        <Text style={styles.meetingLinkText} numberOfLines={1}>
+                            {link}
+                        </Text>
+                        <TouchableOpacity
+                            style={styles.copyButton}
+                            onPress={() => handleCopyLink(link)}
+                        >
+                            <Feather name="copy" size={16} color={Colors.primaryblue} />
+                        </TouchableOpacity>
+                    </View>
+                </View>
+            </View>
+        );
+    };
 
     const renderGuestAvatar = (email: string, index: number) => {
         const initial = email.charAt(0).toUpperCase();
@@ -214,7 +274,12 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                             )
                         )}
 
-                        {/* Location */}
+                        {/* Meeting Link - Separate from Location */}
+                        {getMeetingLink() && (
+                            renderMeetingLinkRow(getMeetingLink(), getMeetingLinkType() || '')
+                        )}
+
+                        {/* Location - Only show if it's not a meeting link */}
                         {getLocation() && (
                             renderDetailRow(
                                 renderIcon('map-pin', 18),
@@ -380,6 +445,21 @@ const styles = StyleSheet.create({
         color: Colors.gray500,
         textAlign: 'center',
         maxWidth: 80,
+    },
+    meetingLinkContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginTop: 4,
+    },
+    meetingLinkText: {
+        fontSize: 16,
+        fontFamily: Fonts.regular,
+        color: Colors.primaryblue,
+        flex: 1,
+        marginRight: 8,
+    },
+    copyButton: {
+        padding: 4,
     },
 });
 

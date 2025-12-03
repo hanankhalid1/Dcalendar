@@ -50,7 +50,7 @@ import CustomAlert from '../components/CustomAlert';
 const HomeScreen = () => {
     const navigation = useNavigation<AppNavigationProp>();
     const { setCurrentMonthByIndex } = useCalendarStore();
-    const { selectedTimeZone } = useSettingsStore();
+    const { selectedTimeZone, selectedDay } = useSettingsStore();
     // const [currentView, setCurrentView] = useState('Week');
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const { api } = useApiClient();
@@ -447,12 +447,31 @@ const HomeScreen = () => {
         }
 
         if (view === 'Week') {
-            // Get start and end of current week
+            // ✅ Helper function to convert day name to numeric value (0=Sunday, 1=Monday, etc.)
+            const getDayNumber = (dayName: string): number => {
+                const dayMap: { [key: string]: number } = {
+                    'Sunday': 0,
+                    'Monday': 1,
+                    'Tuesday': 2,
+                    'Wednesday': 3,
+                    'Thursday': 4,
+                    'Friday': 5,
+                    'Saturday': 6,
+                };
+                return dayMap[dayName] || 0;
+            };
+            
+            const startDayNumber = getDayNumber(selectedDay);
+            
+            // Get start and end of current week based on setting
             const startOfWeek = new Date(today);
-            startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
+            const todayDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+            let diff = todayDay - startDayNumber;
+            if (diff < 0) diff += 7; // If negative, add 7 to go back to previous week
+            startOfWeek.setDate(today.getDate() - diff);
 
-            const endOfWeek = new Date(today);
-            endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
+            const endOfWeek = new Date(startOfWeek);
+            endOfWeek.setDate(startOfWeek.getDate() + 6); // 6 days after start
 
             return allEvents.filter(dayGroup => {
                 const dayDate = new Date(dayGroup.events[0]?.date);
@@ -488,6 +507,7 @@ const HomeScreen = () => {
                 onAction1Press={handleAction1Press}
                 onAction2Press={handleAction2Press}
                 filterType={filterType}  // ✅ Add this line
+                isDrawerOpen={isDrawerOpen}  // Pass drawer state to close dropdowns
             />
 
             {/* Left edge touch area for drawer */}
@@ -497,7 +517,11 @@ const HomeScreen = () => {
                 activeOpacity={0.1}
             />
 
-            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+            <ScrollView 
+                style={styles.content} 
+                contentContainerStyle={styles.scrollContent}
+                showsVerticalScrollIndicator={false}
+            >
                 {loading ? (
                     <CustomLoader />
                 ) : events.length === 0 ? (
@@ -581,8 +605,10 @@ const styles = StyleSheet.create({
     },
     content: {
         flex: 1,
+    },
+    scrollContent: {
         paddingTop: spacing.lg,
-
+        paddingBottom: 100, // Add padding to prevent content from being cut off by FloatingActionButton
     },
     leftEdgeTouchArea: {
         position: 'absolute',

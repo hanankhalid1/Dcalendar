@@ -215,164 +215,175 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
   };
 
   // Zoom Integration Handlers (Following Google pattern)
-  const handleZoomConnect = async () => {
-    try {
-      if (zoomIntegration.isConnected) {
-        return Alert.alert('Disconnect Zoom', 'Do you want to disconnect?', [
-          { text: 'Cancel', style: 'cancel' },
-          { text: 'Disconnect', style: 'destructive', onPress: handleZoomDisconnect },
-        ]);
-      }
+ const handleZoomConnect = async () => {
+  try {
+    if (zoomIntegration.isConnected) {
+      return Alert.alert('Disconnect Zoom', 'Do you want to disconnect?', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Disconnect', style: 'destructive', onPress: handleZoomDisconnect },
+      ]);
+    }
 
-      setIsLoadingZoom(true);
+    setIsLoadingZoom(true);
 
-      // Get username from activeAccount (same as Google)
-      const userName = account?.userName ||
-        account?.user_name ||
-        account?.username ||
-        account?.name;
+    // Get username
+    const userName =
+      account?.userName ||
+      account?.user_name ||
+      account?.username ||
+      account?.name;
 
-      if (!userName) {
-        Alert.alert('Error', 'Cannot find username. Please ensure you are logged in.');
-        setIsLoadingZoom(false);
-        return;
-      }
+    if (!userName) {
+      Alert.alert('Error', 'Cannot find username.');
+      setIsLoadingZoom(false);
+      return;
+    }
 
-      try {
-        // Get Zoom OAuth deep link from backend (returns ncog://zoom/auth?user=335)
-        const response = await api('GET', `/zoom/auth?platform=mobile`);
-        const url = response.data?.data || response.data;
-        const zoomAuthUrl = typeof url === 'string' ? url : url?.authUrl || url?.url;
-
-        if (!zoomAuthUrl) {
-          Alert.alert('Error', 'No valid Zoom auth URL found');
-          setIsLoadingZoom(false);
-          return;
-        }
-
-        console.log('Opening Zoom auth deep link:', zoomAuthUrl);
-
-        // COMMENTED OUT: Zoom OAuth callback handling
-        // Handle ncog:// deep link (similar to Google's serverAuthCode pattern)
-        // let subscription: any = null;
-        // let callbackHandled = false;
-
-        // COMMENTED OUT: Listen for OAuth callback URL with code
-        // const handleCallback = async (event: { url: string }) => {
-        //   if (callbackHandled) return;
-        //   
-        //   const callbackUrl = event.url;
-        //   console.log('🔗 Zoom OAuth callback received:', callbackUrl);
-
-        //   // Extract code from callback URL (Zoom redirects with ?code=...)
-        //   if (callbackUrl.includes('zoom-callback') || callbackUrl.includes('code=')) {
-        //     callbackHandled = true;
-        //     
-        //     if (subscription) {
-        //       subscription.remove();
-        //     }
-        //     
-        //     try {
-        //       // Parse code from URL
-        //       const urlObj = new URL(callbackUrl);
-        //       const params = new URLSearchParams(urlObj.search);
-        //       const code = params.get('code');
-        //       const error = params.get('error');
-
-        //       if (error) {
-        //         Alert.alert('Authentication Error', params.get('error_description') || error);
-        //         setIsLoadingZoom(false);
-        //         return;
-        //       }
-
-        //       if (!code) {
-        //         Alert.alert('Error', 'Failed to get authorization code from Zoom');
-        //         setIsLoadingZoom(false);
-        //         return;
-        //       }
-
-        //       console.log('Calling Zoom callback API...');
-
-        //       // Send code to backend (same pattern as Google)
-        //       const callbackResponse = await api('POST', '/zoom/callback', {
-        //         code: code,
-        //         username: userName,
-        //       });
-
-        //       console.log('Zoom Callback API Response:', safeStringify(callbackResponse.data));
-
-        //       // Check if the response was successful
-        //       if (callbackResponse.data.status && callbackResponse.data.data) {
-        //         const { access_token, refresh_token, email, fullName } = callbackResponse.data.data;
-
-        //         // Store tokens in state (same as Google)
-        //         connectZoom({
-        //           accessToken: access_token,
-        //           refreshToken: refresh_token,
-        //           email: email,
-        //           fullName: fullName,
-        //         });
-
-        //         Alert.alert('Success', 'Zoom account connected successfully!');
-        //       } else {
-        //         Alert.alert('Failed', 'Could not connect Zoom account');
-        //       }
-        //     } catch (err: any) {
-        //       console.error('Zoom callback error:', err);
-        //       Alert.alert('Error', err.response?.data?.message || 'Failed to connect Zoom account');
-        //     } finally {
-        //       setIsLoadingZoom(false);
-        //     }
-        //   }
-        // };
-
-        // COMMENTED OUT: Set up deep link listener for callback
-        // subscription = Linking.addEventListener('url', handleCallback);
-
-        // Open ncog:// deep link (this will open NCOG app or handle Zoom auth)
-        // Try to open directly - canOpenURL might not recognize custom schemes
+    // 1️⃣ Get Zoom OAuth URL from backend
+    const response = await api('GET', `/zoom/auth?platform=mobile`);
+    
+    // DDD Log: Log the API response
+    console.log('DDD Log:', JSON.stringify(response.data, null, 2));
+    
+    // ✅ Once we get the response with status: true, show connected message and open link
+    if (response.data?.status === true) {
+      // Update Zoom connection state so button shows "Connected"
+      connectZoom({
+        accessToken: 'connected',
+        refreshToken: '',
+        email: '',
+        fullName: '',
+      });
+      setIsLoadingZoom(false);
+      Alert.alert('Success', 'Zoom connected!');
+      
+      // Open the deep link from response
+      const zoomAuthUrl = response.data?.data;
+      if (zoomAuthUrl) {
         try {
           await Linking.openURL(zoomAuthUrl);
-          console.log('✅ Opened Zoom auth deep link:', zoomAuthUrl);
-          console.log('⚠️ NOTE: Callback handling is disabled - connection status will not update automatically');
-          // COMMENTED OUT: Keep listener active - callback will come back via deep link
-          
-          // Reset loading after opening (since callback won't be handled)
-          setTimeout(() => {
-            setIsLoadingZoom(false);
-          }, 2000);
+          console.log('✅ Opened Zoom auth link:', zoomAuthUrl);
         } catch (error: any) {
           console.error('Failed to open Zoom auth URL:', error);
-          // COMMENTED OUT: if (subscription) { subscription.remove(); }
-          Alert.alert('Error', 'Unable to open Zoom authentication. Please make sure the NCOG app is installed.');
-          setIsLoadingZoom(false);
         }
-      } catch (error: any) {
-        console.error('Zoom OAuth error:', error);
-        Alert.alert('Error', error.message || 'Failed to connect Zoom');
-        setIsLoadingZoom(false);
       }
-    } catch (error: any) {
-      console.error('Zoom error:', error);
-      Alert.alert('Error', 'Failed to connect Zoom');
-      setIsLoadingZoom(false);
+      return;
     }
-  };
+    
+    const zoomAuthUrl =
+      response.data?.data ||
+      response.data?.url ||
+      response.data?.authUrl;
 
-  const handleZoomDisconnect = async () => {
-    try {
-      setIsLoadingZoom(true);
-      await api('PUT', '/zoom/disconnect', {});
-      disconnectZoom();
-      Alert.alert('Disconnected', 'Zoom account disconnected successfully');
-    } catch (error: any) {
-      console.error('Zoom disconnect error:', error);
-      const errorMsg = error.response?.data?.message || error.message || 'Failed to disconnect';
-      Alert.alert('Error', errorMsg);
-    } finally {
+    if (!zoomAuthUrl) {
+      Alert.alert('Error', 'Zoom authorization link missing.');
       setIsLoadingZoom(false);
+      return;
     }
-  };
+
+     // 2️⃣ Listen for callback from Zoom (NO wallet authentication)
+     let handled = false;
+     let subscription: any = null;
+
+     const handleCallback = async ({ url }: { url: string }) => {
+       // Only process Zoom OAuth callbacks (skip wallet-related URLs)
+       if (!url || handled) return;
+       
+       // Check if this is a Zoom callback URL
+       const isZoomCallback = 
+         url.includes('zoom-callback') || 
+         url.includes('zoom') && url.includes('code=') ||
+         url.includes('dcalendar://zoom') ||
+         url.includes('oauth-callback') && url.includes('zoom');
+       
+       if (!isZoomCallback) {
+         // Not a Zoom callback, ignore it
+         return;
+       }
+
+       handled = true;
+       subscription?.remove();
+
+       try {
+         console.log('🔗 Zoom OAuth callback received:', url);
+         
+         const urlObj = new URL(url);
+         const params = new URLSearchParams(urlObj.search);
+         const code = params.get('code');
+         const error = params.get('error');
+
+         if (error) {
+           Alert.alert('Error', 'Zoom authentication failed.');
+           setIsLoadingZoom(false);
+           return;
+         }
+
+         if (!code) {
+           Alert.alert('Error', 'Authorization code not received.');
+           setIsLoadingZoom(false);
+           return;
+         }
+
+         console.log('📤 Sending Zoom code to backend...');
+
+         // 3️⃣ Send code to backend (simple API call, NO wallet authentication)
+         const callbackResponse = await api('POST', '/zoom/callback', {
+           code,
+           username: userName,
+         });
+
+         console.log('✅ Zoom callback response received');
+
+         if (callbackResponse.data?.status && callbackResponse.data?.data) {
+           const data = callbackResponse.data.data;
+
+           // Store tokens in state (simple connection, NO wallet)
+           connectZoom({
+             accessToken: data.access_token,
+             refreshToken: data.refresh_token,
+             email: data.email,
+             fullName: data.fullName,
+           });
+
+           Alert.alert('Success', 'Zoom connected successfully!');
+         } else {
+           Alert.alert('Error', 'Failed to connect Zoom.');
+         }
+       } catch (err: any) {
+         console.error('❌ Zoom callback error:', err);
+         Alert.alert('Error', err.response?.data?.message || 'Zoom connection failed.');
+       } finally {
+         setIsLoadingZoom(false);
+       }
+     };
+
+     // Set up listener for Zoom OAuth callback (NO wallet involved)
+     subscription = Linking.addEventListener('url', handleCallback);
+
+    // 4️⃣ Open Zoom login page
+    await Linking.openURL(zoomAuthUrl);
+  } catch {
+    Alert.alert('Error', 'Zoom connection failed.');
+    setIsLoadingZoom(false);
+  }
+};
+
+
+// ----------------------------
+// Disconnect (simple)
+// ----------------------------
+const handleZoomDisconnect = async () => {
+  try {
+    setIsLoadingZoom(true);
+    await api('PUT', '/zoom/disconnect', {});
+    disconnectZoom();
+    Alert.alert('Disconnected', 'Zoom account disconnected.');
+  } catch {
+    Alert.alert('Error', 'Failed to disconnect Zoom.');
+  } finally {
+    setIsLoadingZoom(false);
+  }
+};
 
 
   return (
@@ -494,7 +505,7 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
               >
                 {zoomIntegration.isConnected ? (
                   <View style={styles.disconnectButtonContent}>
-                    <Text style={styles.disconnectButtonText}>Disconnect</Text>
+                    <Text style={styles.disconnectButtonText}>Connected</Text>
                   </View>
                 ) : (
                   <LinearGradient

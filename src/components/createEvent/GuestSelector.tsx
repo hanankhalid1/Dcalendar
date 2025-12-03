@@ -102,7 +102,8 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   );
   const hasSearchTerm = normalizedQuery.length > 0;
   const hasNoResults = hasSearchTerm && filteredGuests.length === 0 && guests.length > 0;
-  const isAddDisabled = selectedGuests.length === 0 || disabled || hasNoResults;
+  // Allow adding if guests are selected, even if current search has no results
+  const isAddDisabled = selectedGuests.length === 0 || disabled;
   return (
     <View style={styles.section}>
       <Text style={styles.sectionTitle}>Guests</Text>

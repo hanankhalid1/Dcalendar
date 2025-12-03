@@ -189,8 +189,10 @@ const DaySelectionModal = React.memo(({ visible, onClose, selectedDay, onSelectD
   const handleConfirm = React.useCallback(async () => {
     // Only save when Confirm is clicked
     if (tempSelectedDay !== selectedDay) {
+      console.log('🔄 Updating start of week from', selectedDay, 'to', tempSelectedDay);
       // Update local store (Zustand persist will save to AsyncStorage automatically)
       onSelectDay(tempSelectedDay);
+      console.log('✅ Start of week updated in store:', tempSelectedDay);
 
       // Save to blockchain as background sync
       if (account?.userName) {
@@ -207,6 +209,8 @@ const DaySelectionModal = React.memo(({ visible, onClose, selectedDay, onSelectD
           setIsSaving(false);
         });
       }
+    } else {
+      console.log('ℹ️ Start of week unchanged:', selectedDay);
     }
     onClose();
   }, [tempSelectedDay, selectedDay, account?.userName, onSelectDay, onClose]);

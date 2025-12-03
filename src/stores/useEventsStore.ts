@@ -213,13 +213,17 @@ export const useEventsStore = create<EventsStore>()(
                 // Check if event already exists (avoid duplicates)
                 const exists = currentEvents.some(e => e.uid === event.uid);
                 if (!exists) {
+                    // Use the event's list if provided (it should already have metadata)
+                    // Otherwise create an empty list
+                    const eventList = event.list || [];
+                    // Check if optimistic flag already exists
+                    const hasOptimistic = eventList.some(item => item.key === '_optimistic');
                     // Mark as optimistic so it's preserved during getUserEvents
                     const optimisticEvent = {
                         ...event,
-                        list: [
-                            ...(event.list || []),
-                            { key: '_optimistic', value: 'true' }
-                        ]
+                        list: hasOptimistic 
+                            ? eventList 
+                            : [...eventList, { key: '_optimistic', value: 'true' }]
                     };
                     const newEvents = [...currentEvents, optimisticEvent];
                     // Filter and set events (bypassing setUserEvents to avoid recursion)
@@ -230,6 +234,7 @@ export const useEventsStore = create<EventsStore>()(
                     });
                     set({ userEvents: activeEvents });
                     console.log('✅ Optimistically added event:', event.uid, '- Total events:', activeEvents.length);
+                    console.log('✅ Added event list:', optimisticEvent.list);
                 }
             },
             
@@ -237,15 +242,26 @@ export const useEventsStore = create<EventsStore>()(
                 const currentEvents = get().userEvents;
                 const updatedEvents = currentEvents.map(event => {
                     if (event.uid === uid) {
-                        // Preserve optimistic flag if it exists
-                        const hasOptimistic = event.list?.some(item => item.key === '_optimistic');
-                        const updatedList = hasOptimistic 
-                            ? event.list 
-                            : [...(event.list || []), { key: '_optimistic', value: 'true' }];
+                        // If updates includes a new list, use it (it should already have metadata)
+                        // Otherwise, preserve existing list and add optimistic flag
+                        let finalList: Array<{key: string; value: string}>;
+                        if (updates.list && updates.list.length > 0) {
+                            // Use the new list from updates, but ensure optimistic flag is present
+                            const hasOptimistic = updates.list.some(item => item.key === '_optimistic');
+                            finalList = hasOptimistic 
+                                ? updates.list 
+                                : [...updates.list, { key: '_optimistic', value: 'true' }];
+                        } else {
+                            // No new list provided, preserve existing list and add optimistic flag
+                            const hasOptimistic = event.list?.some(item => item.key === '_optimistic');
+                            finalList = hasOptimistic 
+                                ? event.list 
+                                : [...(event.list || []), { key: '_optimistic', value: 'true' }];
+                        }
                         return { 
                             ...event, 
                             ...updates,
-                            list: updatedList
+                            list: finalList
                         };
                     }
                     return event;
@@ -258,6 +274,7 @@ export const useEventsStore = create<EventsStore>()(
                 });
                 set({ userEvents: activeEvents });
                 console.log('✅ Optimistically updated event:', uid, '- Total events:', activeEvents.length);
+                console.log('✅ Updated event list:', updatedEvents.find(e => e.uid === uid)?.list);
             },
             
             optimisticallyDeleteEvent: (uid: string) => {

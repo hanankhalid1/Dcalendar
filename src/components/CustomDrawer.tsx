@@ -784,7 +784,7 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     bottom: 0,
-    zIndex: 1000,
+    zIndex: 1005, // Higher than month dropdown (1002) to ensure drawer appears on top
     flexDirection: 'row',
   },
   backdrop: {
@@ -800,6 +800,8 @@ const styles = StyleSheet.create({
     left: 0,
     top: 0,
     paddingBottom: scaleHeight(80),
+    zIndex: 1006, // Higher than overlay to ensure drawer content is on top
+    elevation: 15, // Higher elevation for Android
   },
   menuBackdrop: {
     position: 'absolute',

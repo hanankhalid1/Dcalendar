@@ -75,7 +75,6 @@ const CreateEventScreen = () => {
     userEvents 
   } = useEventsStore();
   const { googleIntegration, zoomIntegration } = useAuthStore();
-  const currentTimezone = useSettingsStore();
   // Initialize blockchain service and get contract instance
   // Form state
   const [title, setTitle] = useState(editEventData?.title ?? '');
@@ -135,7 +134,16 @@ const CreateEventScreen = () => {
   });
   const [showEndsDatePicker, setShowEndsDatePicker] = useState(false);
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
-  const [selectedTimezone, setSelectedTimezone] = useState(currentTimezone);
+  // Initialize timezone: use from editEventData if editing, otherwise use current system timezone
+  const getInitialTimezone = () => {
+    if (editEventData?.timezone) {
+      return editEventData.timezone;
+    }
+    const currentTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timezoneData = timezones.find(tz => tz.id === currentTz);
+    return timezoneData?.id || currentTz;
+  };
+  const [selectedTimezone, setSelectedTimezone] = useState<string>(getInitialTimezone());
   const [timezoneSearchQuery, setTimezoneSearchQuery] = useState('');
   const [searchQuery, setsearchQuery] = useState("")
   const [locationSuggestions, setLocationSuggestions] = React.useState<any[]>([]);
@@ -615,6 +623,39 @@ const CreateEventScreen = () => {
     validateDateTime();
   }, [validateDateTime]);
 
+  // Auto-calculate end time whenever start time changes (to ensure it's always 30 min after)
+  useEffect(() => {
+    if (selectedStartTime && selectedStartTime.trim() !== '' && selectedStartDate && !isAllDayEvent) {
+      const calculatedEndTime = addMinutesToTime(selectedStartTime, 30);
+      const normalizedEndTime = calculatedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      
+      if (endTimeMatch) {
+        let endHours = parseInt(endTimeMatch[1], 10);
+        const endPeriod = endTimeMatch[3].toUpperCase();
+        
+        // Only update if end time is different from current (to avoid infinite loops)
+        if (selectedEndTime !== calculatedEndTime) {
+          setSelectedEndTime(calculatedEndTime);
+          
+          // If end time is 12:00 AM, set end date to next day
+          if (endPeriod === 'AM' && endHours === 12) {
+            if (selectedEndDate && selectedEndDate.getTime() !== selectedStartDate.getTime() + 86400000) {
+              const nextDay = new Date(selectedStartDate);
+              nextDay.setDate(nextDay.getDate() + 1);
+              setSelectedEndDate(nextDay);
+            }
+          } else {
+            // End time is same day, ensure end date matches start date
+            if (selectedEndDate && selectedEndDate.getTime() !== selectedStartDate.getTime()) {
+              setSelectedEndDate(selectedStartDate);
+            }
+          }
+        }
+      }
+    }
+  }, [selectedStartTime, selectedStartDate, isAllDayEvent]); // Note: intentionally not including selectedEndTime to avoid loops
+
   useFocusEffect(
     React.useCallback(() => {
       // Just show the video conferencing options when Google is connected
@@ -892,16 +933,30 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   };
 
   const handleTimezoneSelect = (timezoneId: string) => {
-    setSelectedTimezone(timezoneId);
+    // Close modal first to prevent visual glitch
     setShowTimezoneModal(false);
     setTimezoneSearchQuery('');
+    // Update timezone after modal animation completes to prevent glitch
+    // Use requestAnimationFrame to ensure smooth transition
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setSelectedTimezone(timezoneId);
+      });
+    });
   };
 
   const handleUseCurrentTimezone = () => {
     const currentTz = getCurrentTimezone();
-    setSelectedTimezone(currentTz.id);
+    // Close modal first to prevent visual glitch
     setShowTimezoneModal(false);
     setTimezoneSearchQuery('');
+    // Update timezone after modal animation completes to prevent glitch
+    // Use requestAnimationFrame to ensure smooth transition
+    requestAnimationFrame(() => {
+      requestAnimationFrame(() => {
+        setSelectedTimezone(currentTz.id);
+      });
+    });
   };
 
   const getSelectedTimezoneData = () => {
@@ -1142,40 +1197,45 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         console.log('>>>>>>>> CALCULATING END TIME IN handleDateTimeSelect <<<<<<<<', {
           startTime: time,
           calculatedEndTime: suggestedEndTime,
-          previousEndTime: selectedEndTime
+          previousEndTime: selectedEndTime,
+          startDate: date.toISOString()
         });
-        setSelectedEndTime(suggestedEndTime);
         
         // Check if end time rolled over to next day (12:00 AM)
-        // If start time is 11:30 PM or later, end time will be 12:00 AM (next day)
-        const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-        const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-        if (timeMatch) {
-          let hours = parseInt(timeMatch[1], 10);
-          const minutes = parseInt(timeMatch[2], 10);
-          const period = timeMatch[3].toUpperCase();
-          if (period === 'PM' && hours !== 12) hours += 12;
-          if (period === 'AM' && hours === 12) hours = 0;
-          
-          // If start time is 11:30 PM (23:30) or later, end time will be next day
-          if (hours >= 23 || (hours === 23 && minutes >= 30)) {
+        // Only add 1 day if the END time (after adding 30 min) is 12:00 AM or later
+        const normalizedEndTime = suggestedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+        const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (endTimeMatch) {
+          let endHours = parseInt(endTimeMatch[1], 10);
+          const endPeriod = endTimeMatch[3].toUpperCase();
+          // If end time is 12:00 AM, it means it rolled over to next day
+          if (endPeriod === 'AM' && endHours === 12) {
             // Add 1 day to end date
             const nextDay = new Date(date);
             nextDay.setDate(nextDay.getDate() + 1);
             setSelectedEndDate(nextDay);
-          } else if (selectedEndDate && selectedEndDate.getTime() !== date.getTime()) {
-            // If end date was previously set to next day but start time changed to earlier,
-            // reset end date to same as start date
+            console.log('>>>>>>>> END TIME ROLLED OVER - Setting end date to next day:', nextDay.toISOString());
+          } else {
+            // End time is same day, ensure end date matches start date
             setSelectedEndDate(date);
+            console.log('>>>>>>>> END TIME SAME DAY - Setting end date to start date:', date.toISOString());
           }
         }
+        
+        // Always set the calculated end time (this ensures it's always 30 min after start)
+        setSelectedEndTime(suggestedEndTime);
+        console.log('>>>>>>>> SET END TIME TO:', suggestedEndTime);
       } else {
         // If time is empty, clear end time too
         setSelectedEndTime('');
       }
     } else {
+      // When "To" is selected, set the date and time
       setSelectedEndDate(date);
       setSelectedEndTime(time);
+      
+      // If start time exists and we're setting end time, validate that end is after start
+      // But don't auto-calculate here - let user set their own end time
       // Clear errors when date/time is selected
       setEndDateError('');
       setEndTimeError('');
@@ -1203,20 +1263,21 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       newEndTime = addMinutesToTime(time, 30);
       
       // Check if end time rolled over to next day (12:00 AM)
-      const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      if (timeMatch) {
-        let hours = parseInt(timeMatch[1], 10);
-        const period = timeMatch[3].toUpperCase();
-        if (period === 'PM' && hours !== 12) hours += 12;
-        if (period === 'AM' && hours === 12) hours = 0;
-        
-        // If start time is 11:30 PM (23:30) or later, end time will be next day
-        if (hours >= 23 || (hours === 23 && parseInt(timeMatch[2], 10) >= 30)) {
+      // Only add 1 day if the END time (after adding 30 min) is 12:00 AM or later
+      const normalizedEndTime = newEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (endTimeMatch) {
+        let endHours = parseInt(endTimeMatch[1], 10);
+        const endPeriod = endTimeMatch[3].toUpperCase();
+        // If end time is 12:00 AM, it means it rolled over to next day
+        if (endPeriod === 'AM' && endHours === 12) {
           // Add 1 day to end date
           const nextDay = new Date(date);
           nextDay.setDate(nextDay.getDate() + 1);
           newEndDate = nextDay;
+        } else {
+          // End time is same day, ensure end date matches start date
+          newEndDate = date;
         }
       }
     }
@@ -1350,11 +1411,22 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       endDateTime.setHours(finalEndHours, endMinutes, 0, 0);
 
       // Validate that end date/time is strictly after start date/time
-      if (endDateTime <= startDateTime) {
+      // If end time is 12:00 AM, it means it's on the next day, so add 1 day to endDateTime for comparison
+      const endDateTimeForComparison = new Date(endDateTime);
+      if (endPeriod === 'AM' && endHours === 12) {
+        endDateTimeForComparison.setDate(endDateTimeForComparison.getDate() + 1);
+      }
+      
+      if (endDateTimeForComparison <= startDateTime) {
         const startDateOnly = new Date(startDate);
         startDateOnly.setHours(0, 0, 0, 0);
         const endDateOnly = new Date(endDate);
         endDateOnly.setHours(0, 0, 0, 0);
+        
+        // If end time is 12:00 AM, it's actually on the next day
+        if (endPeriod === 'AM' && endHours === 12) {
+          endDateOnly.setDate(endDateOnly.getDate() + 1);
+        }
 
         let errorMessage = '';
         if (endDateOnly < startDateOnly) {
@@ -2168,7 +2240,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     // ✅ Auto-hide loading after 1.5 seconds (save operation continues in background)
     const loadingTimeout = setTimeout(() => {
       setIsLoading(false);
-    }, 1500);
+    }, 100);
     
     // ✅ Use requestAnimationFrame to ensure React processes the state update first
     // Then do validation and processing in the next frame
@@ -2263,15 +2335,8 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     // Store for potential revert
     const previousEvents = [...(userEvents || [])];
 
-    // ✅ STEP 1: OPTIMISTIC UPDATE - INSTANT UI UPDATE (SYNCHRONOUS)
-    if (mode === 'edit') {
-      optimisticallyUpdateEvent(minimalEventData.uid, minimalEventData);
-    } else {
-      optimisticallyAddEvent(minimalEventData as any);
-    }
-    
-    // ✅ STEP 2: PREPARE ALL DATA FOR ENCRYPTION (BEFORE NAVIGATION)
-    // Pre-compute everything needed for encryption to minimize delay
+    // ✅ STEP 2: PREPARE ALL DATA FOR OPTIMISTIC UPDATE (BEFORE OPTIMISTIC UPDATE)
+    // Pre-compute everything needed for metadata to include in optimistic update
     const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
     
     // Helper function to convert a value to seconds based on unit
@@ -2296,6 +2361,53 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         default: return `PT${numericValue}S`;
       }
     })();
+
+    // ✅ PREPARE METADATA FOR OPTIMISTIC UPDATE (BEFORE OPTIMISTIC UPDATE)
+    // Build metadata early so we can include it in the optimistic update
+    const conferencingDataForOptimistic = null;
+    const metadataForOptimistic = buildEventMetadata({
+      ...minimalEventData,
+      organizer: activeAccount?.email || activeAccount?.userName || activeAccount?.address || '',
+      guests: selectedGuests,
+      location: location.trim(),
+      locationType: selectedVideoConferencing,
+      meetingEventId: meetingEventId || '',
+      busy: selectedStatus || 'Busy',
+      visibility: selectedVisibility || 'Default Visibility',
+      notification: selectedNotificationType,
+      seconds: secondsValue,
+      trigger: triggerISO,
+      guest_permission: selectedPermission || 'Modify event',
+      timezone: selectedTimezone || 'UTC',
+      repeatEvent: selectedRecurrence !== 'Does not repeat' ? selectedRecurrence : undefined,
+      customRepeatEvent: undefined,
+    } as any, conferencingDataForOptimistic);
+    
+    // ✅ LOG METADATA FOR OPTIMISTIC UPDATE
+    console.log('🎯 OPTIMISTIC UPDATE - Metadata:', JSON.stringify(metadataForOptimistic, null, 2));
+    const guestMetadataForOptimistic = metadataForOptimistic.filter(item => item.key === 'guest');
+    console.log('👥 Guest Metadata for Optimistic Update:', JSON.stringify(guestMetadataForOptimistic, null, 2));
+    console.log('👥 Guest Metadata Count for Optimistic:', guestMetadataForOptimistic.length);
+
+    // ✅ STEP 1: OPTIMISTIC UPDATE - INSTANT UI UPDATE (SYNCHRONOUS)
+    // Include metadata in optimistic update so guests are visible immediately
+    const optimisticEventData = {
+      ...minimalEventData,
+      list: metadataForOptimistic, // Include full metadata with guests
+    };
+    
+    if (mode === 'edit') {
+      optimisticallyUpdateEvent(optimisticEventData.uid, optimisticEventData);
+    } else {
+      optimisticallyAddEvent(optimisticEventData as any);
+    }
+    
+    console.log('✅ OPTIMISTIC UPDATE - Event Data:', JSON.stringify({
+      ...optimisticEventData,
+      list: optimisticEventData.list,
+      guestItems: optimisticEventData.list?.filter((item: any) => item.key === 'guest') || [],
+      guestItemsCount: optimisticEventData.list?.filter((item: any) => item.key === 'guest').length || 0,
+    }, null, 2));
 
     // Prepare full event data NOW (before navigation)
     const fullEventData = {
@@ -2886,6 +2998,8 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   selectedVideoConferencing === 'google' &&
                   styles.videoConferencingButtonTextSelected,
                 ]}
+                numberOfLines={1}
+                ellipsizeMode="tail"
               >
                 Google Meet
               </Text>
@@ -4084,6 +4198,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize14,
     color: colors.blackText,
     fontWeight: '500',
+    flexShrink: 1,
   },
   videoConferencingButtonTextSelected: {
     color: Colors.primaryGreen,

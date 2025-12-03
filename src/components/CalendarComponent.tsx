@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../stores/useSetting';
@@ -205,10 +205,12 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
 
   // ✅ Reorder weekDays array based on start of week setting
   const baseWeekDays = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
-  const weekDays = [
-    ...baseWeekDays.slice(startOfWeekNumber),
-    ...baseWeekDays.slice(0, startOfWeekNumber)
-  ];
+  const weekDays = useMemo(() => {
+    return [
+      ...baseWeekDays.slice(startOfWeekNumber),
+      ...baseWeekDays.slice(0, startOfWeekNumber)
+    ];
+  }, [startOfWeekNumber, selectedDay]);
 
   const getDaysInMonth = (date: Date) => {
     const year = date.getFullYear();
@@ -369,7 +371,10 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
     onDateSelect?.(selectedDateObj);
   };
 
-  const days = getDaysInMonth(currentDate);
+  // ✅ Recalculate calendar days when selectedDay changes
+  const days = useMemo(() => {
+    return getDaysInMonth(currentDate);
+  }, [currentDate, selectedDay, startOfWeekNumber]);
 
   return (
     <View style={styles.container}>

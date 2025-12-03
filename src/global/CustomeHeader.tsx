@@ -34,6 +34,7 @@ interface HeaderProps {
   onMonthSelect?: (monthIndex: number) => void;
   onViewPress?: () => void;
   onViewSelect?: (view: string) => void;
+  isDrawerOpen?: boolean; // New prop to track drawer state
 }
 
 const CustomeHeader: React.FC<HeaderProps> = ({
@@ -50,10 +51,19 @@ const CustomeHeader: React.FC<HeaderProps> = ({
   onMonthSelect,
   onViewPress,
   onViewSelect,
+  isDrawerOpen = false, // Track drawer state
 }) => {
   // Dropdown states
   const [isMonthDropdownVisible, setIsMonthDropdownVisible] = useState(false);
   const [isViewDropdownVisible, setIsViewDropdownVisible] = useState(false);
+  
+  // Close dropdowns when drawer opens
+  React.useEffect(() => {
+    if (isDrawerOpen) {
+      setIsViewDropdownVisible(false);
+      setIsMonthDropdownVisible(false);
+    }
+  }, [isDrawerOpen]);
 
   // Selected values - use props if available, otherwise fallback to state
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);

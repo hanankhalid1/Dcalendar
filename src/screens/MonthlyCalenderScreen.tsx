@@ -837,10 +837,10 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
           // Delayed refresh in background (non-blocking, skip loading screen)
           setTimeout(() => {
             getUserEvents(account.userName, api, undefined, { skipLoading: true }).catch(err => {
-              console.error('Background event refresh failed:', err);
-              // If refresh fails, revert optimistic update
-              revertOptimisticUpdate(currentEvents);
-            });
+            console.error('Background event refresh failed:', err);
+            // If refresh fails, revert optimistic update
+            revertOptimisticUpdate(currentEvents);
+          });
           }, 2000);
         } catch (err) {
           console.error("Delete Event Failed:", err);
@@ -970,7 +970,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       >
         <View style={styles.calendarWrapper}>
           <Calendar
-            key={selectedDateString}
+            key={`${selectedDateString}-${firstDayNumber}`}
             current={selectedDateString}
             markedDates={markedDates}
             markingType="multi-period"
@@ -1239,7 +1239,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: spacing.xl,
+    paddingBottom: 100, // Add extra padding to prevent content from being cut off by FloatingActionButton
   },
   calendarWrapper: {
     marginHorizontal: spacing.md,
