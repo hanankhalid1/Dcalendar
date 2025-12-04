@@ -10,6 +10,7 @@ import {
   ActivityIndicator,
   Easing,
 } from 'react-native';
+import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CalenderIcon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation } from '@react-navigation/native';
@@ -21,6 +22,7 @@ import {
 } from '../utils/dimensions';
 
 import { colors, fontSize, spacing, shadows, borderRadius } from '../utils/LightTheme';
+import { Fonts } from '../constants/Fonts';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlockchainService } from '../services/BlockChainService';
@@ -29,7 +31,6 @@ import { useApiClient } from '../hooks/useApi';
 import { useToken } from '../stores/useTokenStore';
 import { useEventsStore } from '../stores/useEventsStore';
 import { Colors } from '../constants/Colors';
-import { Fonts } from '../constants/Fonts';
 
 interface CustomDrawerProps {
   isOpen: boolean;
@@ -456,7 +457,15 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               }}
               onLayout={e => setCreateBtnWindowLayout(e.nativeEvent.layout)}
             >
-              <Image source={require('../assets/images/createButton.png')} />
+              <LinearGradient
+                colors={['#18F06E', '#0B6DE0']}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.createButtonGradient}
+              >
+                <Icon name="plus" size={22} color={colors.white} />
+                <Text style={styles.createButtonLabel}>Create</Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
 
@@ -836,7 +845,23 @@ const styles = StyleSheet.create({
     fontWeight: '700',
   },
   createButtonText: {
-    alignSelf: 'center',
+    // Aligned with navItems - no center alignment
+  },
+  createButtonGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 14,
+    paddingBottom: 14,
+    paddingHorizontal: 24,
+    borderRadius: 32,
+    alignSelf: 'flex-start',
+  },
+  createButtonLabel: {
+    fontSize: 17,
+    color: colors.white,
+    fontFamily: Fonts.semiBold,
+    marginLeft: 12,
   },
   createMenuContainer: {
     position: 'absolute',

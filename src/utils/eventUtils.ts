@@ -103,8 +103,8 @@ export const buildEventMetadata = (
   const metadata: EventMetadata[] = [];
 
   console.log("Building metadata for event:", eventData);
-  // Location information
-  if (eventData.location) {
+  // Location information - only add if not empty
+  if (eventData.location && eventData.location.trim().length > 0) {
     metadata.push({ key: 'location', value: eventData.location });
 
   }

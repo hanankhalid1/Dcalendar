@@ -52,7 +52,14 @@ const CreateTaskScreen = () => {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [isLoading, setIsLoading] = useState(false);
-  const { getUserEvents, setUserEvents, userEvents } = useEventsStore();
+  const { 
+    getUserEvents, 
+    setUserEvents, 
+    userEvents,
+    optimisticallyAddEvent,
+    optimisticallyUpdateEvent,
+    revertOptimisticUpdate,
+  } = useEventsStore();
   const { api } = useApiClient();
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
@@ -983,7 +990,27 @@ const CreateTaskScreen = () => {
         setIsLoading(false);
         return;
       }
-    console.log("Processing task...");
+
+      // Additional validation: Ensure title is not empty (double-check)
+      if (!title || !title.trim() || title.trim().length === 0) {
+        clearTimeout(loadingTimeout);
+        setIsLoading(false);
+        setTitleError('Title is required');
+        showAlert('Validation Error', 'Please enter a title for the task', 'error');
+        return;
+      }
+
+      if (!activeAccount || !token) {
+        clearTimeout(loadingTimeout);
+        setIsLoading(false);
+        showAlert('Error', 'Authentication data not found', 'error');
+        return;
+      }
+
+      console.log("Processing task...");
+
+      // Store for potential revert (before any operations)
+      const previousEvents = [...(userEvents || [])];
 
     try {
       // Use uid (like web version) or fallback to id
@@ -1113,38 +1140,97 @@ const CreateTaskScreen = () => {
         list = entries.filter((entry) => entry.value !== undefined && entry.value !== '');
       }
 
-      // 6. Build task data structure
-      const taskData = {
+      // ✅ PREPARE MINIMAL DATA FOR OPTIMISTIC UPDATE (SYNCHRONOUS - NO AWAIT)
+      const minimalTaskData = {
+        uuid: editEventData?.uuid || '',
         uid: uid.toString(),
         title: title.trim(),
         description: description.trim() || "",
         fromTime: startTimeISO,
         toTime: endTimeISO,
         done: editEventData?.done || false,
-        repeatEvent:
-          selectedRecurrence !== 'Does not repeat'
-            ? selectedRecurrence
-            : undefined,
         list: list,
-        organizer: activeAccount?.userName
       };
 
-      // 4. Handle Edit vs. Create
+      // ✅ STEP 1: OPTIMISTIC UPDATE - INSTANT UI UPDATE (SYNCHRONOUS)
+      const optimisticTaskData = {
+        ...minimalTaskData,
+        list: list, // Include full metadata
+      };
+      
       if (mode === 'edit') {
-        await handleEditTask(taskData, activeAccount);
+        optimisticallyUpdateEvent(optimisticTaskData.uid, optimisticTaskData);
       } else {
-        await handleCreateTask(taskData, activeAccount);
+        optimisticallyAddEvent(optimisticTaskData as any);
       }
+      
+      console.log('✅ OPTIMISTIC UPDATE - Task Data:', JSON.stringify({
+        ...optimisticTaskData,
+        list: optimisticTaskData.list,
+      }, null, 2));
 
-      // Navigate immediately for better UX (don't wait for refresh)
+      // Prepare full task data NOW (before navigation)
+      const fullTaskData = {
+        ...minimalTaskData,
+        organizer: activeAccount?.userName || '',
+        repeatEvent: selectedRecurrence !== 'Does not repeat' ? selectedRecurrence : undefined,
+      };
+
+      // ✅ PRE-FETCH CRITICAL DATA IN PARALLEL (BEFORE NAVIGATION)
+      // 1. Public key (needed for encryption)
+      const publicKeyPromise = blockchainService.hostContract.methods
+        .getPublicKeyOfUser(activeAccount?.userName)
+        .call()
+        .catch(err => {
+          console.warn('Pre-fetch public key failed, will fetch later:', err);
+          return null;
+        });
+
+      // 2. For edit mode: Pre-fetch all events to get UUID (critical for encryption)
+      let uuidPromise: Promise<string | null> = Promise.resolve(null);
+      if (mode === 'edit' && minimalTaskData.uid) {
+        uuidPromise = blockchainService.getAllEvents(activeAccount?.userName)
+          .then(allEventsData => {
+            const taskToUpdate = allEventsData.events?.find((event: any) => event.uid === minimalTaskData.uid);
+            return taskToUpdate?.uuid || null;
+          })
+          .catch(err => {
+            console.warn('Pre-fetch UUID failed, will fetch later:', err);
+            return null;
+          });
+      }
+      
+      // ✅ STEP 2: NAVIGATE IMMEDIATELY (loading will auto-hide after 1s)
       navigation.goBack();
 
-      // Note: getUserEvents is not called here to avoid showing "Loading Events" indicator
-      // The optimistic UI update in handleCreateTask/handleEditTask already updates the local state
-
+      // ✅ STEP 3: TRIGGER AUTHENTICATION IMMEDIATELY (NON-BLOCKING)
+      // Start encryption/auth as soon as possible after navigation
+      (async () => {
+        try {
+          // ✅ CRITICAL: Wait for public key and UUID in parallel (already fetching)
+          const [publicKey, uuid] = await Promise.all([publicKeyPromise, uuidPromise]);
+          
+          // ✅ Continue with blockchain operations (they will also encrypt, but auth is already triggered)
+          if (mode === 'edit') {
+            await handleEditTask(fullTaskData, activeAccount);
+          } else {
+            await handleCreateTask(fullTaskData, activeAccount);
+          }
+        } catch (error: any) {
+          console.error('Error in background task operation:', error);
+          clearTimeout(loadingTimeout);
+          revertOptimisticUpdate(previousEvents);
+          setIsLoading(false); // Reset loading state on error
+          // Show error alert
+          const errorMessage = error?.message || 'Failed to save task. Please try again.';
+          showAlert('Task Save Failed', errorMessage, 'error');
+        }
+      })();
     } catch (error: any) {
       console.error('Error saving task:', error);
       clearTimeout(loadingTimeout);
+      // Revert optimistic update on error
+      revertOptimisticUpdate(previousEvents);
       // Show user-friendly error message from blockchain service
       const errorMessage = error?.message || 'Failed to save task. Please try again.';
       showAlert('Task Save Failed', errorMessage, 'error');
@@ -1153,12 +1239,12 @@ const CreateTaskScreen = () => {
       // 5. Hide Loader (only if not already hidden by timeout)
       clearTimeout(loadingTimeout);
       // Don't set to false here if timeout already cleared it
-      // The timeout will handle it automatically after 1.5s
+      // The timeout will handle it automatically after 1s
     }
     }); // Close requestAnimationFrame
   };
 
-  const handleCreateTask = async (taskData, activeAccount) => {
+  const handleCreateTask = async (taskData: any, activeAccount: any) => {
     try {
       console.log("Creating task on blockchain:", taskData);
       const response = await blockchainService.createEvent(
@@ -1193,26 +1279,17 @@ const CreateTaskScreen = () => {
       // Call the same API as edit
       await api('POST', '/updateevents', updatePayload);
 
-      // Optimistically add task to local state for immediate UI feedback
-      if (userEvents && Array.isArray(userEvents)) {
-        const newTask = {
-          uid: taskData.uid,
-          title: taskData.title,
-          description: taskData.description,
-          fromTime: taskData.fromTime,
-          toTime: taskData.toTime,
-          list: taskData.list,
-          done: taskData.done,
-        };
-        setUserEvents([...userEvents, newTask]);
-      }
-
-      // Don't wait for refresh - navigation happens in createTask
+      // ✅ Background refresh (non-blocking, skip loading screen)
+      // Optimistic update already done in createTask, so just refresh in background
+      setTimeout(() => {
+        getUserEvents(activeAccount?.userName, api, undefined, { skipLoading: true }).catch(err => {
+          console.error('Background task refresh failed:', err);
+        });
+      }, 2000);
     } catch (error: any) {
       console.error('Error in handleCreateTask:', error);
-      // Show user-friendly error message from blockchain service
-      const errorMessage = error?.message || 'An unexpected error occurred while creating the task. Please check your network connection.';
-      showAlert('Task Creation Failed', errorMessage, 'error');
+      // Error handling is done in createTask's background operation
+      throw error; // Re-throw to be caught by createTask's error handler
     }
   };
 
@@ -1254,37 +1331,20 @@ const CreateTaskScreen = () => {
         const apiResponse = await api('POST', '/updateevents', updatePayload);
         console.log('API response data (edit task):', apiResponse.data);
 
-        // Optimistically update local state for immediate UI feedback
-        if (userEvents && Array.isArray(userEvents)) {
-          const updatedEvents = userEvents.map((event: any) => {
-            if (event.uid === taskData.uid) {
-              return {
-                ...event,
-                title: taskData.title,
-                description: taskData.description,
-                fromTime: taskData.fromTime,
-                toTime: taskData.toTime,
-                list: taskData.list,
-              };
-            }
-            return event;
+        // ✅ Background refresh (non-blocking, skip loading screen)
+        // Optimistic update already done in createTask, so just refresh in background
+        setTimeout(() => {
+          getUserEvents(activeAccount?.userName, api, undefined, { skipLoading: true }).catch(err => {
+            console.error('Background task refresh failed:', err);
           });
-          setUserEvents(updatedEvents);
-        }
-
-        // Show success and navigate immediately
-        showAlert('Task Updated', 'Task has been successfully updated.', 'success');
-        
-        // Note: getUserEvents is not called here to avoid showing "Loading Events" indicator
-        // The optimistic UI update already updates the local state
+        }, 2000);
       } else {
-        showAlert('Task Update Failed', 'Failed to update the task. Please try again.', 'error');
+        throw new Error('Failed to update the task on blockchain');
       }
     } catch (error: any) {
       console.error('Error in handleEditTask:', error);
-      // Show user-friendly error message from blockchain service
-      const errorMessage = error?.message || 'Failed to update the task. Please try again.';
-      showAlert('Task Update Failed', errorMessage, 'error');
+      // Error handling is done in createTask's background operation
+      throw error; // Re-throw to be caught by createTask's error handler
     }
   };
 
@@ -1454,7 +1514,13 @@ const CreateTaskScreen = () => {
                 }}
                 disabled={isLoading}
               >
-                <Text style={styles.selectorText}>{selectedRecurrence}</Text>
+                <Text 
+                  style={styles.selectorText}
+                  numberOfLines={1}
+                  ellipsizeMode="tail"
+                >
+                  {selectedRecurrence}
+                </Text>
                 <Image
                   style={{ marginLeft: scaleWidth(10) }}
                   source={require('../assets/images/CreateEventImages/smallArrowDropdown.png')}
@@ -2216,6 +2282,8 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     marginLeft: spacing.sm,
     flex: 1,
+    flexShrink: 1,
+    minWidth: 0,
   },
   buttonText: {
     color: "#fff",
@@ -2231,6 +2299,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     marginLeft: spacing.sm,
+    minWidth: 0,
+    flexShrink: 1,
   },
   recurrenceDropdown: {
     position: 'absolute',

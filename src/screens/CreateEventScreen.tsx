@@ -830,7 +830,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
   // Handle location selection
   const handleLocationSelect = (selectedLocation: any) => {
-    setLocation(selectedLocation.label);
+    const locationValue = selectedLocation.label?.trim() || '';
+    // Reject empty or whitespace-only strings
+    if (!locationValue || locationValue.length === 0) {
+      setLocationError('Please select a valid location');
+      return;
+    }
+    setLocation(locationValue);
     setShowLocationModal(false);
     setLocationSuggestions([]);
     if (locationError) setLocationError('');
@@ -1554,8 +1560,9 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       if (!firstErrorField) firstErrorField = 'endDate';
     }
 
-    // Validate location format (if provided)
-    if (location.trim() && location.trim().length > 0) {
+    // Validate location format (if provided) - reject whitespace-only strings
+    const trimmedLocation = location.trim();
+    if (trimmedLocation && trimmedLocation.length > 0) {
       // Check for invalid characters that could cause issues
       // Blocked: < > { } [ ] | \ ` ~ ^ / @ # $ % & * + = ?
       const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
@@ -1564,6 +1571,11 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         isValid = false;
         if (!firstErrorField) firstErrorField = 'location';
       }
+    } else if (location && location.length > 0) {
+      // Location has only whitespace - reject it
+      setLocationError('Location cannot be empty or contain only spaces');
+      isValid = false;
+      if (!firstErrorField) firstErrorField = 'location';
     }
 
     // Check if start date/time is in the past (only for new events, not edit mode)
@@ -1622,73 +1634,81 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
     // ✅ Only validate times if NOT an all-day event
     if (!isAllDayEvent) {
-      if (!selectedStartTime) {
+      if (!selectedStartTime || !selectedStartTime.trim()) {
         setStartTimeError('Start time is required');
         isValid = false;
         if (!firstErrorField) firstErrorField = 'startTime';
       }
-      if (!selectedEndTime) {
+      if (!selectedEndTime || !selectedEndTime.trim()) {
         setEndTimeError('End time is required');
         isValid = false;
         if (!firstErrorField) firstErrorField = 'endTime';
       }
 
-      // Validate that end date/time is after start date/time
-      const startDateTime = new Date(selectedStartDate);
-      const endDateTime = new Date(selectedEndDate);
+      // Only proceed with time parsing if both times are provided
+      if (selectedStartTime && selectedStartTime.trim() && selectedEndTime && selectedEndTime.trim()) {
+        // Validate that end date/time is after start date/time
+        const startDateTime = new Date(selectedStartDate);
+        const endDateTime = new Date(selectedEndDate);
 
-      // Parse start time (handle non-breaking spaces)
-      const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        // Parse start time (handle non-breaking spaces)
+        const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+        const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
 
-      if (!startTimeMatch) {
-        setStartTimeError('Invalid start time format');
-        isValid = false;
-      }
+        if (!startTimeMatch) {
+          setStartTimeError('Invalid start time format');
+          isValid = false;
+        } else {
+          // Only parse if match is successful
+          const startHours = parseInt(startTimeMatch[1], 10);
+          const startMinutes = parseInt(startTimeMatch[2], 10);
+          const startPeriod = startTimeMatch[3].toUpperCase();
+          let finalStartHours = startHours;
+          if (startPeriod === 'PM' && startHours !== 12) {
+            finalStartHours = startHours + 12;
+          } else if (startPeriod === 'AM' && startHours === 12) {
+            finalStartHours = 0;
+          }
+          startDateTime.setHours(finalStartHours, startMinutes, 0, 0);
+        }
 
-      const startHours = parseInt(startTimeMatch[1], 10);
-      const startMinutes = parseInt(startTimeMatch[2], 10);
-      const startPeriod = startTimeMatch[3].toUpperCase();
-      let finalStartHours = startHours;
-      if (startPeriod === 'PM' && startHours !== 12) {
-        finalStartHours = startHours + 12;
-      } else if (startPeriod === 'AM' && startHours === 12) {
-        finalStartHours = 0;
-      }
-      startDateTime.setHours(finalStartHours, startMinutes, 0, 0);
+        // Parse end time (handle non-breaking spaces)
+        const normalizedEndTime = selectedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+        const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
 
-      // Parse end time (handle non-breaking spaces)
-      const normalizedEndTime = selectedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (!endTimeMatch) {
+          setEndTimeError('Invalid end time format');
+          isValid = false;
+        } else {
+          // Only parse if match is successful
+          const endHours = parseInt(endTimeMatch[1], 10);
+          const endMinutes = parseInt(endTimeMatch[2], 10);
+          const endPeriod = endTimeMatch[3].toUpperCase();
+          let finalEndHours = endHours;
+          if (endPeriod === 'PM' && endHours !== 12) {
+            finalEndHours = endHours + 12;
+          } else if (endPeriod === 'AM' && endHours === 12) {
+            finalEndHours = 0;
+          }
+          endDateTime.setHours(finalEndHours, endMinutes, 0, 0);
 
-      if (!endTimeMatch) {
-        setEndTimeError('Invalid end time format');
-        isValid = false;
-      }
+          // Validate that end date/time is strictly after start date/time (only if both parsed successfully)
+          if (startTimeMatch && endTimeMatch) {
+            console.log('DEBUG - Date/Time Validation:', {
+              startDateTime: startDateTime.toISOString(),
+              endDateTime: endDateTime.toISOString(),
+              startTime: selectedStartTime,
+              endTime: selectedEndTime,
+              isValid: endDateTime > startDateTime
+            });
 
-      const endHours = parseInt(endTimeMatch[1], 10);
-      const endMinutes = parseInt(endTimeMatch[2], 10);
-      const endPeriod = endTimeMatch[3].toUpperCase();
-      let finalEndHours = endHours;
-      if (endPeriod === 'PM' && endHours !== 12) {
-        finalEndHours = endHours + 12;
-      } else if (endPeriod === 'AM' && endHours === 12) {
-        finalEndHours = 0;
-      }
-      endDateTime.setHours(finalEndHours, endMinutes, 0, 0);
-
-      // Validate that end date/time is strictly after start date/time
-      console.log('DEBUG - Date/Time Validation:', {
-        startDateTime: startDateTime.toISOString(),
-        endDateTime: endDateTime.toISOString(),
-        startTime: selectedStartTime,
-        endTime: selectedEndTime,
-        isValid: endDateTime > startDateTime
-      });
-
-      if (endDateTime <= startDateTime) {
-        // Error is already shown inline, just return false
-        return false;
+            if (endDateTime <= startDateTime) {
+              setDateTimeError('End time must be after start time');
+              isValid = false;
+              if (!firstErrorField) firstErrorField = 'endTime';
+            }
+          }
+        }
       }
     } else {
       // ✅ For all-day events, just validate that end date is not before start date
@@ -2252,6 +2272,15 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         return;
       }
 
+      // Additional validation: Ensure title is not empty (double-check)
+      if (!title || !title.trim() || title.trim().length === 0) {
+        clearTimeout(loadingTimeout);
+        setIsLoading(false);
+        setTitleError('Title is required');
+        Alert.alert('Validation Error', 'Please enter a title for the event');
+        return;
+      }
+
       if (!activeAccount || !token) {
         clearTimeout(loadingTimeout);
         setIsLoading(false);
@@ -2365,11 +2394,14 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     // ✅ PREPARE METADATA FOR OPTIMISTIC UPDATE (BEFORE OPTIMISTIC UPDATE)
     // Build metadata early so we can include it in the optimistic update
     const conferencingDataForOptimistic = null;
+    // Only include location if it's not empty or whitespace-only
+    const trimmedLocation = location.trim();
+    const validLocation = trimmedLocation.length > 0 ? trimmedLocation : '';
     const metadataForOptimistic = buildEventMetadata({
       ...minimalEventData,
       organizer: activeAccount?.email || activeAccount?.userName || activeAccount?.address || '',
       guests: selectedGuests,
-      location: location.trim(),
+      location: validLocation,
       locationType: selectedVideoConferencing,
       meetingEventId: meetingEventId || '',
       busy: selectedStatus || 'Busy',
@@ -2410,11 +2442,14 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     }, null, 2));
 
     // Prepare full event data NOW (before navigation)
+    // Only include location if it's not empty or whitespace-only
+    const trimmedLocationForSave = location.trim();
+    const validLocationForSave = trimmedLocationForSave.length > 0 ? trimmedLocationForSave : '';
     const fullEventData = {
       ...minimalEventData,
       organizer: activeAccount?.email || activeAccount?.userName || activeAccount?.address || '',
       guests: selectedGuests,
-      location: location.trim(),
+      location: validLocationForSave,
       locationType: selectedVideoConferencing,
       meetingEventId: meetingEventId || '',
       busy: selectedStatus || 'Busy',
@@ -2742,6 +2777,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               // ✅ When switching TO all-day:
               setSelectedStartTime('');
               setSelectedEndTime('');
+              // Clear time validation errors when switching to all-day
+              setStartTimeError('');
+              setEndTimeError('');
+              setDateTimeError('');
 
               if (selectedStartDate) {
                 // Important: Create a new Date object to avoid modifying the start date state directly.
@@ -2757,6 +2796,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               // ✅ When switching FROM all-day, clear times so user must select
               setSelectedStartTime('');
               setSelectedEndTime('');
+              // Clear time validation errors when switching from all-day
+              setStartTimeError('');
+              setEndTimeError('');
+              setDateTimeError('');
             }
           }}
           disabled={isLoading}
@@ -3706,8 +3749,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   // If valid, update location and clear error
                   setLocation(text);
                   if (locationError) setLocationError('');
-                  if (text.length >= 2) {
-                    debouncedFetchSuggestions(text);
+                  // Only search if text has non-whitespace characters
+                  const trimmedText = text.trim();
+                  if (trimmedText.length >= 2) {
+                    debouncedFetchSuggestions(trimmedText);
                   } else {
                     setLocationSuggestions([]);
                   }

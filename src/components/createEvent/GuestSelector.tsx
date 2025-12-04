@@ -8,6 +8,8 @@ import {
   Image,
   Modal,
   TextInput,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FeatherIcon from 'react-native-vector-icons/Feather';
@@ -129,7 +131,11 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
         transparent={true}
         onRequestClose={onToggleGuestModal}
       >
-        <View style={styles.modalOverlay}>
+        <KeyboardAvoidingView
+          style={styles.modalOverlay}
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        >
           <View style={styles.guestModalContainer}>
             {/* Modal Handle */}
             <View style={styles.modalHandle} />
@@ -209,6 +215,8 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                 keyExtractor={item => item.id}
                 style={styles.guestList}
                 showsVerticalScrollIndicator={false}
+                keyboardShouldPersistTaps="handled"
+                keyboardDismissMode="on-drag"
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={styles.guestItem}
@@ -290,7 +298,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               </TouchableOpacity>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
     </View>
   );
@@ -335,8 +343,8 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderTopLeftRadius: 20,
     borderTopRightRadius: 20,
-    maxHeight: '80%',
-    minHeight: '60%',
+    maxHeight: '85%',
+    minHeight: '50%',
     paddingBottom: scaleHeight(40),
   },
   modalHandle: {
@@ -396,6 +404,7 @@ const styles = StyleSheet.create({
   guestList: {
     flex: 1,
     paddingHorizontal: spacing.lg,
+    maxHeight: '100%',
   },
   guestItem: {
     flexDirection: 'row',

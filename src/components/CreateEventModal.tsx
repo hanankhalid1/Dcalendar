@@ -242,10 +242,19 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
     if (!validateForm()) return;
 
+    // Additional validation: Ensure title is not empty (double-check)
+    if (!title || !title.trim() || title.trim().length === 0) {
+      Alert.alert('Validation Error', 'Please enter a title for the event');
+      return;
+    }
+
     // Don't block UI with loading state - optimistic updates handle this
     setIsLoading(false);
 
     try {
+      // Only include location if it's not empty or whitespace-only
+      const trimmedLocation = location.trim();
+      const validLocation = trimmedLocation.length > 0 ? trimmedLocation : '';
       const payload = {
         title: title.trim(),
         selectedDate: selectedDate!,
@@ -253,7 +262,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
         selectedEndTime,
         selectedEventType,
         description: description.trim(),
-        location: location.trim(),
+        location: validLocation,
         videoConferencing: videoConferencing.trim(),
         notificationMinutes,
         guests: selectedGuests,
@@ -272,7 +281,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
           fromTime: payload.selectedStartTime,
           toTime: payload.selectedEndTime,
           description: payload.description,
-          location: payload.location,
+          location: validLocation,
         });
 
         // ✅ NAVIGATE IMMEDIATELY - SYNCHRONOUS (NO DELAY)
