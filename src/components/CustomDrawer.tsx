@@ -9,6 +9,7 @@ import {
   Image,
   ActivityIndicator,
   Easing,
+  Alert
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CalenderIcon from 'react-native-vector-icons/MaterialIcons';
@@ -19,7 +20,7 @@ import {
   scaleWidth,
   screenHeight,
 } from '../utils/dimensions';
-
+import LinearGradient from 'react-native-linear-gradient';
 import { colors, fontSize, spacing, shadows, borderRadius } from '../utils/LightTheme';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -30,6 +31,7 @@ import { useToken } from '../stores/useTokenStore';
 import { useEventsStore } from '../stores/useEventsStore';
 import { Colors } from '../constants/Colors';
 import { Fonts } from '../constants/Fonts';
+import AntDesign from 'react-native-vector-icons/AntDesign';
 
 interface CustomDrawerProps {
   isOpen: boolean;
@@ -207,38 +209,6 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
   };
 
-  const handleAccountSelection = async (selectedAccount: Account) => {
-
-    console.log('handleAccountSelection called with:', selectedAccount.userName);
-    console.log('Current active account:', account.userName);
-    // Check if the selected account is already active
-    if (
-      selectedAccount.ncogWalletAddress === account?.ncogWalletAddress &&
-      (selectedAccount.userName === account?.userName)
-    ) {
-      console.log('Account is already active');
-      setIsAccountDropdownOpen(false);
-      return;
-    }
-    setIsLoadingAccount(true);
-    setLoadingAccountId(selectedAccount.userName);
-    // Call the function to fetch and save token for the selected account
-    try {
-      // Call the function to fetch and save token for the selected account
-      await fetchAccountTokenAndSave(selectedAccount, selectedAccount.userName || '');
-    } catch (error) {
-      console.error('Error switching account:', error);
-    } finally {
-      // Reset loading state
-      setIsLoadingAccount(false);
-      setLoadingAccountId(null);
-    }
-
-    // Close the dropdown after selection
-    setIsAccountDropdownOpen(false);
-  };
-
-
 
   useEffect(() => {
     fetchAccountDetails();
@@ -282,74 +252,31 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     setIsAccountDropdownOpen(false); // Close dropdown when drawer closes
   }, [isOpen, slideAnim, backdropOpacity]);
 
-  const renderAccountDropdown = () => {
-    if (!isAccountDropdownOpen || accounts.length === 0) return null;
-
-    return (
-      <ScrollView nestedScrollEnabled={true} style={styles.accountDropdownContainer}>
-        {accounts.map((acc, index) => {
-          const isCurrentAccount =
-            acc.ncogWalletAddress === account?.ncogWalletAddress &&
-            acc.userName === account?.userName;
-          const isLoading = isLoadingAccount && loadingAccountId === acc.userName;
-
-          return (
-            <TouchableOpacity
-              key={index}
-              style={[
-                styles.accountDropdownItem,
-                isLoading && styles.accountDropdownItemLoading
-              ]}
-              onPress={() => {
-                if (!isLoadingAccount) {
-                  handleAccountSelection(acc);
-                  console.log('Selected account:', acc);
-                }
-              }}
-              disabled={isLoadingAccount}
-            >
-              {/* Avatar */}
-              <View style={styles.avatarContainer}>
-                <Text style={styles.avatarText}>
-                  {acc.name?.trim()?.charAt(0)?.toUpperCase() || 'N'}
-                </Text>
-              </View>
-
-              <View style={{
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'space-between',
-                flexDirection: 'row',
-                flex: 1
-              }}>
-                {/* Account Details in Dropdown Item */}
-                <View style={styles.profileTextContainer}>
-                  <Text style={styles.profileName} numberOfLines={1}>
-                    {acc.name}
-                  </Text>
-                  <Text style={styles.profileUsername} numberOfLines={1}>
-                    {acc.username || acc.userName}
-                  </Text>
-                </View>
-
-                {/* Show loader or active indicator */}
-                {isLoading ? (
-                  <ActivityIndicator
-                    size="small"
-                    color={Colors.primaryblue}
-                    style={{ marginLeft: 8 }}
-                  />
-                ) : isCurrentAccount ? (
-                  <Text style={styles.activeAccountIndicator}> (Active)</Text>
-                ) : null}
-              </View>
-            </TouchableOpacity>
-          );
-        })}
-      </ScrollView>
+ 
+  const showLogoutConfirm = () => {
+    Alert.alert(
+      "Log Out", // Alert Title
+      "Are you sure you want to log out?", // Alert Message
+      [
+        // Cancel Button
+        {
+          text: "Cancel",
+          onPress: () => console.log("Logout cancelled"),
+          style: "cancel"
+        },
+        // OK/Confirm Button
+        {
+          text: "Log Out",
+          onPress: () => {
+            handleLogout(); // Execute logout function
+            onClose();      // Close any open menu/modal
+          },
+          style: "destructive" // Use 'destructive' style for actions that lose data/session
+        }
+      ],
+      { cancelable: true } // Allows closing the alert by tapping outside
     );
   };
-
   async function handleLogout() {
     try {
       console.log("Logging out...");
@@ -421,13 +348,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             {/* NEW: Container for Menu Button + Logo/Home Link */}
             <View style={styles.logoRow}>
 
-              {/* 1. MENU BUTTON: Only closes the drawer */}
-              <TouchableOpacity
-                style={styles.menuCloseButton} // Add a new style for spacing
-                onPress={onClose} // Just close the drawer
-              >
-                <Icon name="menu" size={24} color={colors.white} />
-              </TouchableOpacity>
+        
 
               {/* 2. LOGO/TITLE BUTTON: Navigates to HomeScreen AND closes the drawer */}
               <TouchableOpacity
@@ -449,14 +370,27 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 </View>
               </TouchableOpacity>
             </View>
-            <TouchableOpacity
-              style={styles.createButtonText}
+               <TouchableOpacity
+              style={styles.buttonContainer} // Apply layout styles to the container
               onPress={() => {
                 setShowCreateMenu(prev => !prev);
               }}
               onLayout={e => setCreateBtnWindowLayout(e.nativeEvent.layout)}
+              activeOpacity={0.8}
             >
-              <Image source={require('../assets/images/createButton.png')} />
+              <LinearGradient
+                colors={['#18F06E', '#0B6DE0']}
+                start={{ x: 0, y: 0 }} // Horizontal flow starts from left (0) to right (1)
+                end={{ x: 1, y: 0 }}
+                style={styles.buttonGradient}
+              >
+                {/* Plus Icon (or replace with your SVG/Icon component) */}
+                <Text style={styles.plusIcon}>+</Text>
+
+                <Text style={styles.buttonText}>
+                  Create Event
+                </Text>
+              </LinearGradient>
             </TouchableOpacity>
           </View>
 
@@ -507,40 +441,8 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
           <View style={styles.separator} />
 
           {/* User Profile with Dropdown Toggle */}
-          <TouchableOpacity
-            style={styles.profileSection}
-            onPress={toggleAccountDropdown}
-            onLayout={e => setAccountBtnLayout(e.nativeEvent.layout)}
-          >
-            {/* Avatar Section */}
-            {
-              (() => {
-                const initial = (account?.name?.trim()?.charAt(0) || 'N').toUpperCase();
-                return (
-                  <View style={styles.avatarContainer}>
-                    <Text style={styles.avatarText}>{initial}</Text>
-                  </View>
-                );
-              })()
-            }
-            {/* Profile Text */}
-            <View style={styles.profileTextContainer}>
-              <Text style={styles.profileName}>{account?.name || "Name"}</Text>
-              <Text style={styles.profileUsername}>
-                {account?.username || account?.userName || 'Select Account'}
-              </Text>
-            </View>
-            {/* Dropdown Indicator Icon */}
-            <Icon
-              name={isAccountDropdownOpen ? "menu-up" : "menu-down"}
-              size={24}
-              color={colors.white}
-              style={{ marginLeft: 'auto' }}
-            />
-          </TouchableOpacity>
-
-          {/* RENDER THE ACCOUNT DROPDOWN HERE */}
-          {renderAccountDropdown()}
+        
+ 
 
 
           {/* <View style={styles.section}>
@@ -685,8 +587,10 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 onClose();
               }}
             >
-              <Image
-                source={require('../assets/images/Primaryfolder-open.png')}
+             <AntDesign
+                name="setting"
+                size={24}
+                color={'#00AEEF'}
               />
               <Text style={styles.navText}>Settings</Text>
             </TouchableOpacity>
@@ -714,7 +618,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             <TouchableOpacity
               style={styles.navItem}
               onPress={() => {
-                handleLogout();
+                showLogoutConfirm();
                 onClose();
               }}
             >
@@ -1011,6 +915,40 @@ const styles = StyleSheet.create({
   },
   accountDropdownItemLoading: {
     opacity: 0.6,
+  },
+   buttonContainer: {
+    borderRadius: 26,
+    overflow: 'hidden',
+  },
+  buttonGradient: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center', // Vertical alignment
+    justifyContent: 'center', // Start content from the left
+
+    minHeight: scaleHeight(50), // Re-apply the desired min height
+    paddingVertical: 10, // A balanced vertical padding for flexibility (or use 15/13 if you know the exact numbers)
+
+    // --- Horizontal Space Correction (from prior specs) ---
+
+    paddingRight: 20,
+  },
+  plusIcon: {
+    fontSize: 24, // Size of the plus icon
+    color: Colors.white,
+    marginRight: 12, // Gap: 12px
+    // Center the icon vertically relative to the text
+    lineHeight: 24,
+    fontWeight: 'bold',
+  },
+  buttonText: {
+    // style={styles.createButtonText} from your original TouchableOpacity reference
+    color: Colors.white,
+    fontSize: 18, // Estimated based on appearance/context
+    fontFamily: Fonts.bold, // Use your custom font
+    fontWeight: '600', // Matches the semi-bold look
+    // Ensure text isn't clipped from custom font
+    lineHeight: 24,
   },
 });
 
