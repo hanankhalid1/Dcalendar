@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Image,
   StatusBar,
@@ -19,13 +19,16 @@ import {
   shadows,
   spacing,
 } from '../utils/LightTheme';
+import MenuIcon from '../assets/svgs/menu.svg';
+import EventIcon from '../assets/svgs/eventIcon.svg';
+type EventFilter = 'All' | 'EventsOnly' | 'TasksOnly';
 
 interface HeaderProps {
   onMenuPress: () => void;
   onMonthChange?: (month: string) => void;
   onViewChange?: (view: string) => void;
-  onAction1Press?: () => void;
-  onAction2Press?: () => void;
+  onAction1Press?: (isSelected: boolean) => void; // Event (Calendar/Check)
+  onAction2Press?: (isSelected: boolean) => void;
   // New props for HomeScreen integration
   title?: string;
   currentMonth?: string;
@@ -34,7 +37,7 @@ interface HeaderProps {
   onMonthSelect?: (monthIndex: number) => void;
   onViewPress?: () => void;
   onViewSelect?: (view: string) => void;
-  isDrawerOpen?: boolean; // New prop to track drawer state
+  filterType?: EventFilter; // Add this prop
 }
 
 const CustomeHeader: React.FC<HeaderProps> = ({
@@ -51,23 +54,19 @@ const CustomeHeader: React.FC<HeaderProps> = ({
   onMonthSelect,
   onViewPress,
   onViewSelect,
-  isDrawerOpen = false, // Track drawer state
+  filterType = 'All', // Default value
 }) => {
   // Dropdown states
   const [isMonthDropdownVisible, setIsMonthDropdownVisible] = useState(false);
   const [isViewDropdownVisible, setIsViewDropdownVisible] = useState(false);
-  
-  // Close dropdowns when drawer opens
-  React.useEffect(() => {
-    if (isDrawerOpen) {
-      setIsViewDropdownVisible(false);
-      setIsMonthDropdownVisible(false);
-    }
-  }, [isDrawerOpen]);
 
   // Selected values - use props if available, otherwise fallback to state
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
   const [selectedView, setSelectedView] = useState(currentView);
+
+  // Derive button states from filterType prop
+  const isEventSelected = filterType === 'EventsOnly';
+  const isTaskSelected = filterType === 'TasksOnly';
 
   // Dropdown data
   const months = [
@@ -83,19 +82,41 @@ const CustomeHeader: React.FC<HeaderProps> = ({
     onMonthChange?.(month);
   };
 
+  const handleEventPress = () => {
+    if (isEventSelected) {
+      // If already selected, unselect it (show all)
+      onAction1Press?.(false);
+    } else {
+      // If not selected, select Events and unselect Tasks
+      onAction1Press?.(true);
+      onAction2Press?.(false);
+    }
+  };
+
+  const handleTaskPress = () => {
+    if (isTaskSelected) {
+      // If already selected, unselect it (show all)
+      onAction2Press?.(false);
+    } else {
+      // If not selected, select Tasks and unselect Events
+      onAction2Press?.(true);
+      onAction1Press?.(false);
+    }
+  };
+
   const handleViewSelect = (view: string) => {
     setSelectedView(view as 'Day' | 'Week' | 'Month');
     setIsViewDropdownVisible(false);
     onViewChange?.(view);
-    onViewSelect?.(view); // Call the new prop handler
+    onViewSelect?.(view);
   };
 
   // Update local state when props change
-  React.useEffect(() => {
+  useEffect(() => {
     setSelectedMonth(currentMonth);
   }, [currentMonth]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     setSelectedView(currentView);
   }, [currentView]);
 
@@ -111,26 +132,9 @@ const CustomeHeader: React.FC<HeaderProps> = ({
             style={styles.menuButton}
             onPress={onMenuPress}
             activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
           >
-            <Image
-              source={require('../assets/images/HeaderImages/HeaderDrawer.png')}
-            />
+            <MenuIcon width={24} height={24} />
           </TouchableOpacity>
-
-          {/* Month Selector - COMMENTED OUT */}
-          {/* <TouchableOpacity
-            style={styles.monthSelector}
-            onPress={() => {
-              setIsMonthDropdownVisible(!isMonthDropdownVisible);
-              setIsViewDropdownVisible(false); // close other dropdown
-            }}
-          >
-            <Text style={styles.monthText}>{selectedMonth}</Text>
-            <Image
-              source={require('../assets/images/HeaderImages/arrowDropdown.png')}
-            />
-          </TouchableOpacity> */}
         </View>
 
         {/* Spacer to push right section to the far right */}
@@ -143,8 +147,7 @@ const CustomeHeader: React.FC<HeaderProps> = ({
               style={styles.viewSelectorContent}
               onPress={() => {
                 setIsViewDropdownVisible(!isViewDropdownVisible);
-                setIsMonthDropdownVisible(false); // close other dropdown
-                // Removed onViewPress to prevent automatic value change
+                setIsMonthDropdownVisible(false);
               }}
             >
               <LinearGradient
@@ -197,60 +200,48 @@ const CustomeHeader: React.FC<HeaderProps> = ({
 
         {/* Action Buttons */}
         <View style={styles.actionButtonsContainer}>
+          {/* ACTION 1: Events (Calendar/Check) */}
           <TouchableOpacity
-            style={styles.actionButton1}
-            onPress={onAction1Press}
+            style={[
+              styles.actionButton,
+              styles.actionButton1,
+              !isEventSelected && styles.actionButtonInactive,
+            ]}
+            onPress={handleEventPress}
           >
-            <AntDesign
-              name="check"
-              size={14}
-              color="#000"
-              style={{ backgroundColor: 'transparent' }}
-            />
-            <View style={styles.CalenderView}>
-              <FontAwesome6 name="calendar" size={14} color="#000" />
+
+            <View
+              style={[
+                styles.CalenderView,
+                isEventSelected && styles.CalenderViewActive,
+              ]}
+            >
+              <EventIcon
+                height={22}
+                width={22}
+                color={isEventSelected ? colors.primary : '#000'}
+              />
             </View>
           </TouchableOpacity>
 
+          {/* ACTION 2: Tasks (Check Circle) */}
           <TouchableOpacity
-            style={styles.actionButton2}
-            onPress={onAction2Press}
+            style={[
+              styles.actionButton,
+              styles.actionButton2,
+              !isTaskSelected && styles.actionButtonInactive,
+            ]}
+            onPress={handleTaskPress}
           >
-            <Feather name="check-circle" size={20} color="#000" />
+            <Feather
+              name="check-circle"
+              size={20}
+              color={isTaskSelected ? colors.white : '#000'}
+            />
           </TouchableOpacity>
         </View>
-      </View>
 
-      {/* Month Dropdown - COMMENTED OUT */}
-      {/* {isMonthDropdownVisible && (
-        <Pressable
-          style={styles.dropdownOverlay}
-          onPress={() => setIsMonthDropdownVisible(false)}
-        >
-          <View style={[styles.dropdownContainer, { left: 55, top: 70 }]}>
-            
-            <FlatList
-              data={months}
-              keyExtractor={(item) => item}
-              renderItem={({ item }) => (
-                <TouchableOpacity
-                  style={styles.dropdownItem}
-                  onPress={() => handleMonthSelect(item)}
-                >
-                  <Text
-                    style={[
-                      styles.dropdownText,
-                      item === selectedMonth && styles.selectedText,
-                    ]}
-                  >
-                    {item}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            />
-          </View>
-        </Pressable>
-      )} */}
+      </View>
 
       {/* Backdrop for dropdown */}
       {isViewDropdownVisible && (
@@ -279,7 +270,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.sm,
   },
   spacer: {
-    flex: 1, // This will take up all available space, pushing right section to the far right
+    flex: 1,
   },
   leftSection: {
     flexDirection: 'row',
@@ -290,7 +281,7 @@ const styles = StyleSheet.create({
     height: moderateScale(40),
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginLeft: spacing.sm,
     padding: spacing.xs,
   },
   monthSelector: {
@@ -334,30 +325,46 @@ const styles = StyleSheet.create({
     color: '#18F06E',
     marginRight: spacing.xs,
   },
-  actionButton1: {
-    flexDirection: 'row',
+  actionButton: {
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: '#E6EFFF',
-    marginRight: scaleWidth(3),
-    borderTopRightRadius: scaleHeight(1),
-    borderTopLeftRadius: scaleHeight(20),
-    borderBottomLeftRadius: scaleHeight(20),
-    width: scaleWidth(55.47),
-    height: scaleHeight(35.73),
+    height: scaleHeight(36.11),
+    borderRadius: scaleHeight(20),
+    paddingHorizontal: spacing.sm,
   },
-
+  actionButton1: {
+    flexDirection: 'row',
+    backgroundColor: '#00AEEF',
+    marginRight: scaleWidth(3),
+    width: scaleWidth(55.47),
+  },
+  actionButton2: {
+    backgroundColor: '#00AEEF',
+    borderWidth: 1,
+    width: scaleWidth(40.11),
+  },
+  actionButtonInactive: {
+    borderWidth: 1,
+    borderColor: colors.grey20,
+    backgroundColor: colors.white,
+  },
+  CalenderView: {
+    backgroundColor: colors.white,
+    borderRadius: 2,
+    marginLeft: 5,
+  },
+  CalenderViewActive: {
+    backgroundColor: colors.white,
+  },
   dropdownOverlay: {
     position: 'absolute',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.2)', // slight dim background
-    zIndex: 999, // ensure it's on top
+    backgroundColor: 'rgba(0,0,0,0.2)',
+    zIndex: 999,
   },
-
-  // Dropdown container box
   dropdownContainer: {
     position: 'absolute',
     backgroundColor: colors.white,
@@ -370,8 +377,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.grey20,
   },
-
-  // Each dropdown option
   dropdownItem: {
     paddingVertical: 12,
     paddingHorizontal: 14,
@@ -379,56 +384,30 @@ const styles = StyleSheet.create({
     borderBottomWidth: 0.5,
     borderBottomColor: colors.grey20,
   },
-
-  // Last item without border
   dropdownItemLast: {
     borderBottomWidth: 0,
   },
-
-  // Text inside dropdown
   dropdownText: {
     fontSize: fontSize.textSize16,
     color: colors.blackText,
     textAlign: 'center',
   },
-
-  // Highlighted selected item
   selectedText: {
     fontWeight: 'bold',
     color: '#0B6DE0',
   },
-  actionButton2: {
-    backgroundColor: colors.white,
-    borderWidth: 1,
-    borderColor: colors.grey20,
-    borderRadius: scaleHeight(20),
-    width: scaleWidth(40.11),
-    height: scaleHeight(36.11),
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  CalenderView: {
-    backgroundColor: colors.white,
-    padding: 2,
-    borderRadius: 2,
-    marginLeft: 5,
-  },
-
-  // Dropdown Styles
-   dropdownArrow: {
+  dropdownArrow: {
     width: 12,
     height: 8,
-    marginTop:4,
+    marginTop: 4,
     marginLeft: 1,
   },
   dropdownArrowRotated: {
     transform: [{ rotate: '180deg' }],
   },
-
-  // Improved View Dropdown Styles (matching WeekHeader design exactly)
   backdrop: {
     position: 'absolute',
-    top: '100%', // Start below the header
+    top: '100%',
     left: 0,
     right: 0,
     bottom: 0,
@@ -438,8 +417,8 @@ const styles = StyleSheet.create({
   viewDropdown: {
     position: 'absolute',
     top: '100%',
-    right: 0, // Align to right side
-    backgroundColor: '#FFFFFF', // Explicit white background
+    right: 0,
+    backgroundColor: '#FFFFFF',
     borderRadius: borderRadius.md,
     paddingVertical: spacing.xs,
     minWidth: 150,
@@ -448,13 +427,13 @@ const styles = StyleSheet.create({
     elevation: 11,
     borderWidth: 1,
     borderColor: colors.lightGrayishBlue || 'rgba(0, 0, 0, 0.1)',
-    overflow: 'hidden', // Ensure clean edges
+    overflow: 'hidden',
   },
   viewDropdownItem: {
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: '#FFFFFF', // Explicit white background for each item
-    minHeight: 44, // Ensure proper touch target size
+    backgroundColor: '#FFFFFF',
+    minHeight: 44,
     color: colors.blackText,
   },
   viewDropdownItemSelected: {
