@@ -21,7 +21,6 @@ import {
   scaleWidth,
   screenHeight,
 } from '../utils/dimensions';
-import LinearGradient from 'react-native-linear-gradient';
 import { colors, fontSize, spacing, shadows, borderRadius } from '../utils/LightTheme';
 import { Fonts } from '../constants/Fonts';
 import { useActiveAccount } from '../stores/useActiveAccount';
@@ -32,7 +31,6 @@ import { useApiClient } from '../hooks/useApi';
 import { useToken } from '../stores/useTokenStore';
 import { useEventsStore } from '../stores/useEventsStore';
 import { Colors } from '../constants/Colors';
-import { Fonts } from '../constants/Fonts';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 
 interface CustomDrawerProps {
@@ -390,7 +388,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 <Text style={styles.plusIcon}>+</Text>
 
                 <Text style={styles.buttonText}>
-                  Create Event
+                  Create
                 </Text>
               </LinearGradient>
             </TouchableOpacity>
