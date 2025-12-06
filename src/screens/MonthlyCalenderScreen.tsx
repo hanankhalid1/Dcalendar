@@ -45,7 +45,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const navigation = useNavigation();
   const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
   const { account } = useActiveAccount();
-  const { userEvents, userEventsLoading, getUserEvents, setUserEvents } = useEventsStore();
+  const { userEvents, userEventsLoading, getUserEvents, setUserEvents, deletedUserEvents } = useEventsStore();
   const { selectedDate, setSelectedDate } = useCalendarStore();
   // ✅ Get start of week setting from store
 
@@ -821,10 +821,41 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       // Store current events for potential revert
       const currentEvents = [...(userEvents || [])];
       
-      // Optimistically remove event from UI immediately for better UX
+      // Optimistically mark event as deleted instead of removing it
+      // This ensures it appears in the deleted events list immediately
       if (userEvents && Array.isArray(userEvents)) {
-        const filteredEvents = userEvents.filter((ev: any) => ev.uid !== event.uid);
-        setUserEvents(filteredEvents);
+        const updatedEvents = userEvents.map((ev: any) => {
+          if (ev.uid === event.uid || ev.eventId === event.uid || ev.id === event.uid) {
+            // Mark as deleted by adding isDeleted flag to list
+            const existingList = ev.list || [];
+            // Remove any existing isDeleted or deletedTime items
+            const filteredList = existingList.filter((item: any) => 
+              item.key !== 'isDeleted' && item.key !== 'deletedTime'
+            );
+            // Add isDeleted and deletedTime
+            const updatedList = [
+              ...filteredList,
+              { key: 'isDeleted', value: 'true' },
+              { key: 'deletedTime', value: new Date().toISOString().replace(/[-:]/g, '').split('.')[0] }
+            ];
+            return {
+              ...ev,
+              list: updatedList
+            };
+          }
+          return ev;
+        });
+        // Include all events (active + deleted) so setUserEvents can properly filter them
+        // Remove duplicates by UID to prevent duplicate key errors
+        const allEventsMap = new Map();
+        [...updatedEvents, ...(deletedUserEvents || [])].forEach((ev: any) => {
+            if (!allEventsMap.has(ev.uid)) {
+                allEventsMap.set(ev.uid, ev);
+            }
+        });
+        const allEvents = Array.from(allEventsMap.values());
+        // setUserEvents will automatically filter into userEvents and deletedUserEvents
+        setUserEvents(allEvents);
       }
 
       // Delete on blockchain (this will take time, but UI already updated)

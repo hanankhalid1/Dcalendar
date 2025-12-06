@@ -761,29 +761,6 @@ const SettingsScreen = () => {
           />
         </View>
 
-        {/* About DCalendar Section */}
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>About DCalendar</Text>
-          <SettingRow
-            title="About app"
-            hasArrow={true}
-            onPress={() => {
-              // Navigate to about app screen
-              console.log('Navigate to About app');
-            }}
-            isLast={false}
-          />
-          <SettingRow
-            title="Contact us"
-            hasArrow={true}
-            onPress={() => {
-              // Navigate to contact us screen
-              console.log('Navigate to Contact us');
-            }}
-            isLast={false}
-          />
-        </View>
-
         {/* Logout Button */}
         <View style={styles.logoutContainer}>
           <SettingRow

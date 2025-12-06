@@ -635,7 +635,20 @@ export class BlockchainService {
         } else {
           // Try to extract meaningful error from the error object
           try {
-            const errorObj = typeof error === 'string' ? JSON.parse(error) : error;
+            let errorObj = error;
+            if (typeof error === 'string') {
+              try {
+                // Only parse if the string is not empty and looks like JSON
+                if (error.trim() && (error.trim().startsWith('{') || error.trim().startsWith('['))) {
+                  errorObj = JSON.parse(error);
+                } else {
+                  errorObj = { message: error };
+                }
+              } catch (parseError) {
+                // If JSON parse fails, use the error string as message
+                errorObj = { message: error };
+              }
+            }
             if (errorObj?.name || errorObj?.message) {
               errorMessage = `Transaction error: ${errorObj.name || errorObj.message}`;
             }
@@ -880,7 +893,20 @@ export class BlockchainService {
         } else {
           // Try to extract meaningful error from the error object
           try {
-            const errorObj = typeof error === 'string' ? JSON.parse(error) : error;
+            let errorObj = error;
+            if (typeof error === 'string') {
+              try {
+                // Only parse if the string is not empty and looks like JSON
+                if (error.trim() && (error.trim().startsWith('{') || error.trim().startsWith('['))) {
+                  errorObj = JSON.parse(error);
+                } else {
+                  errorObj = { message: error };
+                }
+              } catch (parseError) {
+                // If JSON parse fails, use the error string as message
+                errorObj = { message: error };
+              }
+            }
             if (errorObj?.name || errorObj?.message) {
               errorMessage = `Transaction error: ${errorObj.name || errorObj.message}`;
             }
@@ -1529,12 +1555,23 @@ export class BlockchainService {
       try {
         // Try to extract user info from token if it's a JWT
         if (typeof token === 'string' && token.includes('.')) {
-          const payload = JSON.parse(atob(token.split('.')[1]));
-          user =
-            payload.userName ||
-            payload.email ||
-            payload.username ||
-            'default_user';
+          try {
+            const tokenParts = token.split('.');
+            if (tokenParts.length >= 2 && tokenParts[1]) {
+              const decodedPayload = atob(tokenParts[1]);
+              if (decodedPayload && decodedPayload.trim()) {
+                const payload = JSON.parse(decodedPayload);
+                user =
+                  payload.userName ||
+                  payload.email ||
+                  payload.username ||
+                  'default_user';
+              }
+            }
+          } catch (parseError) {
+            console.warn('Failed to parse JWT token:', parseError);
+            // Continue with default user if parsing fails
+          }
         }
       } catch (e) { }
 

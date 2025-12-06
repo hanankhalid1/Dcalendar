@@ -12,6 +12,7 @@ import {
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import LinearGradient from 'react-native-linear-gradient';
+import ArrowDownIcon from '../../assets/svgs/arrow-down.svg';
 import { moderateScale, scaleHeight, scaleWidth } from '../../utils/dimensions';
 import {
   colors,
@@ -22,6 +23,7 @@ import {
 } from '../../utils/LightTheme';
 import { getAllContacts, Guest as DynamicGuest } from '../../utils/gueastUtils';
 import { useActiveAccount } from '../../stores/useActiveAccount';
+import { Fonts } from '../../constants/Fonts';
 
 interface GuestSelectorProps {
   isVisible: boolean;
@@ -101,20 +103,20 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   );
   return (
     <View style={styles.section}>
-      <Text style={styles.sectionTitle}>Add people</Text>
       <TouchableOpacity
         style={styles.guestInputContainer}
         onPress={onToggleGuestModal}
         disabled={disabled}
       >
-        <MaterialIcons name="person-add" size={24} color="#6C6C6C" />
+        <MaterialIcons name="person-add" size={20} color="#A4A7AE" />
         <Text style={styles.guestInput}>
           {selectedGuests.length > 0
             ? `${selectedGuests.length} guest${
                 selectedGuests.length > 1 ? 's' : ''
               } selected`
-            : 'Add guests'}
+            : 'Add people'}
         </Text>
+        <FeatherIcon name="plus" size={20} color="#A4A7AE" />
       </TouchableOpacity>
 
       {/* Guest Modal */}
@@ -131,7 +133,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
 
             {/* Modal Header */}
             <View style={styles.modalHeader}>
-              <Text style={styles.modalTitle}>Add guests</Text>
+              <Text style={styles.modalTitle}>Add people</Text>
             </View>
 
             {/* Search Bar */}
@@ -140,7 +142,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               <TextInput
                 style={styles.searchInput}
                 placeholder="Search contacts..."
-                placeholderTextColor="#9E9E9E"
+                placeholderTextColor="#A4A7AE"
                 value={searchQuery}
                 onChangeText={onSearchQueryChange}
                 editable={!disabled}
@@ -234,14 +236,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                 style={styles.addButton}
                 onPress={onToggleGuestModal}
               >
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.addButtonGradient}
-                >
-                  <Text style={styles.addButtonText}>Add</Text>
-                </LinearGradient>
+                <Text style={styles.addButtonText}>Add</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -265,20 +260,24 @@ const styles = StyleSheet.create({
   guestInputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
-    borderColor: colors.veryLightGrayishBlue,
-    backgroundColor: colors.lightgray,
-    borderRadius: borderRadius.md,
+    borderColor: '#DCE0E5',
+    backgroundColor: colors.white,
+    borderRadius: 8,
+    paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    height: scaleHeight(41),
-    width: scaleWidth(314),
+    minHeight: scaleHeight(44),
   },
   guestInput: {
     flex: 1,
-    fontSize: fontSize.textSize12,
-    color: colors.mediumlightgray,
-    paddingVertical: 0,
+    fontSize: 14,
+    color: '#A4A7AE',
+    fontWeight: '400',
+    marginLeft: spacing.sm,
+    fontFamily: Fonts.latoRegular,
+    lineHeight: 18,
+    letterSpacing: 0,
   },
   // Modal Styles
   modalOverlay: {
@@ -311,6 +310,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize20,
     fontWeight: '600',
     color: colors.blackText,
+    fontFamily: Fonts.latoBold,
   },
   searchContainer: {
     flexDirection: 'row',
@@ -325,9 +325,10 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: fontSize.textSize16,
-    color: colors.blackText,
+    color: '#252B37',
     marginLeft: spacing.sm,
     padding: 0,
+    fontFamily: Fonts.latoRegular,
   },
   guestList: {
     flex: 1,
@@ -377,10 +378,12 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     color: colors.blackText,
     marginBottom: 2,
+    fontFamily: Fonts.latoMedium,
   },
   guestUsername: {
     fontSize: fontSize.textSize14,
     color: '#6B7280',
+    fontFamily: Fonts.latoRegular,
   },
   checkbox: {
     width: scaleWidth(20),
@@ -405,6 +408,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize16,
     color: colors.blackText,
     fontWeight: '500',
+    fontFamily: Fonts.latoMedium,
   },
   errorContainer: {
     flex: 1,
@@ -419,6 +423,7 @@ const styles = StyleSheet.create({
     fontWeight: '500',
     textAlign: 'center',
     marginBottom: spacing.md,
+    fontFamily: Fonts.latoMedium,
   },
   retryButton: {
     backgroundColor: '#18F06E',
@@ -440,28 +445,29 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     backgroundColor: '#F3F4F6',
-    borderRadius: 10,
-    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    paddingVertical: scaleHeight(12),
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     fontWeight: '500',
     color: '#6B7280',
+    fontFamily: Fonts.latoMedium,
   },
   addButton: {
     flex: 2,
-    borderRadius: 10,
-    overflow: 'hidden',
-  },
-  addButtonGradient: {
-    paddingVertical: spacing.md,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.primaryBlue,
+    paddingVertical: scaleHeight(12),
     alignItems: 'center',
+    justifyContent: 'center',
   },
   addButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     fontWeight: '600',
     color: colors.white,
+    fontFamily: Fonts.latoSemiBold,
   },
   emptyContainer: {
     flex: 1,
@@ -475,6 +481,7 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     fontWeight: '500',
     marginBottom: spacing.sm,
+    fontFamily: Fonts.latoMedium,
   },
   emptySubtext: {
     fontSize: fontSize.textSize14,

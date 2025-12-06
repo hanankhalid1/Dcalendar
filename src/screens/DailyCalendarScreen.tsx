@@ -1,19 +1,17 @@
 import { useNavigation } from '@react-navigation/native';
-import { useState } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import {
-  StyleProp,
   StyleSheet,
   Text,
-  TextStyle,
   View,
-  Alert
+  ScrollView,
+  TouchableOpacity,
+  Image,
+  Modal,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
-import WeekView from 'react-native-week-view';
 import CustomDrawer from '../components/CustomDrawer';
 import EventDetailsModal from '../components/EventDetailsModal';
 import FloatingActionButton from '../components/FloatingActionButton';
-import CustomeHeader from '../global/CustomeHeader';
 import { useApiClient } from '../hooks/useApi';
 import { Screen } from '../navigations/appNavigation.type';
 import { useActiveAccount } from '../stores/useActiveAccount';
@@ -22,86 +20,32 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { useToken } from '../stores/useTokenStore';
 import { parseTimeToPST, isEventInPast } from '../utils';
 import CustomAlert from '../components/CustomAlert';
-import { colors } from '../utils/LightTheme';
-
-const CustomDayHeader = ({
-  date: _date,
-  formattedDate,
-  textStyle: _textStyle,
-  isToday,
-}: {
-  date: any;
-  formattedDate: string;
-  textStyle: StyleProp<TextStyle>;
-  isToday: boolean;
-}) => {
-  const dayName = formattedDate.split(' ')[0];
-  const dayNumber = formattedDate.split(' ')[1];
-
-  return (
-    <View style={styles.dayHeaderContainer}>
-      <Text style={styles.dayNameText}>{dayName}</Text>
-      {isToday ? (
-        <LinearGradient
-          colors={['#18F06E', '#0B6DE0']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.selectedDateCircle}
-        >
-          <Text style={styles.selectedDateText}>{dayNumber}</Text>
-        </LinearGradient>
-      ) : (
-        <LinearGradient
-          colors={['#18F06E', '#0B6DE0']}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.selectedDateCircle}
-        >
-          <Text style={styles.selectedDateText}>{dayNumber}</Text>
-        </LinearGradient>
-      )}
-
-      {/* {dayName === 'Sat' && (
-        <LinearGradient
-          colors={['#4CAF50', '#2196F3']}
-          style={styles.holidayLabel}
-        >
-          <Text style={styles.holidayText}>Holiday</Text>
-        </LinearGradient>
-      )} */}
-    </View>
-  );
-};
-// Custom EventComponent to match the design
-const CustomEventComponent = ({ event }: { event: any }) => {
-  return (
-    <View>
-      <Text style={styles.eventTitle}>{event.description}</Text>
-      <Text style={styles.eventTime}>
-        {event.startDate
-          .toLocaleTimeString('en-US', {
-            hour: 'numeric',
-            minute: '2-digit',
-            hour12: true,
-          })
-          .toLowerCase()}
-      </Text>
-      {/* {event.location && (
-          <Text style={styles.eventLocation}>{event.location}</Text>
-        )} */}
-    </View>
-  );
-};
+import { colors, spacing, fontSize, shadows, borderRadius } from '../utils/LightTheme';
+import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
+import { Fonts } from '../constants/Fonts';
+import MenuIcon from '../assets/svgs/menu.svg';
+import SearchIcon from '../assets/svgs/search.svg';
+import CalendarIcon from '../assets/svgs/calendar.svg';
+import ClockIcon from '../assets/svgs/clock.svg';
+import EventIcon from '../assets/svgs/eventIcon.svg';
+import TaskIcon from '../assets/svgs/taskIcon.svg';
+import AntDesign from 'react-native-vector-icons/AntDesign';
+import { useSettingsStore } from '../stores/useSetting';
+import EventCard from '../components/EventCard';
 
 const DailyCalendarScreen = () => {
   const navigation = useNavigation();
-  const { userEvents, userEventsLoading, userEventsError } = useEventsStore();
-  const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
+  const { userEvents, userEventsLoading, getUserEvents } = useEventsStore();
   const { selectedDate, setSelectedDate } = useCalendarStore();
-  const [isPaging, setIsPaging] = useState(false);
+  const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isEventModalVisible, setIsEventModalVisible] = useState(false);
+  const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const { account } = useActiveAccount();
+  const { api } = useApiClient();
+  const { selectedTimeZone } = useSettingsStore();
   
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
@@ -121,113 +65,177 @@ const DailyCalendarScreen = () => {
     setAlertVisible(true);
   };
 
-
-  // Transform UserEvents to WeekView format
-  const transformUserEventsForWeekView = (userEvents: any[]) => {
-
-  
-    return userEvents
-      .map((event, index) => {
-        const startDate = parseTimeToPST(event.fromTime);
-        const endDate = parseTimeToPST(event.toTime);
-
-        // const isTask = (event: any): boolean => {
-        //   return event.list?.some(
-        //     (item: any) => item.key === 'task' && item.value === 'true'
-        //   ) || false;
-        // };
-        
-        if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-          console.log('Skipping invalid event:', event);
-          return null;
-        }
-
-        let colour = '#337E891A'; // Default color for standard events
-        if(event.list?.some((item: any) => item.key === 'task' && item.value === 'true')) {
-          console.log('Event is a task:', event);
-          colour = colors.figmaPurpleOpacity20; // Color for tasks
-        }
-
-        return {
-          id: event.uuid || `event-${index}`,
-          startDate,
-          endDate,
-          color: colour,
-          description: event.title || 'Event',
-          title: event.title || 'Event',
-          location: '',
-          eventKind: 'standard' as const,
-          resolveOverlap: 'stack' as const,
-          stackKey: event.uuid || `event-${index}`,
-          originalEvent: event, // Store the original event data
-        };
-      })
-      .filter((event): event is NonNullable<typeof event> => event !== null);
+  // Format date for display
+  const formatDateDisplay = (date: Date) => {
+    return date.toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
   };
 
-  // Transform user events for WeekView display
-  const myEvents = transformUserEventsForWeekView(userEvents);
+  // Get events for selected date
+  const selectedDateString = useMemo(() => {
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  }, [selectedDate]);
+
+  // Group events by date
+  const { eventsByDate } = useMemo(() => {
+    const grouped: { [key: string]: any[] } = {};
+    
+    userEvents.forEach((event) => {
+      if (!event.fromTime) return;
+      
+        const startDate = parseTimeToPST(event.fromTime);
+      if (!startDate || isNaN(startDate.getTime())) return;
+      
+      const year = startDate.getFullYear();
+      const month = String(startDate.getMonth() + 1).padStart(2, '0');
+      const day = String(startDate.getDate()).padStart(2, '0');
+      const dateKey = `${year}-${month}-${day}`;
+      
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(event);
+    });
+    
+    return { eventsByDate: grouped };
+  }, [userEvents]);
+
+  // Get events for selected date and sort by time
+  const selectedDateEvents = useMemo(() => {
+    const events = eventsByDate[selectedDateString] || [];
+    return events.sort((a, b) => {
+      const timeA = parseTimeToPST(a.fromTime);
+      const timeB = parseTimeToPST(b.fromTime);
+      if (!timeA || !timeB) return 0;
+      return timeA.getTime() - timeB.getTime();
+    });
+  }, [eventsByDate, selectedDateString]);
+
+  // Calculate duration
+  const calculateDuration = (fromTime: string, toTime: string) => {
+    const from = parseTimeToPST(fromTime);
+    const to = parseTimeToPST(toTime);
+    if (!from || !to) return '0h';
+    
+    const diffMs = to.getTime() - from.getTime();
+    const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+    const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    
+    if (diffHours > 0) {
+      return diffMinutes > 0 ? `${diffHours}h ${diffMinutes}m` : `${diffHours}h`;
+    }
+    return `${diffMinutes}m`;
+  };
+
+  // Format time
+  const formatTime = (dateString: string) => {
+    const date = parseTimeToPST(dateString);
+    if (!date) return 'Invalid Time';
+    
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).toLowerCase().replace(' ', '');
+  };
+
+  // Extract guests from event
+  const getEventGuests = (event: any): Array<{ email: string; avatar?: string }> => {
+    if (!event) return [];
+    const guests: Array<{ email: string; avatar?: string }> = [];
+    
+    if (event.guests && Array.isArray(event.guests)) {
+      event.guests.forEach((g: any) => {
+        if (typeof g === 'string') {
+          guests.push({ email: g });
+        } else if (g && typeof g === 'object' && g.email) {
+          guests.push({ email: g.email, avatar: g.avatar || g.picture || g.profilePicture });
+        }
+      });
+    }
+    
+    if (event.list && Array.isArray(event.list)) {
+      const guestItems = event.list.filter((item: any) => item && item.key === 'guest');
+      guestItems.forEach((item: any) => {
+        if (typeof item.value === 'string') {
+          guests.push({ email: item.value });
+        } else if (item.value && typeof item.value === 'object') {
+          guests.push({
+            email: item.value.email || item.value,
+            avatar: item.value.avatar || item.value.picture || item.value.profilePicture
+          });
+        }
+      });
+    }
+    
+    return guests.filter((g: any) => g && g.email);
+  };
+
+  // Generate initials from email
+  const getGuestInitials = (email: string): string => {
+    if (!email) return '?';
+    const parts = email.split('@')[0].split(/[._-]/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return email.charAt(0).toUpperCase();
+  };
+
+  // Generate background color based on email
+  const getGuestBackgroundColor = (email: string): string[] => {
+    const colorOptions = [
+      ['#FF6B6B', '#FF8E8E'],
+      ['#4ECDC4', '#6EDDD6'],
+      ['#45B7D1', '#6BC5D8'],
+      ['#FFA07A', '#FFB89A'],
+      ['#98D8C8', '#B0E4D4'],
+      ['#F7DC6F', '#F9E68A'],
+      ['#BB8FCE', '#C9A5D9'],
+      ['#85C1E2', '#9DCFE8'],
+    ];
+    const index = email.charCodeAt(0) % colorOptions.length;
+    return colorOptions[index];
+  };
+
+  // Get recurrence info
+  const getRecurrenceDayText = (event: any) => {
+    if (!event.list || !Array.isArray(event.list)) return '';
+    const repeatOn = event.list.find((item: any) => item.key === 'repeatOn');
+    if (repeatOn && repeatOn.value) {
+      return repeatOn.value;
+    }
+    return '';
+  };
+
+  // Get progress percentage
+  const getProgress = (event: any): number => {
+    if (!event.list || !Array.isArray(event.list)) return 0;
+    const progressItem = event.list.find((item: any) => item && (item.key === 'progress' || item.key === 'completion'));
+    if (progressItem && typeof progressItem.value === 'number') {
+      return Math.min(100, Math.max(0, progressItem.value));
+    }
+    return 0;
+  };
+
+  // Check if event is a task
+  const isTask = (event: any) => {
+    return event.list?.some((item: any) => item.key === 'task') || false;
+  };
+
+  useEffect(() => {
+    if (account && account[3]) {
+      getUserEvents(account[3], api);
+    }
+  }, [account]);
+
   const handleMenuPress = () => {
     setIsDrawerOpen(true);
-  };
-
-  const handleMonthPress = () => {
-    console.log('Month selector pressed');
-  };
-
-  // Helper function to update month display
-  const updateMonthDisplay = (date: Date) => {
-    setCurrentMonthByIndex(date.getMonth());
-  };
-
-  const handleMonthSelect = (monthIndex: number) => {
-    setCurrentMonthByIndex(monthIndex);
-  };
-
-  const handleDateSelect = (date: Date) => {
-    console.log('Date selected:', date);
-    console.log('Date day of week:', date.getDay()); // 0 = Sunday, 1 = Monday, etc.
-    console.log(
-      'Date formatted:',
-      date.toLocaleDateString('en-US', {
-        weekday: 'long',
-        year: 'numeric',
-        month: 'long',
-        day: 'numeric',
-      }),
-    );
-
-    // Create a new date object to avoid any timezone issues
-    const newDate = new Date(
-      date.getFullYear(),
-      date.getMonth(),
-      date.getDate(),
-      12,
-      0,
-      0,
-      0,
-    );
-    console.log('New date created:', newDate);
-    console.log('New date day of week:', newDate.getDay());
-
-    setSelectedDate(newDate);
-    updateMonthDisplay(newDate);
-  };
-
-  const handleSwipeNext = (date: Date) => {
-    console.log('Swiped to next:', date);
-    setIsPaging(true);
-    setSelectedDate(date);
-    updateMonthDisplay(date);
-    setTimeout(() => setIsPaging(false), 200);
-  };
-
-  const handleSwipePrev = (date: Date) => {
-    console.log('Swiped to previous:', date);
-    setIsPaging(true);
-    setSelectedDate(date);
-    updateMonthDisplay(date);
-    setTimeout(() => setIsPaging(false), 200);
   };
 
   const handleDrawerClose = () => {
@@ -235,19 +243,8 @@ const DailyCalendarScreen = () => {
   };
 
   const handleEventPress = (event: any) => {
-    console.log('Event pressed:', event);
-
-    // Use the original event data that we stored in the processed event
-    const originalEvent = event.originalEvent;
-    console.log('Found original event:', originalEvent);
-
-    if (originalEvent) {
-      setSelectedEvent(originalEvent);
+    setSelectedEvent(event);
       setIsEventModalVisible(true);
-      console.log('Modal should be visible now');
-    } else {
-      console.log('No original event found in event object');
-    }
   };
 
   const handleCloseEventModal = () => {
@@ -258,25 +255,20 @@ const DailyCalendarScreen = () => {
   const handleEditEvent = (event: any) => {
     handleCloseEventModal();
     
-    // Extract the raw data if available
     const eventToPass = event.originalRawEventData || event;
-    
-    // Check if it's a task first (needed for conditional alert message)
     const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
-    const isTask = list.some((item: any) => item.key === 'task');
+    const isTaskEvent = list.some((item: any) => item.key === 'task');
     
-    // Check if event is in the past
     if (isEventInPast(eventToPass)) {
       showAlert(
-        isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
+        isTaskEvent ? 'Cannot edit past Task' : 'Cannot edit past Event',
         '',
         'warning'
       );
       return;
     }
     
-    // Determine the target screen
-    const targetScreen = isTask
+    const targetScreen = isTaskEvent
       ? Screen.CreateTaskScreen
       : Screen.CreateEventScreen;
     
@@ -287,80 +279,150 @@ const DailyCalendarScreen = () => {
   };
 
   const handleDeleteEvent = (event: any) => {
-    console.log('Delete event:', event);
-    // TODO: Implement delete functionality
     handleCloseEventModal();
+    // Delete functionality handled by EventDetailsModal
   };
 
-  // Drawer-specific handlers removed; CustomDrawer navigates internally
+  const handleDatePress = () => {
+    setIsDatePickerVisible(true);
+  };
+
+  const handleSearchPress = () => {
+    // TODO: Implement search functionality
+  };
+
+  const handleCalendarPress = () => {
+    // TODO: Navigate to monthly calendar or show calendar picker
+  };
+
+  // Transform events for EventCard component
+  const transformEventForCard = (event: any) => {
+    const startTime = parseTimeToPST(event.fromTime);
+    const endTime = parseTimeToPST(event.toTime);
+    const duration = calculateDuration(event.fromTime, event.toTime);
+    const startTimeStr = startTime?.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).toLowerCase().replace(' ', '') || '';
+    const endTimeStr = endTime?.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true,
+    }).toLowerCase().replace(' ', '') || '';
+    const timeRange = `${startTimeStr}-${endTimeStr}`;
+    const timeDisplay = `${duration} (${timeRange})`;
+    
+    const isTaskEvent = isTask(event);
+    const eventColor = isTaskEvent ? '#8DC63F' : '#00AEEF';
+    
+    return {
+      id: event.uid,
+      title: event.title,
+      time: timeDisplay,
+      date: formatDateDisplay(selectedDate),
+      color: eventColor,
+      tags: event.list || [],
+      originalRawEventData: event,
+    };
+  };
+
   return (
     <View style={styles.container}>
-      <CustomeHeader
-        onMenuPress={handleMenuPress}
-        currentMonth={currentMonth}
-        onMonthPress={handleMonthPress}
-        onMonthSelect={handleMonthSelect}
-      />
-      {/* Loading indicator */}
-      {userEventsLoading && (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading events...</Text>
+      {/* Custom Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <TouchableOpacity onPress={handleMenuPress} style={styles.headerIcon}>
+            <MenuIcon width={24} height={24} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            onPress={handleDatePress}
+            style={styles.dateContainer}
+          >
+            <Text style={styles.dateText}>{formatDateDisplay(selectedDate)}</Text>
+            <AntDesign name="down" size={12} color="#000" style={styles.dateCaret} />
+          </TouchableOpacity>
         </View>
-      )}
+        
+        <TouchableOpacity onPress={handleSearchPress} style={styles.headerIcon}>
+          <SearchIcon width={24} height={24} />
+        </TouchableOpacity>
+      </View>
 
-      {/* Error indicator */}
-      {userEventsError && (
-        <View style={styles.errorContainer}>
-          <Text style={styles.errorText}>Error: {userEventsError}</Text>
-        </View>
-      )}
+      {/* Today's Schedule Section */}
+      <ScrollView 
+        style={styles.scrollView}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <Text style={styles.sectionTitle}>Today's schedule</Text>
+        
+        {selectedDateEvents.length === 0 ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>No events scheduled for today</Text>
+          </View>
+        ) : (
+          (() => {
+            // Group events by time (hour) for display
+            const groupedByTime: { [key: string]: any[] } = {};
+            selectedDateEvents.forEach((event) => {
+              const startTime = parseTimeToPST(event.fromTime);
+              const timeLabel = startTime?.toLocaleTimeString('en-US', {
+                hour: 'numeric',
+                minute: '2-digit',
+                hour12: true,
+              }).toLowerCase().replace(' ', '') || '';
+              
+              if (!groupedByTime[timeLabel]) {
+                groupedByTime[timeLabel] = [];
+              }
+              groupedByTime[timeLabel].push(event);
+            });
+            
+            return Object.entries(groupedByTime).map(([timeLabel, events]) => (
+              <View key={timeLabel} style={styles.timeGroup}>
+                <View style={styles.timeHeader}>
+                  <Text style={styles.timeLabelText} numberOfLines={1}>
+                    {timeLabel}
+                  </Text>
+                  <View style={styles.timeDivider} />
+                </View>
+                {events.map((event, index) => {
+                  const duration = calculateDuration(event.fromTime, event.toTime);
+                  const startTimeStr = formatTime(event.fromTime);
+                  const endTimeStr = formatTime(event.toTime);
+                  const timeRange = `${startTimeStr}-${endTimeStr}`;
+                  const timeDisplay = `${duration} (${timeRange})`;
+                  
+                  const isTaskEvent = isTask(event);
+                  
+                  return (
+                    <View key={`${event.uid}-${index}`} style={styles.eventCardWrapper}>
+                      <EventCard
+                        title={event.title}
+                        eventId={event.uid}
+                        event={transformEventForCard(event)}
+                        time={timeDisplay}
+                        date={formatDateDisplay(selectedDate)}
+                        color={isTaskEvent ? '#8DC63F' : '#00AEEF'}
+                        tags={event.list || []}
+                        compact={true}
+                        onEdit={() => handleEditEvent(event)}
+                      />
+                    </View>
+                  );
+                })}
+              </View>
+            ));
+          })()
+        )}
+      </ScrollView>
 
-      <WeekView
-        key={`dailyview-${selectedDate.getFullYear()}-${selectedDate.getMonth()}-${selectedDate.getDate()}`}
-        events={myEvents}
-        selectedDate={selectedDate}
-        numberOfDays={1}
-        pageStartAt={{ left: 0, weekday: 1 }}
-        formatDateHeader="ddd D"
-        showTitle={false} // Hide the default title
-        headerStyle={styles.headerStyle}
-        headerTextStyle={styles.headerTextStyle}
-        hourTextStyle={styles.hourTextStyle}
-        eventContainerStyle={styles.eventContainerStyle}
-        gridRowStyle={styles.gridRowStyle}
-        startHour={10}
-        hoursInDisplay={12}
-        timeStep={60}
-        formatTimeLabel="h A"
-        rightToLeft={false}
-        showNowLine={true}
-        timesColumnWidth={0.15}
-        DayHeaderComponent={CustomDayHeader}
-        EventComponent={CustomEventComponent}
-        onSwipeNext={handleSwipeNext}
-        onSwipePrev={handleSwipePrev}
-        onDayPress={handleDateSelect}
-        onEventPress={handleEventPress}
-      />
-
-      {isPaging && (
-        <View style={styles.loadingContainer}>
-          <Text style={styles.loadingText}>Loading…</Text>
-        </View>
-      )}
-
-      {/* Floating Action Button matching the design */}
+      {/* Floating Action Button */}
       <FloatingActionButton
         onOptionSelect={option => {
-          console.log('Selected option:', option);
-          // Handle different menu options
           switch (option) {
-            case 'goal':
-              console.log('Create Goal');
-              break;
-            case 'reminder':
-              navigation.navigate(Screen.RemindersScreen as never);
-              break;
             case 'task':
               navigation.navigate(Screen.CreateTaskScreen as never);
               break;
@@ -372,6 +434,7 @@ const DailyCalendarScreen = () => {
           }
         }}
       />
+
       {/* Custom Drawer */}
       <CustomDrawer
         isOpen={isDrawerOpen}
@@ -399,188 +462,88 @@ const DailyCalendarScreen = () => {
   );
 };
 
-export default DailyCalendarScreen;
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#ffffff',
-    // paddingTop: 60,
+    backgroundColor: '#F5F5F5',
   },
-
-  // WeekView Header Styles
-  headerStyle: {
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 0,
-    paddingVertical: 5,
-    borderLeftWidth: 0,
-    borderRightWidth: 0,
-    // elevation: 3,
-  },
-  headerTextStyle: {
-    color: '#333333',
-    fontSize: 14,
-    fontWeight: '500',
-    textAlign: 'center',
-  },
-
-  // Day Header Component Styles
-  dayHeaderContainer: {
+  header: {
+    flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#fff',
-    justifyContent: 'center',
-    position: 'absolute',
-    left: 0,
+    justifyContent: 'space-between',
+    paddingHorizontal: scaleWidth(20),
+    paddingTop: scaleHeight(50),
+    paddingBottom: scaleHeight(16),
+    backgroundColor: colors.white,
   },
-  dayNameText: {
-    fontSize: 14,
-    color: '#000000',
-    fontWeight: '500',
-  },
-  selectedDateCircle: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    justifyContent: 'center',
+  headerLeft: {
+    flexDirection: 'row',
     alignItems: 'center',
+    flex: 1,
   },
-  selectedDateText: {
-    color: '#ffffff',
-    fontSize: 14,
-    fontWeight: '600',
+  headerIcon: {
+    padding: scaleWidth(8),
   },
-  regularDateCircle: {
-    backgroundColor: '#F9F9F9',
+  dateContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    width: 28,
-    height: 28,
-    borderRadius: 14,
+    marginLeft: scaleWidth(12),
   },
   dateText: {
-    fontSize: 16,
-    color: '#CACACA',
-    fontWeight: '600',
+    fontSize: fontSize.textSize16,
+    fontFamily: Fonts.latoBold,
+    color: '#000',
+    marginRight: scaleWidth(4),
   },
-  holidayLabel: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 12,
-    marginTop: 2,
+  dateCaret: {
+    marginLeft: scaleWidth(4),
   },
-  holidayText: {
-    color: '#ffffff',
-    fontSize: 10,
-    fontWeight: '500',
+  scrollView: {
+    flex: 1,
   },
-
-  // Event Component Styles
-  eventTitle: {
-    color: '#337E89',
-    fontSize: 8,
-    fontWeight: 'bold',
-    marginBottom: 2,
+  scrollContent: {
+    paddingHorizontal: scaleWidth(20),
+    paddingTop: scaleHeight(20),
+    paddingBottom: scaleHeight(100),
   },
-  eventTime: {
-    color: '#747474',
-    fontSize: 6,
-    fontWeight: '400',
+  sectionTitle: {
+    fontSize: fontSize.textSize18,
+    fontFamily: Fonts.latoBold,
+    color: '#000',
+    marginBottom: scaleHeight(20),
   },
-  eventLocation: {
-    color: '#747474',
-    fontSize: 9,
-    fontWeight: '400',
-    marginTop: 2,
+  timeGroup: {
+    marginBottom: scaleHeight(16),
   },
-
-  // WeekView Styles
-  hourTextStyle: {
-    color: '#6C6C6C',
-    fontSize: 14,
-    fontWeight: '300',
-    lineHeight: 16,
-  },
-  eventContainerStyle: {
-    borderRadius: 4,
-    padding: 2,
-   // backgroundColor: '#337E891A',
-    borderColor: '#337E89',
-    borderWidth: 1,
-  },
-  eventTextStyle: {
-    color: '#333',
-    fontSize: 12,
-    fontWeight: '500',
-  },
-  gridRowStyle: {
-    borderWidth: 1,
-    borderColor: '#EFEFEF',
-  },
-
-  // Floating Action Button Styles
-  fab: {
-    position: 'absolute',
-    bottom: 20,
-    right: 20,
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    elevation: 8,
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 4,
-    },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-  },
-  fabGradient: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
+  timeHeader: {
+    flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: scaleHeight(12),
   },
-  fabIcon: {
-    color: '#ffffff',
-    fontSize: 24,
-    fontWeight: 'bold',
+  timeLabelText: {
+    fontSize: moderateScale(16),
+    fontFamily: Fonts.latoBold,
+    color: '#000',
+    marginRight: scaleWidth(12),
   },
-
-  // Loading and Error States
-  loadingContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(255, 255, 255, 0.8)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    zIndex: 1000,
+  timeDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E0E0E0',
   },
-  loadingText: {
-    fontSize: 16,
-    color: '#666',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 10,
-    borderRadius: 5,
+  eventCardWrapper: {
+    marginBottom: scaleHeight(12),
   },
-  errorContainer: {
-    position: 'absolute',
-    top: '50%',
-    left: 20,
-    right: 20,
+  emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 1000,
+    paddingVertical: scaleHeight(40),
   },
-  errorText: {
-    fontSize: 14,
-    color: '#ff4444',
-    backgroundColor: 'rgba(255, 255, 255, 0.9)',
-    padding: 10,
-    borderRadius: 5,
-    textAlign: 'center',
+  emptyText: {
+    fontSize: fontSize.textSize14,
+    fontFamily: Fonts.latoRegular,
+    color: '#717680',
   },
 });
+
+export default DailyCalendarScreen;

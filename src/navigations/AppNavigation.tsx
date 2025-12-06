@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
+import ScheduleScreen from '../screens/ScheduleScreen';
 import WeekScreen from '../screens/WeekScreen';
 import DailyCalendarScreen from '../screens/DailyCalendarScreen';
 import RemindersScreen from '../screens/RemindersScreen';
@@ -60,7 +61,7 @@ const StackNavigator = () => {
       />
       <Stack.Screen
         name="ScheduleScreen"
-        component={HomeScreen}
+        component={ScheduleScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

@@ -19,6 +19,7 @@ import {
     scaleHeight,
     scaleWidth,
     screenHeight,
+    screenWidth,
 } from '../utils/dimensions';
 import {
     colors,
@@ -42,12 +43,28 @@ const DeletedEventsScreen: React.FC = () => {
     const { deletedUserEvents, userEventsLoading, getUserEvents } = useEventsStore();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const [selectedEventMenu, setSelectedEventMenu] = useState<string | null>(null);
-    const [menuPosition, setMenuPosition] = useState<{ x: number; y: number } | null>(null);
+    const [menuPosition, setMenuPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+    const [showClearBinModal, setShowClearBinModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [eventToDelete, setEventToDelete] = useState<any>(null);
     const menuButtonRefs = React.useRef<{ [key: string]: View | null }>({});
     const activeAccount = useActiveAccount(state => state.account);
     const blockchainService = React.useMemo(() => new BlockchainService(), []);
     const token = useToken.getState().token;
     const { api } = useApiClient();
+
+    // Debug: Log when modal state changes
+    useEffect(() => {
+        console.log('🔔 MODAL STATE CHANGE:');
+        console.log('  showDeleteModal:', showDeleteModal);
+        console.log('  eventToDelete:', eventToDelete);
+        console.log('  eventToDelete?.title:', eventToDelete?.title);
+        if (showDeleteModal) {
+            console.log('✅ Modal should be VISIBLE now!');
+        } else {
+            console.log('❌ Modal is HIDDEN');
+        }
+    }, [showDeleteModal, eventToDelete]);
 
     const handleMenuPress = () => {
         setIsDrawerOpen(true);
@@ -100,7 +117,16 @@ const DeletedEventsScreen: React.FC = () => {
 
     const groupEventsByDate = () => {
         const grouped: { [key: string]: any[] } = {};
+        // Remove duplicates by UID before grouping
+        const uniqueEventsMap = new Map();
         deletedUserEvents.forEach((event) => {
+            if (event.uid && !uniqueEventsMap.has(event.uid)) {
+                uniqueEventsMap.set(event.uid, event);
+            }
+        });
+        const uniqueEvents = Array.from(uniqueEventsMap.values());
+        
+        uniqueEvents.forEach((event) => {
             const dateKey = formatDateHeader(event.fromTime);
             if (!grouped[dateKey]) {
                 grouped[dateKey] = [];
@@ -111,53 +137,97 @@ const DeletedEventsScreen: React.FC = () => {
     };
 
     const handleClearBin = () => {
-        Alert.alert(
-            'Clear Bin',
-            'Are you sure you want to permanently delete all items in the recycle bin? This action cannot be undone.',
-            [
-                {
-                    text: 'Cancel',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Clear',
-                    style: 'destructive',
-                    onPress: async () => {
-                        // Delete all events permanently
-                        for (const event of deletedUserEvents) {
-                            await blockchainService.deleteEventPermanent(event.uid, activeAccount, token, api);
-                        }
-                    },
-                },
-            ]
-        );
+        setShowClearBinModal(true);
     };
 
-    const handleRename = (event: any) => {
+    const handleConfirmClearBin = async () => {
+        setShowClearBinModal(false);
+        // Delete all events permanently
+        for (const event of deletedUserEvents) {
+            await blockchainService.deleteEventPermanent(event.uid, activeAccount, token, api);
+        }
+    };
+
+    const handleRestore = async (event: any) => {
         setSelectedEventMenu(null);
-        // TODO: Implement rename functionality
-        console.log('Rename event:', event);
+        setMenuPosition(null);
+        try {
+            // Optimistically restore event by removing isDeleted flag
+            const { setUserEvents, userEvents, deletedUserEvents } = useEventsStore.getState();
+            // Combine all events and remove duplicates by UID (keep the first occurrence)
+            const allEventsMap = new Map();
+            [...(userEvents || []), ...(deletedUserEvents || [])].forEach((ev: any) => {
+                if (!allEventsMap.has(ev.uid)) {
+                    allEventsMap.set(ev.uid, ev);
+                }
+            });
+            const allEvents = Array.from(allEventsMap.values());
+            
+            const updatedEvents = allEvents.map((ev: any) => {
+                if (ev.uid === event.uid) {
+                    const existingList = ev.list || [];
+                    const filteredList = existingList.filter((item: any) => 
+                        item.key !== 'isDeleted' && item.key !== 'deletedTime'
+                    );
+                    return {
+                        ...ev,
+                        list: filteredList
+                    };
+                }
+                return ev;
+            });
+            setUserEvents(updatedEvents);
+
+            // Restore on blockchain
+            await blockchainService.restoreEvent(event, activeAccount, token, api);
+            
+            // Refresh events in background
+            getUserEvents(activeAccount.userName, api).catch(err => {
+                console.error('Background event refresh failed:', err);
+            });
+        } catch (err) {
+            console.error("Restore Event Failed:", err);
+            Alert.alert("Error", "Failed to restore the event");
+            // Refresh to revert optimistic update
+            getUserEvents(activeAccount.userName, api);
+        }
     };
 
     const handleDelete = (event: any) => {
+        console.log('========== handleDelete START ==========');
+        console.log('handleDelete called with event:', event);
+        console.log('Event UID:', event?.uid);
+        console.log('Event title:', event?.title);
+        
+        // Close menu modal first
+        console.log('Closing menu modal...');
         setSelectedEventMenu(null);
-        Alert.alert(
-            'Permanently Delete',
-            `Are you sure you want to permanently delete "${event.title}"? This action cannot be undone.`,
-            [
-                {
-                    text: 'Cancel',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Delete',
-                    style: 'destructive',
-                    onPress: async () => {
-                        await blockchainService.deleteEventPermanent(event.uid, activeAccount, token, api);
-                    },
-                },
-            ]
-        );
+        setMenuPosition(null);
+        
+        // Set event and show modal immediately
+        console.log('Setting eventToDelete and showDeleteModal...');
+        setEventToDelete(event);
+        setShowDeleteModal(true);
+        
+        console.log('showDeleteModal should now be: true');
+        console.log('eventToDelete should now be:', event);
+        console.log('========== handleDelete END ==========');
+    };
+
+    const handleConfirmDelete = async () => {
+        if (eventToDelete) {
+            setShowDeleteModal(false);
+            try {
+                await blockchainService.deleteEventPermanent(eventToDelete.uid, activeAccount, token, api);
+                // Refresh events after deletion
+                await getUserEvents(activeAccount.userName, api);
+            } catch (error) {
+                console.error('Error deleting event permanently:', error);
+                Alert.alert('Error', 'Failed to permanently delete the event');
+            } finally {
+                setEventToDelete(null);
+            }
+        }
     };
 
     const renderEventCard = (event: any, index: number) => {
@@ -168,7 +238,7 @@ const DeletedEventsScreen: React.FC = () => {
         const timeRange = `${startTime}-${endTime}`;
 
         return (
-            <View key={event.uid || index} style={styles.eventCard}>
+            <View key={event.uid || `event-${index}`} style={styles.eventCard}>
                 <View style={styles.eventContent}>
                     <Text style={styles.eventTitle} numberOfLines={2} ellipsizeMode="tail">
                         {event.title}
@@ -220,7 +290,7 @@ const DeletedEventsScreen: React.FC = () => {
                             const ref = menuButtonRefs.current[event.uid];
                             if (ref) {
                                 ref.measure((x, y, width, height, pageX, pageY) => {
-                                    setMenuPosition({ x: pageX, y: pageY });
+                                    setMenuPosition({ x: pageX, y: pageY, width, height });
                                     setSelectedEventMenu(event.uid);
                                 });
                             } else {
@@ -306,8 +376,8 @@ const DeletedEventsScreen: React.FC = () => {
                                 styles.menuPopup,
                                 {
                                     position: 'absolute',
-                                    top: menuPosition.y + scaleHeight(8),
-                                    right: scaleWidth(20),
+                                    top: menuPosition.y + menuPosition.height + scaleHeight(4),
+                                    right: screenWidth - menuPosition.x - menuPosition.width,
                                 }
                             ]}>
                                 <TouchableOpacity
@@ -315,20 +385,25 @@ const DeletedEventsScreen: React.FC = () => {
                                     onPress={() => {
                                         const event = deletedUserEvents.find(e => e.uid === selectedEventMenu);
                                         if (event) {
-                                            handleRename(event);
-                                            setMenuPosition(null);
+                                            handleRestore(event);
                                         }
                                     }}
                                 >
-                                    <Text style={styles.menuItemText}>Rename</Text>
+                                    <Text style={styles.menuItemText}>Restore</Text>
                                 </TouchableOpacity>
                                 <TouchableOpacity
                                     style={styles.menuItem}
                                     onPress={() => {
+                                        console.log('Delete button clicked in menu');
+                                        console.log('selectedEventMenu:', selectedEventMenu);
                                         const event = deletedUserEvents.find(e => e.uid === selectedEventMenu);
+                                        console.log('Found event:', event);
                                         if (event) {
+                                            console.log('Calling handleDelete with event:', event);
                                             handleDelete(event);
                                             setMenuPosition(null);
+                                        } else {
+                                            console.log('Event not found for uid:', selectedEventMenu);
                                         }
                                     }}
                                 >
@@ -340,6 +415,94 @@ const DeletedEventsScreen: React.FC = () => {
                 )}
                 </>
             )}
+
+            {/* Clear Bin Confirmation Modal */}
+            <Modal
+                transparent={true}
+                visible={showClearBinModal}
+                animationType="fade"
+                onRequestClose={() => setShowClearBinModal(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowClearBinModal(false)}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={(e) => e.stopPropagation()}
+                        style={styles.modalContainer}
+                    >
+                        <Text style={styles.modalTitle}>Clear bin?</Text>
+                        <Text style={styles.modalMessage}>
+                            Are you sure you want to delete all the completed activities in the bin? They will be permanently deleted and you cannot restore them.
+                        </Text>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={styles.modalCancelButton}
+                                onPress={() => setShowClearBinModal(false)}
+                            >
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalClearButton}
+                                onPress={handleConfirmClearBin}
+                            >
+                                <Text style={styles.modalClearText}>Clear</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* Permanently Delete Confirmation Modal */}
+            <Modal
+                transparent={true}
+                visible={showDeleteModal}
+                animationType="fade"
+                onRequestClose={() => {
+                    console.log('Modal onRequestClose called');
+                    setShowDeleteModal(false);
+                    setEventToDelete(null);
+                }}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => {
+                        setShowDeleteModal(false);
+                        setEventToDelete(null);
+                    }}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={(e) => e.stopPropagation()}
+                        style={styles.modalContainer}
+                    >
+                        <Text style={styles.modalTitle}>Permanently Delete</Text>
+                        <Text style={styles.modalMessage}>
+                            Are you sure you want to permanently delete "{eventToDelete?.title}"? This action cannot be undone.
+                        </Text>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalCancelButton, { backgroundColor: 'transparent' }]}
+                                onPress={() => {
+                                    setShowDeleteModal(false);
+                                    setEventToDelete(null);
+                                }}
+                            >
+                                <Text style={[styles.modalCancelText, { color: '#000000' }]}>CANCEL</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalDeleteButton, { backgroundColor: '#FF4444' }]}
+                                onPress={handleConfirmDelete}
+                            >
+                                <Text style={[styles.modalDeleteText, { color: '#FFFFFF' }]}>DELETE</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
 
             {/* Custom Drawer */}
             <CustomDrawer
@@ -420,6 +583,7 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         alignItems: 'flex-start',
         justifyContent: 'space-between',
+        marginBottom: scaleHeight(12),
     },
     eventContent: {
         flex: 1,
@@ -499,7 +663,6 @@ const styles = StyleSheet.create({
         borderRadius: moderateScale(8),
         paddingVertical: scaleHeight(4),
         minWidth: scaleWidth(120),
-        elevation: 10,
         ...shadows.md,
     },
     strikethroughIcon: {
@@ -547,6 +710,91 @@ const styles = StyleSheet.create({
         color: colors.mediumgray,
         textAlign: 'center',
         lineHeight: 20,
+    },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: scaleWidth(20),
+        zIndex: 10000,
+        elevation: 10000,
+    },
+    modalContainer: {
+        backgroundColor: colors.white,
+        borderRadius: moderateScale(16),
+        padding: scaleWidth(24),
+        width: '100%',
+        maxWidth: scaleWidth(340),
+        zIndex: 10001,
+        elevation: 10001,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
+    modalTitle: {
+        fontSize: fontSize.textSize18,
+        fontWeight: '700',
+        color: '#000',
+        fontFamily: Fonts.latoBold,
+        marginBottom: scaleHeight(16),
+        textAlign: 'left',
+    },
+    modalMessage: {
+        fontSize: fontSize.textSize14,
+        fontWeight: '400',
+        color: '#717680',
+        fontFamily: Fonts.latoRegular,
+        marginBottom: scaleHeight(24),
+        lineHeight: scaleHeight(20),
+        textAlign: 'left',
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: scaleWidth(12),
+    },
+    modalCancelButton: {
+        paddingVertical: scaleHeight(12),
+        paddingHorizontal: scaleWidth(24),
+        borderRadius: moderateScale(8),
+        backgroundColor: 'transparent',
+    },
+    modalCancelText: {
+        fontSize: fontSize.textSize14,
+        fontWeight: '600',
+        color: '#000',
+        fontFamily: Fonts.latoSemiBold,
+        letterSpacing: 0,
+    },
+    modalClearButton: {
+        paddingVertical: scaleHeight(12),
+        paddingHorizontal: scaleWidth(24),
+        borderRadius: moderateScale(8),
+        backgroundColor: '#FF4444',
+    },
+    modalClearText: {
+        fontSize: fontSize.textSize14,
+        fontWeight: '500',
+        color: colors.white,
+        fontFamily: Fonts.latoSemiBold,
+    },
+    modalDeleteButton: {
+        paddingVertical: scaleHeight(12),
+        paddingHorizontal: scaleWidth(24),
+        borderRadius: moderateScale(8),
+        backgroundColor: '#FF4444',
+    },
+    modalDeleteText: {
+        fontSize: fontSize.textSize14,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        fontFamily: Fonts.latoSemiBold,
+        letterSpacing: 0,
     },
 });
 

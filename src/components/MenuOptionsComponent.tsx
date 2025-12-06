@@ -28,7 +28,7 @@ interface MenuOptionsComponentProps {
 interface MenuOption {
   id: string;
   label: string;
-  iconType: 'calendar' | 'task' | 'birthday';
+  iconType: 'calendar' | 'task';
 }
 
 const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
@@ -49,11 +49,6 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
       id: 'task',
       label: 'Create task',
       iconType: 'task',
-    },
-    {
-      id: 'birthday',
-      label: 'Birthday',
-      iconType: 'birthday',
     },
   ];
 
@@ -109,13 +104,6 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
             <TaskIcon width={iconSize} height={iconSize} color={iconColor} />
           </View>
         );
-      case 'birthday':
-        // Using event icon as placeholder for birthday - can be replaced with cake icon if available
-        return (
-          <View style={styles.iconContainer}>
-            <EventIcon width={iconSize} height={iconSize} />
-          </View>
-        );
       default:
         return null;
     }
@@ -151,8 +139,6 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
               itemStyle = [styles.menuItem, styles.eventItem];
             } else if (option.id === 'task') {
               itemStyle = [styles.menuItem, styles.taskItem];
-            } else if (option.id === 'birthday') {
-              itemStyle = [styles.menuItem, styles.birthdayItem];
             }
             
             return (
@@ -220,9 +206,6 @@ const styles = StyleSheet.create({
   },
   taskItem: {
     width: scaleWidth(150), // Width for "Create task"
-  },
-  birthdayItem: {
-    width: scaleWidth(120), // Width for "Birthday"
   },
   lastMenuItem: {
     marginBottom: scaleHeight(24), // Space before close button

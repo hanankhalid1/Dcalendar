@@ -23,7 +23,7 @@ import { useActiveAccount } from '../../stores/useActiveAccount';
 import { useToken } from '../../stores/useTokenStore';
 import Config from '../../config';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import Logo from '../../assets/svgs/logo.svg';
+import DIcon from '../../assets/svgs/DIcon.svg';
 
 interface Account {
   id: string;
@@ -232,7 +232,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
             ) : (
               <View style={[styles.avatarPlaceholder, { backgroundColor }]}>
                 <Text
-                  style={[styles.avatarText, { fontFamily: Fonts.semiBold }]}
+                  style={[styles.avatarText, { fontFamily: Fonts.latoBold }]}
                 >
                   {getInitials(item.name)}
                 </Text>
@@ -241,10 +241,10 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
           </View>
 
           <View style={styles.accountInfo}>
-            <Text style={[styles.accountName, { fontFamily: Fonts.semiBold }]}>
+            <Text style={[styles.accountName, { fontFamily: Fonts.latoBold }]}>
               {item.name}
             </Text>
-            <Text style={[styles.accountEmail, { fontFamily: Fonts.regular }]}>
+            <Text style={[styles.accountEmail, { fontFamily: Fonts.latoRegular }]}>
               {item.userName}
             </Text>
           </View>
@@ -265,21 +265,19 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
     <View style={styles.container}>
       {/* Logo Section */}
       <View style={styles.logoSection}>
-        <Logo width={40} height={40} />
-
-        <Text style={styles.appName}>DCalendar</Text>
+        <DIcon width={72} height={72} />
       </View>
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.chooseText, { fontFamily: Fonts.semiBold }]}>
+        <Text style={[styles.chooseText, { fontFamily: Fonts.latoBold }]}>
           Choose an account
         </Text>
       </View>
 
       {/* Subtitle */}
-      <Text style={[styles.subtitle, { fontFamily: Fonts.regular }]}>
-        to continue to <Text style={{ color: Colors.primaryblue }}>DCalendar</Text>
+      <Text style={[styles.subtitle, { fontFamily: Fonts.latoRegular }]}>
+        to continue to <Text style={{ color: '#00AEEF' }}>DCalendar</Text>
       </Text>
 
       {/* Account List */}
@@ -297,10 +295,10 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
           onClose();
         }}
         activeOpacity={0.7}>
-        <Icon name="plus-circle-outline" size={24} color="#999" />
+        <Icon name="plus-circle-outline" size={24} color="#00AEEF" />
         <GradientText
           style={[styles.addAccountText, { fontFamily: Fonts.medium }]}
-          colors={[Colors.primaryGreen, Colors.primaryblue]}
+          colors={['#00AEEF', '#0088CC']}
         >
           Add new account
         </GradientText>
@@ -423,12 +421,13 @@ const styles = StyleSheet.create({
   },
   container: {
     flex: 1,
-    backgroundColor: '#FFF', // Light gray background
+    backgroundColor: '#F5F5F5', // Gray background matching app design
     paddingHorizontal: 24,
     paddingTop: 20,
   },
   logoSection: {
     alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 30,
     marginTop: 20,
   },
@@ -438,9 +437,12 @@ const styles = StyleSheet.create({
     marginBottom: 16,
   },
   appName: {
-    fontSize: scale(24),
-    fontFamily: Fonts.bold,
-    color: '#000',
+    fontSize: 42.79,
+    fontFamily: Fonts.latoExtraBold,
+    fontWeight: '800',
+    color: '#000000',
+    lineHeight: 42.79,
+    letterSpacing: 0,
   },
   header: {
     alignItems: 'center',
@@ -450,12 +452,14 @@ const styles = StyleSheet.create({
     fontSize: scale(24),
     color: '#000',
     textAlign: 'center',
+    fontFamily: Fonts.latoBold,
   },
   subtitle: {
     fontSize: scale(14),
     color: '#666',
     marginBottom: 30,
     textAlign: 'center',
+    fontFamily: Fonts.latoRegular,
   },
   accountList: {
     flexGrow: 0, // Don't let it take all space

@@ -6,6 +6,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Image,
   StatusBar,
   Modal,
   Alert,
@@ -59,13 +60,15 @@ const CreateTaskScreen = () => {
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
   const [selectedRecurrence, setSelectedRecurrence] = useState('Does not repeat');
-  const [isRepeatDropdownOpen, setIsRepeatDropdownOpen] = useState(false);
   const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
   const [activeField, setActiveField] = useState<'title' | 'date' | 'startTime' | 'endTime' | 'repeat' | 'description' | null>(null);
   const endsOptions = ['Never', 'On', 'After'];
   const [selectedValue, setSelectedValue] = useState(null);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const [showEndsDatePicker, setShowEndsDatePicker] = useState(false);
+  const [repeatEveryError, setRepeatEveryError] = useState('');
+  const repeatEveryInputRef = React.useRef<TextInput>(null);
+  const isRepeatEveryFocused = React.useRef(false);
 
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
@@ -156,7 +159,6 @@ const CreateTaskScreen = () => {
   const scrollViewRef = useRef<ScrollView>(null);
   const titleInputRef = useRef<View>(null);
   const dateTimeSectionRef = useRef<View>(null);
-  const repeatDropdownScrollRef = useRef<ScrollView>(null);
   const repeatFieldRef = useRef<View>(null);
   const [labelList, setLabelList] = useState([
     { label: "My Tasks", value: "1" },
@@ -237,14 +239,10 @@ const CreateTaskScreen = () => {
   const handleRecurrenceSelect = (recurrence: string) => {
     if (recurrence === 'Custom...') {
       setShowRecurrenceDropdown(false);
-      setIsRepeatDropdownOpen(false);
-      setActiveField(null);
       setShowCustomRecurrenceModal(true);
     } else {
       setSelectedRecurrence(recurrence);
       setShowRecurrenceDropdown(false);
-      setActiveField(null);
-      setIsRepeatDropdownOpen(false);
     }
   };
   const handleCustomRecurrenceDone = () => {
@@ -285,75 +283,6 @@ const CreateTaskScreen = () => {
     setShowCustomRecurrenceModal(false);
   };
 
-  const toggleRepeatDropdown = () => {
-    if (isLoading) {
-      return;
-    }
-
-    const willOpen = !isRepeatDropdownOpen;
-    setShowRecurrenceDropdown(willOpen);
-    setIsRepeatDropdownOpen(willOpen);
-    setActiveField(willOpen ? 'repeat' : null);
-    
-    // Scroll main screen to show dropdown when opening
-    if (willOpen && scrollViewRef.current && repeatFieldRef.current) {
-      setTimeout(() => {
-        // Measure the repeat field position
-        repeatFieldRef.current?.measureLayout(
-          scrollViewRef.current as any,
-          (x, y) => {
-            if (scrollViewRef.current) {
-              // Calculate scroll position: field position + dropdown height + some padding
-              // Dropdown max height is ~450, so we need to ensure it's visible
-              const dropdownHeight = scaleHeight(450);
-              const screenHeight = Dimensions.get('window').height;
-              const scrollPosition = Math.max(0, y - (screenHeight - dropdownHeight - 100));
-              
-              scrollViewRef.current.scrollTo({
-                y: scrollPosition,
-                animated: true,
-              });
-            }
-          },
-          () => {
-            // Fallback: try scrolling after a delay
-            setTimeout(() => {
-              if (scrollViewRef.current && repeatFieldRef.current) {
-                repeatFieldRef.current.measureLayout(
-                  scrollViewRef.current as any,
-                  (x, y) => {
-                    if (scrollViewRef.current) {
-                      const dropdownHeight = scaleHeight(450);
-                      const screenHeight = Dimensions.get('window').height;
-                      const scrollPosition = Math.max(0, y - (screenHeight - dropdownHeight - 100));
-                      scrollViewRef.current.scrollTo({
-                        y: scrollPosition,
-                        animated: true,
-                      });
-                    }
-                  },
-                  () => {}
-                );
-              }
-            }, 200);
-          }
-        );
-      }, 100);
-    }
-    
-    // Scroll to selected option in dropdown when opening
-    if (willOpen && repeatDropdownScrollRef.current) {
-      setTimeout(() => {
-        const selectedIndex = recurrenceOptions.findIndex(opt => opt === selectedRecurrence);
-        if (selectedIndex >= 0 && repeatDropdownScrollRef.current) {
-          repeatDropdownScrollRef.current.scrollTo({
-            y: selectedIndex * scaleHeight(44),
-            animated: false,
-          });
-        }
-      }, 200);
-    }
-  };
 
   const handleDayToggle = (day: string) => {
     setCustomRecurrence(prev => ({
@@ -1274,7 +1203,7 @@ const CreateTaskScreen = () => {
         </TouchableOpacity>
 
         <Text style={styles.headerTitle}>
-          {mode === 'edit' ? 'Edit task' : 'Create task'}
+          {mode === 'edit' ? 'Edit Task' : 'Create Task'}
         </Text>
       </View>
 
@@ -1286,7 +1215,7 @@ const CreateTaskScreen = () => {
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
-          scrollEnabled={!showRecurrenceDropdown && !isRepeatDropdownOpen}
+          scrollEnabled={!showRecurrenceDropdown}
           keyboardShouldPersistTaps="handled"
           contentContainerStyle={{ paddingBottom: scaleHeight(20) }}
           showsVerticalScrollIndicator={true}
@@ -1317,155 +1246,169 @@ const CreateTaskScreen = () => {
               ) : null}
             </View>
 
-            {/* Date Field */}
+            {/* Pick date and time */}
             <View
               ref={dateTimeSectionRef}
               style={styles.fieldContainer}
               collapsable={false}
             >
-              <Text style={styles.labelText}>Date</Text>
               <TouchableOpacity
-                style={[styles.datePicker, activeField === 'date' && styles.fieldActive]}
+                style={styles.datePicker}
                 onPress={() => {
                   if (!isLoading) {
-                    setActiveField('date');
-                    setCalendarModalMode('date');
                     setShowCalendarModal(true);
                   }
                 }}
                 disabled={isLoading}
               >
-                <Text style={styles.selectorText}>
+                <FeatherIcon name="calendar" size={20} color="#A4A7AE" />
+                <Text style={[
+                  styles.selectorText,
+                  (selectedDate && selectedStartTime) && styles.selectorTextFilled
+                ]}>
                   {selectedDate
-                    ? selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                    : "Select"}
+                    ? selectedDate.toLocaleDateString() + ' ' + selectedStartTime
+                    : "Pick date and time"}
                 </Text>
-                <CalendarIcon width={20} height={20} fill="#6C6C6C" />
+                <FeatherIcon name="chevron-down" size={16} color="#00AEEF" style={{ marginLeft: scaleWidth(10) }} />
               </TouchableOpacity>
-              {dateError && (
+              {(dateError || timeError) && (
                 <Text style={styles.fieldErrorText}>
-                  {dateError}
+                  {dateError || timeError}
                 </Text>
               )}
             </View>
 
-            {/* Start Time Field */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.labelText}>Start Time</Text>
-              <TouchableOpacity
-                style={[styles.datePicker, activeField === 'startTime' && styles.fieldActive]}
-                onPress={() => {
-                  if (!isLoading) {
-                    setActiveField('startTime');
-                    setCalendarModalMode('startTime');
-                    setShowCalendarModal(true);
-                  }
-                }}
-                disabled={isLoading}
+            {/* Repeat Field - Match task screen design */}
+            {showDetailedDateTime && (
+              <View
+                ref={repeatFieldRef}
+                style={[styles.fieldContainer, styles.repeatFieldContainer]}
+                collapsable={false}
               >
-                <Text style={styles.selectorText}>
-                  {selectedStartTime || "Select"}
-                </Text>
-                <ClockIcon width={20} height={20} fill="#6C6C6C" />
-              </TouchableOpacity>
-              {timeError && (
-                <Text style={styles.fieldErrorText}>
-                  {timeError}
-                </Text>
-              )}
-            </View>
+                <Text style={styles.labelText}>Repeat</Text>
+                <TouchableOpacity
+                  style={[
+                    styles.recurrenceContainer,
+                    showRecurrenceDropdown && styles.fieldActive,
+                  ]}
+                  onPress={() => {
+                    if (!isLoading) {
+                      const willOpen = !showRecurrenceDropdown;
+                      setShowRecurrenceDropdown(willOpen);
+                      setActiveField(willOpen ? 'repeat' : null);
+                      
+                      // Scroll to show dropdown when opening
+                      if (willOpen && scrollViewRef.current && repeatFieldRef.current) {
+                        setTimeout(() => {
+                          repeatFieldRef.current?.measureLayout(
+                            scrollViewRef.current as any,
+                            (x, y) => {
+                              if (scrollViewRef.current) {
+                                // Scroll to position the field near the top, accounting for dropdown height
+                                const dropdownHeight = scaleHeight(280);
+                                const scrollPosition = Math.max(0, y - 100);
+                                scrollViewRef.current.scrollTo({
+                                  y: scrollPosition,
+                                  animated: true,
+                                });
+                              }
+                            },
+                            () => {
+                              // Fallback: try scrolling after a delay
+                              setTimeout(() => {
+                                if (repeatFieldRef.current && scrollViewRef.current) {
+                                  repeatFieldRef.current.measureLayout(
+                                    scrollViewRef.current as any,
+                                    (x, y) => {
+                                      if (scrollViewRef.current) {
+                                        const scrollPosition = Math.max(0, y - 100);
+                                        scrollViewRef.current.scrollTo({
+                                          y: scrollPosition,
+                                          animated: true,
+                                        });
+                                      }
+                                    },
+                                    () => {}
+                                  );
+                                }
+                              }, 200);
+                            }
+                          );
+                        }, 100);
+                      }
+                    }
+                  }}
+                  disabled={isLoading}
+                >
+                  <Text style={[styles.selectorText, selectedRecurrence && selectedRecurrence !== "Does not repeat" && styles.selectorTextFilled]}>{selectedRecurrence}</Text>
+                  <ArrowDownIcon
+                    width={20}
+                    height={20}
+                    fill="#6C6C6C"
+                  />
+                </TouchableOpacity>
 
-            {/* End Time Field */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.labelText}>End Time</Text>
-              <TouchableOpacity
-                style={[styles.datePicker, activeField === 'endTime' && styles.fieldActive]}
-                onPress={() => {
-                  if (!isLoading) {
-                    setActiveField('endTime');
-                    setCalendarModalMode('endTime');
-                    setShowCalendarModal(true);
-                  }
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.selectorText}>
-                  {selectedEndTime || "Select"}
-                </Text>
-                <ClockIcon width={20} height={20} fill="#6C6C6C" />
-              </TouchableOpacity>
-            </View>
-
-            {/* Repeat Field - Fixed dropdown positioning */}
-            <View
-              ref={repeatFieldRef}
-              style={[styles.fieldContainer, styles.repeatFieldContainer]}
-              collapsable={false}
-            >
-              <Text style={styles.labelText}>Repeat</Text>
-              <TouchableOpacity
-                style={[
-                  styles.recurrenceContainer,
-                  (isRepeatDropdownOpen || showRecurrenceDropdown) && styles.fieldActive,
-                ]}
-                onPress={toggleRepeatDropdown}
-                disabled={isLoading}
-              >
-                <Text style={styles.selectorText}>{selectedRecurrence}</Text>
-                <ArrowDownIcon
-                  width={20}
-                  height={20}
-                  fill="#6C6C6C"
-                />
-              </TouchableOpacity>
-
-              {isRepeatDropdownOpen && (
-                <View style={styles.repeatDropdown}>
-                  <ScrollView
-                    ref={repeatDropdownScrollRef}
-                    style={styles.repeatOptionsWrapper}
-                    contentContainerStyle={styles.repeatOptionsContent}
-                    showsVerticalScrollIndicator={true}
-                    nestedScrollEnabled={true}
-                    bounces={false}
-                    scrollEnabled={true}
-                    keyboardShouldPersistTaps="handled"
-                    alwaysBounceVertical={false}
-                    removeClippedSubviews={false}
-                  >
-                    {recurrenceOptions.map((option, index) => (
-                      <TouchableOpacity
-                        key={`${option}-${index}`}
-                        style={[
-                          styles.repeatOption,
-                          selectedRecurrence === option && styles.repeatOptionSelected,
-                        ]}
-                        onPress={() => {
-                          if (!isLoading) {
-                            handleRecurrenceSelect(option);
-                          }
-                        }}
-                        disabled={isLoading}
-                        activeOpacity={0.7}
-                      >
-                        <Text
+                {/* Repeat Dropdown - Match task screen design */}
+                {showRecurrenceDropdown && (
+                  <View style={styles.repeatDropdown}>
+                    <ScrollView
+                      style={styles.repeatOptionsWrapper}
+                      contentContainerStyle={styles.repeatOptionsContent}
+                      showsVerticalScrollIndicator={true}
+                      nestedScrollEnabled={true}
+                      bounces={false}
+                      scrollEnabled={true}
+                      keyboardShouldPersistTaps="handled"
+                      alwaysBounceVertical={false}
+                      removeClippedSubviews={false}
+                      contentInsetAdjustmentBehavior="automatic"
+                    >
+                      {recurrenceOptions.map((option, index) => (
+                        <TouchableOpacity
+                          key={`${option}-${index}`}
                           style={[
-                            styles.repeatOptionText,
-                            selectedRecurrence === option && styles.repeatOptionTextSelected,
+                            styles.repeatOption,
+                            selectedRecurrence === option && styles.repeatOptionSelected,
                           ]}
-                          numberOfLines={1}
+                          onPress={() => {
+                            if (!isLoading) {
+                              handleRecurrenceSelect(option);
+                            }
+                          }}
+                          disabled={isLoading}
+                          activeOpacity={0.7}
                         >
-                          {option}
-                        </Text>
-                        {selectedRecurrence === option && (
-                          <FeatherIcon name="check" size={18} color={colors.primaryBlue} />
-                        )}
-                      </TouchableOpacity>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
-            </View>
+                          <Text
+                            style={[
+                              styles.repeatOptionText,
+                              selectedRecurrence === option && styles.repeatOptionTextSelected,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {option}
+                          </Text>
+                          {selectedRecurrence === option && (
+                            <FeatherIcon name="check" size={18} color={colors.primaryBlue} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {(showRecurrenceDropdown) && (
+              <TouchableOpacity
+                style={styles.recurrenceOverlay}
+                activeOpacity={1}
+                onPress={() => {
+                  setShowRecurrenceDropdown(false);
+                  setActiveField(null);
+                }}
+              />
+            )}
 
             <View style={styles.fieldContainer}>
               <Text style={styles.labelText}>Description</Text>
@@ -1498,47 +1441,15 @@ const CreateTaskScreen = () => {
         </ScrollView>
       </KeyboardAvoidingView>
 
-      {(showRecurrenceDropdown || isRepeatDropdownOpen) && (
-        <TouchableOpacity
-          style={styles.recurrenceOverlay}
-          activeOpacity={1}
-          onPress={() => {
-            setShowRecurrenceDropdown(false);
-            setIsRepeatDropdownOpen(false);
-            setActiveField(null);
-          }}
-        />
-      )}
 
       {/* Calendar with Time Modal */}
       <CalendarWithTime
         isVisible={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
-        onDateTimeSelect={(date, time) => {
-          if (calendarModalMode === 'date') {
-            setSelectedDate(date);
-            if (!selectedStartTime) {
-              setShowDetailedDateTime(true);
-            }
-          } else if (calendarModalMode === 'startTime') {
-            setSelectedStartTime(time);
-            setSelectedDate(date);
-            setShowDetailedDateTime(true);
-          } else if (calendarModalMode === 'endTime') {
-            setSelectedEndTime(time);
-            setSelectedDate(date);
-          }
-          setShowCalendarModal(false);
-        }}
-        mode={calendarModalMode === 'endTime' ? 'to' : 'from'}
-        selectedDate={selectedDate || new Date()}
-        selectedTime={
-          calendarModalMode === 'startTime'
-            ? selectedStartTime || undefined
-            : calendarModalMode === 'endTime'
-              ? selectedEndTime || undefined
-              : undefined
-        }
+        onDateTimeSelect={handleDateTimeSelect}
+        mode="from"
+        selectedDate={selectedDate || undefined}
+        selectedTime={selectedStartTime || undefined}
       />
 
 
@@ -1552,7 +1463,7 @@ const CreateTaskScreen = () => {
           <View style={styles.customRecurrenceModalContainer}>
             {/* Modal Header */}
             <View style={styles.customModalHeader}>
-              <Text style={styles.customModalTitle}>Custom recurrence</Text>
+              <Text style={styles.customModalTitle}>Custom repeat</Text>
             </View>
             <ScrollView
               style={{ flexGrow: 0 }}
@@ -1565,49 +1476,126 @@ const CreateTaskScreen = () => {
                   <Text style={styles.customRecurrenceSectionTitle}>
                     Repeat every
                   </Text>
-                  <View style={styles.customRepeatEveryRow}>
+                  <View style={styles.customRepeatEveryColumn}>
                     <TextInput
-                      style={styles.customRepeatEveryInput}
+                      ref={repeatEveryInputRef}
+                      style={[
+                        styles.customRepeatEveryInput,
+                        repeatEveryError && styles.customRepeatEveryInputError,
+                      ]}
+                      placeholder="Enter number"
+                      placeholderTextColor="#A4A7AE"
                       value={customRecurrence.repeatEvery}
                       onChangeText={text => {
-                        // Only allow positive integers (1-99)
+                        // Clear error on input
+                        if (repeatEveryError) {
+                          setRepeatEveryError('');
+                        }
+                        
                         // Remove any non-numeric characters
                         const numericOnly = text.replace(/[^0-9]/g, '');
-
-                        // Prevent empty string or zero
-                        if (numericOnly === '' || numericOnly === '0') {
-                          // Don't update if it would be empty or zero
+                        
+                        // Allow empty temporarily for backspace
+                        if (numericOnly === '') {
+                          setCustomRecurrence(prev => ({
+                            ...prev,
+                            repeatEvery: '',
+                          }));
                           return;
                         }
-
+                        
+                        // Prevent zero
+                        if (numericOnly === '0') {
+                          return;
+                        }
+                        
+                        // Handle smart replacement when focused and typing single digit
+                        const currentValue = customRecurrence.repeatEvery;
+                        if (isRepeatEveryFocused.current && currentValue.length === 1 && numericOnly.length === 1) {
+                          // Direct replacement when typing a single digit
+                          setCustomRecurrence(prev => ({
+                            ...prev,
+                            repeatEvery: numericOnly,
+                          }));
+                          return;
+                        }
+                        
+                        // Handle case where text was appended instead of replaced
+                        if (currentValue.length === 1 && numericOnly.length === 2 && numericOnly.startsWith(currentValue)) {
+                          const newDigit = numericOnly.slice(1);
+                          setCustomRecurrence(prev => ({
+                            ...prev,
+                            repeatEvery: newDigit,
+                          }));
+                          return;
+                        }
+                        
                         // Limit to 2 digits (1-99)
                         const limitedValue = numericOnly.length > 2 ? numericOnly.slice(0, 2) : numericOnly;
-
+                        
                         setCustomRecurrence(prev => ({
                           ...prev,
                           repeatEvery: limitedValue,
                         }));
                       }}
+                      onFocus={() => {
+                        isRepeatEveryFocused.current = true;
+                        setRepeatEveryError('');
+                      }}
+                      onBlur={() => {
+                        isRepeatEveryFocused.current = false;
+                        // Validate on blur
+                        const value = customRecurrence.repeatEvery.trim();
+                        if (!value || value === '' || parseInt(value, 10) < 1 || parseInt(value, 10) > 99) {
+                          setRepeatEveryError('Please enter a number between 1 and 99');
+                          setCustomRecurrence(prev => ({
+                            ...prev,
+                            repeatEvery: '1',
+                          }));
+                        }
+                      }}
                       keyboardType="numeric"
                       maxLength={2}
+                      selectTextOnFocus={true}
                       editable={!isLoading}
                     />
-                    <TouchableOpacity
-                      style={styles.customRepeatUnitDropdown}
-                      onPress={() => setShowUnitDropdown(prev => !prev)}
-                    >
-                      <Text style={styles.customRepeatUnitText}>
-                        {customRecurrence.repeatUnit}
-                      </Text>
-                      <FeatherIcon
-                        name="chevron-down"
-                        size={14}
-                        color="#6C6C6C"
-                        style={{ paddingTop: 3 }}
-                      />
-                    </TouchableOpacity>
+                    <View style={styles.customRepeatUnitContainer}>
+                      <TouchableOpacity
+                        style={styles.customRepeatUnitDropdown}
+                        onPress={() => setShowUnitDropdown(prev => !prev)}
+                      >
+                        <Text style={[styles.customRepeatUnitText, !repeatUnits.includes(customRecurrence.repeatUnit) ? styles.customRepeatUnitTextPlaceholder : null]}>
+                          {repeatUnits.includes(customRecurrence.repeatUnit) ? customRecurrence.repeatUnit : 'Select'}
+                        </Text>
+                        <FeatherIcon
+                          name="chevron-down"
+                          size={14}
+                          color="#6C6C6C"
+                          style={{ paddingTop: 3 }}
+                        />
+                      </TouchableOpacity>
+                      {showUnitDropdown && (
+                        <View style={styles.customUnitDropdownContainer}>
+                          {repeatUnits.map(unit => (
+                            <TouchableOpacity
+                              key={unit}
+                              style={styles.customUnitDropdownItem}
+                              onPress={() => {
+                                setCustomRecurrence(prev => ({ ...prev, repeatUnit: unit }));
+                                setShowUnitDropdown(false);
+                              }}
+                            >
+                              <Text style={styles.customUnitDropdownItemText}>{unit}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </View>
                 </View>
+                {repeatEveryError ? (
+                  <Text style={styles.customRepeatEveryErrorText}>{repeatEveryError}</Text>
+                ) : null}
 
                 {/* Repeat on section */}
                 {customRecurrence.repeatUnit === repeatUnits[1] && (
@@ -1615,35 +1603,24 @@ const CreateTaskScreen = () => {
                     <Text style={styles.customRecurrenceSectionTitle}>
                       Repeat on
                     </Text>
-                    <ScrollView horizontal={true}
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ alignItems: 'center' }}
-                    >
-                      <View style={styles.customDaysRow}>
-                        {dayAbbreviations.map((day, index) => (
-                          <TouchableOpacity
-                            key={index}
-                            style={[
-                              styles.customDayButton,
-                              customRecurrence.repeatOn.includes(dayNames[index]) &&
-                              styles.customDayButtonSelected,
-                            ]}
-                            onPress={() => handleDayToggle(dayNames[index])}
-                          >
-                            <Text
-                              style={[
-                                styles.customDayButtonText,
-                                customRecurrence.repeatOn.includes(
-                                  dayNames[index],
-                                ) && styles.customDayButtonTextSelected,
-                              ]}
-                            >
-                              {day}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
+                    <View style={styles.customDaysList}>
+                      {dayNames.map((day, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.customDayOption}
+                          onPress={() => handleDayToggle(day)}
+                        >
+                          <View style={[styles.customDayCheckbox, customRecurrence.repeatOn.includes(day) && styles.customDayCheckboxSelected]}>
+                            {customRecurrence.repeatOn.includes(day) && (
+                              <FeatherIcon name="check" size={14} color="#000000" />
+                            )}
+                          </View>
+                          <Text style={[styles.customDayOptionText, customRecurrence.repeatOn.includes(day) && styles.customDayOptionTextSelected]}>
+                            {day}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   </View>
                 )}
 
@@ -1653,44 +1630,38 @@ const CreateTaskScreen = () => {
 
                   <TouchableOpacity
                     style={styles.customEndsOption}
-                    onPress={() => {
-                      if (!isLoading) {
-                        setCustomRecurrence(prev => ({
-                          ...prev,
-                          endsType: endsOptions[0],
-                        }));
-                      }
-                    }}
-                    disabled={isLoading}
+                    onPress={() =>
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsType: endsOptions[0],
+                      }))
+                    }
                   >
-                    <View style={styles.customRadioButton}>
+                    <View style={[styles.customCheckbox, customRecurrence.endsType === endsOptions[0] && styles.customCheckboxSelected]}>
                       {customRecurrence.endsType === endsOptions[0] && (
-                        <View style={styles.customRadioButtonSelected} />
+                        <FeatherIcon name="check" size={14} color="#000000" />
                       )}
                     </View>
-                    <Text style={styles.customEndsOptionText}>
+                    <Text style={[styles.customEndsOptionText, customRecurrence.endsType === endsOptions[0] && styles.customEndsOptionTextSelected]}>
                       {endsOptions[0]}
                     </Text>
                   </TouchableOpacity>
 
                   <TouchableOpacity
                     style={styles.customEndsOption}
-                    onPress={() => {
-                      if (!isLoading) {
-                        setCustomRecurrence(prev => ({
-                          ...prev,
-                          endsType: endsOptions[1],
-                        }));
-                      }
-                    }}
-                    disabled={isLoading}
+                    onPress={() =>
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsType: endsOptions[1],
+                      }))
+                    }
                   >
-                    <View style={styles.customRadioButton}>
+                    <View style={[styles.customCheckbox, customRecurrence.endsType === endsOptions[1] && styles.customCheckboxSelected]}>
                       {customRecurrence.endsType === endsOptions[1] && (
-                        <View style={styles.customRadioButtonSelected} />
+                        <FeatherIcon name="check" size={14} color="#000000" />
                       )}
                     </View>
-                    <Text style={styles.customEndsOptionText}>
+                    <Text style={[styles.customEndsOptionText, customRecurrence.endsType === endsOptions[1] && styles.customEndsOptionTextSelected]}>
                       {endsOptions[1]}
                     </Text>
                     <TouchableOpacity
@@ -1700,11 +1671,11 @@ const CreateTaskScreen = () => {
                         styles.customEndsInputDisabled,
                       ]}
                       onPress={() => {
-                        if (customRecurrence.endsType === endsOptions[1] && !isLoading) {
+                        if (customRecurrence.endsType === endsOptions[1]) {
                           setShowEndsDatePicker(true);
                         }
                       }}
-                      disabled={customRecurrence.endsType !== endsOptions[1] || isLoading}
+                      disabled={customRecurrence.endsType !== endsOptions[1]}
                     >
                       <Text
                         style={[
@@ -1714,12 +1685,12 @@ const CreateTaskScreen = () => {
                       >
                         {customRecurrence.endsDate
                           ? (() => {
-                            const date = customRecurrence.endsDate;
-                            const month = String(date.getMonth() + 1).padStart(2, '0');
-                            const day = String(date.getDate()).padStart(2, '0');
-                            const year = date.getFullYear();
-                            return `${month}/${day}/${year}`;
-                          })()
+                              const date = customRecurrence.endsDate;
+                              const month = String(date.getMonth() + 1).padStart(2, '0');
+                              const day = String(date.getDate()).padStart(2, '0');
+                              const year = date.getFullYear();
+                              return `${month}/${day}/${year}`;
+                            })()
                           : '04/09/2025'}
                       </Text>
                     </TouchableOpacity>
@@ -1727,22 +1698,19 @@ const CreateTaskScreen = () => {
 
                   <TouchableOpacity
                     style={styles.customEndsOption}
-                    onPress={() => {
-                      if (!isLoading) {
-                        setCustomRecurrence(prev => ({
-                          ...prev,
-                          endsType: endsOptions[2],
-                        }));
-                      }
-                    }}
-                    disabled={isLoading}
+                    onPress={() =>
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsType: endsOptions[2],
+                      }))
+                    }
                   >
-                    <View style={styles.customRadioButton}>
+                    <View style={[styles.customCheckbox, customRecurrence.endsType === endsOptions[2] && styles.customCheckboxSelected]}>
                       {customRecurrence.endsType === endsOptions[2] && (
-                        <View style={styles.customRadioButtonSelected} />
+                        <FeatherIcon name="check" size={14} color="#000000" />
                       )}
                     </View>
-                    <Text style={styles.customEndsOptionText}>
+                    <Text style={[styles.customEndsOptionText, customRecurrence.endsType === endsOptions[2] && styles.customEndsOptionTextSelected]}>
                       {endsOptions[2]}
                     </Text>
                     <TextInput
@@ -1759,7 +1727,7 @@ const CreateTaskScreen = () => {
                         }))
                       }
                       keyboardType="numeric"
-                      editable={customRecurrence.endsType === endsOptions[2] && !isLoading}
+                      editable={customRecurrence.endsType === endsOptions[2]}
                     />
                     <Text style={styles.customEndsOccurrencesText}>
                       occurrences
@@ -1767,21 +1735,6 @@ const CreateTaskScreen = () => {
                   </TouchableOpacity>
                 </View>
               </View>
-              {showUnitDropdown && (
-                <View style={styles.dropdownOverlay}>
-                  <View style={styles.dropdownContainer}>
-                    {repeatUnits.map(unit => (
-                      <TouchableOpacity
-                        key={unit}
-                        style={styles.dropdownItem}
-                        onPress={() => handleUnitSelect(unit)}
-                      >
-                        <Text style={styles.dropdownItemText}>{unit}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
             </ScrollView>
 
             {/* Date Picker Modal for Ends Date */}
@@ -1838,33 +1791,16 @@ const CreateTaskScreen = () => {
             <View style={styles.customModalActions}>
               <TouchableOpacity
                 style={styles.customCancelButton}
-                onPress={() => {
-                  if (!isLoading) {
-                    setShowCustomRecurrenceModal(false);
-                  }
-                }}
-                disabled={isLoading}
+                onPress={() => setShowCustomRecurrenceModal(false)}
               >
                 <Text style={styles.customCancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
               <TouchableOpacity
                 style={styles.customDoneButton}
-                onPress={() => {
-                  if (!isLoading) {
-                    handleCustomRecurrenceDone();
-                  }
-                }}
-                disabled={isLoading}
+                onPress={handleCustomRecurrenceDone}
               >
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.customDoneButtonGradient}
-                >
-                  <Text style={styles.customDoneButtonText}>Done</Text>
-                </LinearGradient>
+                <Text style={styles.customDoneButtonText}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -1944,10 +1880,6 @@ const styles = StyleSheet.create({
   fieldContainer: {
     marginBottom: scaleHeight(20),
   },
-  repeatFieldContainer: {
-    position: 'relative',
-    zIndex: 1001,
-  },
   inputUnderline: {
     height: 1,
     backgroundColor: colors.grey20,
@@ -1970,7 +1902,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 18,
     letterSpacing: 0,
-    color: colors.textPrimary,
+    color: '#252B37',
     paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.sm,
     borderWidth: 1,
@@ -1998,14 +1930,14 @@ const styles = StyleSheet.create({
   datePicker: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    justifyContent: 'flex-start',
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: 8,
     paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.sm,
     backgroundColor: colors.white,
+    minHeight: scaleHeight(44),
   },
   fieldErrorText: {
     fontSize: fontSize.textSize12,
@@ -2025,7 +1957,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 18,
     letterSpacing: 0,
-    color: colors.textPrimary,
+    color: '#252B37',
     padding: spacing.md,
     minHeight: scaleHeight(150),
   },
@@ -2061,13 +1993,16 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.latoBold,
   },
   selectorText: {
-    fontSize: 14,
+    fontSize: 12,
     fontFamily: Fonts.latoRegular,
-    fontWeight: '400',
     lineHeight: 18,
     letterSpacing: 0,
-    color: colors.blackText, // Text color for selected value
+    color: '#A4A7AE', // Text color for placeholder/empty state
+    marginLeft: spacing.sm,
     flex: 1,
+  },
+  selectorTextFilled: {
+    color: '#252B37', // Text color when value is entered
   },
   buttonText: {
     color: "#fff",
@@ -2097,15 +2032,11 @@ const styles = StyleSheet.create({
     minHeight: scaleHeight(44),
   },
 
-  fieldActive: {
-    borderColor: '#B3E5FC', // Light blue border when active
-  },
-
   repeatDropdown: {
     position: 'absolute',
     top: '100%',
-    left: 0,
-    right: 0,
+    left: scaleWidth(10), // Add left margin to make it narrower
+    right: scaleWidth(10), // Add right margin to make it narrower
     marginTop: scaleHeight(4),
     borderRadius: 8,
     borderWidth: 1,
@@ -2117,17 +2048,17 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 15, // Higher elevation for Android
-    maxHeight: scaleHeight(300), // Fixed max height to force scrolling
+    maxHeight: scaleHeight(320), // Increased height to show more options
     overflow: 'hidden', // Ensure content doesn't overflow
   },
 
   repeatOptionsWrapper: {
-    height: scaleHeight(300), // Fixed height - CRITICAL for scrolling to work
+    height: scaleHeight(320), // Fixed height - forces scrolling when content exceeds this
   },
 
   repeatOptionsContent: {
-    paddingBottom: scaleHeight(20), // Add padding at bottom for last item
-    paddingTop: scaleHeight(8), // Add padding at top
+    paddingBottom: scaleHeight(12), // Compact padding at bottom
+    paddingTop: scaleHeight(4), // Compact padding at top
   },
 
   repeatOption: {
@@ -2135,10 +2066,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: scaleWidth(16),
-    paddingVertical: scaleHeight(14),
+    paddingVertical: scaleHeight(10), // Reduced from 14 to make more compact
     borderBottomWidth: 1,
     borderBottomColor: '#F2F4F7',
-    minHeight: scaleHeight(44),
+    minHeight: scaleHeight(38), // Reduced from 44 to make more compact
     backgroundColor: colors.white,
   },
 
@@ -2170,11 +2101,6 @@ const styles = StyleSheet.create({
     pointerEvents: 'auto', // Allow overlay to capture touches for closing
   },
 
-  // Make sure the ScrollView allows scrolling
-  scrollView: {
-    flex: 1,
-    zIndex: 1,
-  },
 
   // Custom Modal Styles
   customModalOverlay: {
@@ -2184,49 +2110,74 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.lg,
   },
+  customRecurrenceModalContainer: {
+    backgroundColor: colors.white,
+    borderRadius: 20,
+    width: '92%',
+    maxWidth: scaleWidth(480),
+    maxHeight: '75%',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
+  },
+  customRecurrenceContent: {
+    flex: 1,
+    overflow: 'visible',
+    paddingHorizontal: spacing.md,
+  },
   customModalHeader: {
-    marginBottom: spacing.xl,
-    alignItems: 'center',
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   customModalTitle: {
-    fontSize: fontSize.textSize20,
+    fontSize: fontSize.textSize18,
     fontWeight: '600',
-    color: colors.blackText,
+    color: '#252B37',
+    fontFamily: Fonts.latoBold,
   },
   customRecurrenceSection: {
-    marginBottom: spacing.xl,
+    marginBottom: spacing.lg,
     overflow: 'visible',
   },
   customRecurrenceSectionTitle: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     fontWeight: '600',
-    color: colors.blackText,
+    color: '#414651',
     marginBottom: spacing.md,
+    fontFamily: Fonts.latoSemiBold,
   },
-  customRepeatEveryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  customRepeatEveryColumn: {
+    flexDirection: 'column',
     width: '100%',
-    justifyContent: 'flex-start',
-    flexWrap: 'wrap',
-    marginBottom: spacing.xs,
     gap: spacing.sm,
   },
   customRepeatEveryInput: {
-    width: scaleWidth(70),
-    minWidth: scaleWidth(60),
-    maxWidth: scaleWidth(90),
+    width: '100%',
     height: scaleHeight(40),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
-    textAlign: 'center',
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
-    paddingHorizontal: scaleWidth(10),
+    textAlign: 'left',
+    fontSize: fontSize.textSize14,
+    color: '#252B37',
+    paddingHorizontal: spacing.md,
     paddingVertical: 0,
     backgroundColor: colors.white,
-    flexShrink: 0,
+    fontFamily: Fonts.latoRegular,
+  },
+  customRepeatEveryInputError: {
+    borderColor: '#EF4444',
+    borderWidth: 1.5,
+  },
+  customRepeatEveryErrorText: {
+    fontSize: fontSize.textSize12,
+    color: '#EF4444',
+    marginTop: spacing.xs,
+    marginLeft: 0,
+    fontFamily: Fonts.latoRegular,
+  },
+  customRepeatUnitContainer: {
+    position: 'relative',
+    width: '100%',
   },
   customRepeatUnitDropdown: {
     flexDirection: 'row',
@@ -2238,16 +2189,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     height: scaleHeight(40),
-    minWidth: scaleWidth(90),
-    maxWidth: scaleWidth(130),
-    flex: 0,
+    width: '100%',
     backgroundColor: colors.white,
   },
   customRepeatUnitText: {
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
+    fontSize: fontSize.textSize14,
+    color: '#252B37',
     fontWeight: '400',
     marginRight: spacing.xs,
+    fontFamily: Fonts.latoRegular,
+  },
+  customUnitDropdownContainer: {
+    position: 'absolute',
+    top: scaleHeight(45),
+    left: 0,
+    right: 0,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1001,
+    maxHeight: scaleHeight(180),
+  },
+  customUnitDropdownItem: {
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  customUnitDropdownItemText: {
+    fontSize: fontSize.textSize14,
+    color: '#252B37',
+    fontFamily: Fonts.latoRegular,
+  },
+  customRepeatUnitTextPlaceholder: {
+    color: '#A4A7AE',
   },
   dropdownContainer: {
     position: 'absolute',
@@ -2275,64 +2256,73 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize16,
     color: colors.blackText,
   },
-  customDaysRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  customDaysList: {
+    flexDirection: 'column',
     gap: spacing.xs,
   },
-  customDayButton: {
-    width: scaleWidth(40),
-    height: scaleHeight(40),
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#DCE0E5',
-    backgroundColor: colors.white,
+  customDayOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: scaleHeight(8),
+  },
+  customDayCheckbox: {
+    width: scaleWidth(20),
+    height: scaleHeight(20),
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#A4A7AE',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.white,
+    marginRight: spacing.md,
   },
-  customDayButtonSelected: {
-    backgroundColor: Colors.primaryblue,
-    borderColor: Colors.primaryblue,
+  customDayCheckboxSelected: {
+    backgroundColor: colors.white,
+    borderColor: '#000000',
   },
-  customDayButtonText: {
+  customDayOptionText: {
     fontSize: fontSize.textSize14,
-    fontWeight: '500',
-    color: colors.blackText,
+    fontWeight: '400',
+    color: '#A4A7AE',
+    fontFamily: Fonts.latoRegular,
   },
-  customDayButtonTextSelected: {
-    color: colors.white,
+  customDayOptionTextSelected: {
+    color: '#000000',
   },
   customEndsOption: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: spacing.sm,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
-  customRadioButton: {
+  customCheckbox: {
     width: scaleWidth(20),
     height: scaleHeight(20),
-    borderRadius: 10,
+    borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#DCE0E5',
+    borderColor: '#A4A7AE',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.white,
   },
-  customRadioButtonSelected: {
-    width: scaleWidth(10),
-    height: scaleHeight(10),
-    borderRadius: 5,
-    backgroundColor: Colors.primaryblue,
+  customCheckboxSelected: {
+    backgroundColor: colors.white,
+    borderColor: '#000000',
   },
   customEndsOptionText: {
     fontSize: fontSize.textSize14,
-    color: colors.blackText,
+    color: '#A4A7AE',
     fontWeight: '400',
     minWidth: scaleWidth(40),
+    fontFamily: Fonts.latoRegular,
+  },
+  customEndsOptionTextSelected: {
+    color: '#000000',
   },
   customEndsInput: {
-    minWidth: scaleWidth(100),
-    width: scaleWidth(110),
+    minWidth: scaleWidth(80),
+    maxWidth: scaleWidth(100),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
@@ -2351,6 +2341,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize12,
     color: colors.blackText,
     flexShrink: 0,
+    fontFamily: Fonts.latoRegular,
   },
   customEndsInputPlaceholder: {
     color: '#9E9E9E',
@@ -2390,19 +2381,19 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize14,
     color: colors.blackText,
     marginLeft: spacing.xs,
+    fontFamily: Fonts.latoRegular,
   },
   customModalActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: spacing.md,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.sm,
-    borderTopWidth: 1,
-    borderTopColor: '#E5E7EB',
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
     backgroundColor: colors.white,
   },
   customCancelButton: {
-    paddingVertical: 10,
+    paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,
     backgroundColor: '#F3F4F6',
@@ -2411,28 +2402,21 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize14,
     fontWeight: '500',
     color: '#6B7280',
+    fontFamily: Fonts.latoMedium,
   },
   customDoneButton: {
     borderRadius: borderRadius.md,
-    overflow: 'hidden',
-  },
-  customDoneButtonGradient: {
-    paddingVertical: 10,
+    backgroundColor: colors.primaryBlue,
+    paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   customDoneButtonText: {
     fontSize: fontSize.textSize14,
     fontWeight: '600',
     color: colors.white,
-  },
-  recurrenceOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: 1000,
+    fontFamily: Fonts.latoSemiBold,
   },
   repeatContainer: {
     marginTop: scaleHeight(24),

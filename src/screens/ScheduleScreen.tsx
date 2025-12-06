@@ -50,7 +50,7 @@ import CalendarIcon from '../assets/svgs/calendar.svg';
 import TaskCompleteIcon from '../assets/svgs/taskComplete.svg';
 
 
-const HomeScreen = () => {
+const ScheduleScreen = () => {
     const navigation = useNavigation<AppNavigationProp>();
     const { setCurrentMonthByIndex } = useCalendarStore();
     const { selectedTimeZone } = useSettingsStore();
@@ -868,4 +868,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default HomeScreen;
+export default ScheduleScreen;

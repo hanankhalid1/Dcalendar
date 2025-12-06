@@ -50,7 +50,7 @@ import {
   timezones,
 } from '../constants/dummyData';
 import { AppNavigationProp, Screen } from '../navigations/appNavigation.type';
-import { generateEventUID } from '../utils/eventUtils';
+import { generateEventUID, buildEventMetadata } from '../utils/eventUtils';
 
 import GuestSelector from '../components/createEvent/GuestSelector';
 import { BlockchainService } from '../services/BlockChainService';
@@ -68,7 +68,7 @@ const CreateEventScreen = () => {
   const token = useToken(state => state.token);
   const route = useRoute<any>();
   const { mode, eventData: editEventData } = route.params || {};
-  const { getUserEvents } = useEventsStore();
+  const { getUserEvents, setUserEvents, userEvents } = useEventsStore();
   const { googleIntegration } = useAuthStore();
   const currentTimezone = useSettingsStore();
   // Initialize blockchain service and get contract instance
@@ -107,7 +107,7 @@ const CreateEventScreen = () => {
   const [selectedVideoConferencing, setSelectedVideoConferencing] = useState('');
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [guestSearchQuery, setGuestSearchQuery] = useState('');
-  const [activeField, setActiveField] = useState<'title' | 'date' | 'startTime' | 'endTime' | 'repeat' | 'description' | 'videoConferencing' | null>(null);
+  const [activeField, setActiveField] = useState<'title' | 'date' | 'startTime' | 'endTime' | 'repeat' | 'description' | 'videoConferencing' | 'location' | null>(null);
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
   const [selectedRecurrence, setSelectedRecurrence] = useState('Does not repeat');
   const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
@@ -1110,40 +1110,46 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         console.log('>>>>>>>> CALCULATING END TIME IN handleDateTimeSelect <<<<<<<<', {
           startTime: time,
           calculatedEndTime: suggestedEndTime,
-          previousEndTime: selectedEndTime
+          previousEndTime: selectedEndTime,
+          startDate: date.toISOString()
         });
         setSelectedEndTime(suggestedEndTime);
         
         // Check if end time rolled over to next day (12:00 AM)
-        // If start time is 11:30 PM or later, end time will be 12:00 AM (next day)
-        const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-        const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-        if (timeMatch) {
-          let hours = parseInt(timeMatch[1], 10);
-          const minutes = parseInt(timeMatch[2], 10);
-          const period = timeMatch[3].toUpperCase();
-          if (period === 'PM' && hours !== 12) hours += 12;
-          if (period === 'AM' && hours === 12) hours = 0;
-          
-          // If start time is 11:30 PM (23:30) or later, end time will be next day
-          if (hours >= 23 || (hours === 23 && minutes >= 30)) {
+        // Only add 1 day if the END time (after adding 30 min) is 12:00 AM or later
+        const normalizedEndTime = suggestedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+        const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        if (endTimeMatch) {
+          let endHours = parseInt(endTimeMatch[1], 10);
+          const endPeriod = endTimeMatch[3].toUpperCase();
+          // If end time is 12:00 AM, it means it rolled over to next day
+          if (endPeriod === 'AM' && endHours === 12) {
             // Add 1 day to end date
             const nextDay = new Date(date);
             nextDay.setDate(nextDay.getDate() + 1);
             setSelectedEndDate(nextDay);
-          } else if (selectedEndDate && selectedEndDate.getTime() !== date.getTime()) {
-            // If end date was previously set to next day but start time changed to earlier,
-            // reset end date to same as start date
+            console.log('>>>>>>>> END TIME ROLLED OVER - Setting end date to next day:', nextDay.toISOString());
+          } else {
+            // End time is same day, ensure end date matches start date
             setSelectedEndDate(date);
+            console.log('>>>>>>>> END TIME SAME DAY - Setting end date to start date:', date.toISOString());
           }
         }
+        
+        // Always set the calculated end time (this ensures it's always 30 min after start)
+        setSelectedEndTime(suggestedEndTime);
+        console.log('>>>>>>>> SET END TIME TO:', suggestedEndTime);
       } else {
         // If time is empty, clear end time too
         setSelectedEndTime('');
       }
     } else {
+      // When "To" is selected, set the date and time
       setSelectedEndDate(date);
       setSelectedEndTime(time);
+      
+      // If start time exists and we're setting end time, validate that end is after start
+      // But don't auto-calculate here - let user set their own end time
       // Clear errors when date/time is selected
       setEndDateError('');
       setEndTimeError('');
@@ -1171,20 +1177,21 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       newEndTime = addMinutesToTime(time, 30);
       
       // Check if end time rolled over to next day (12:00 AM)
-      const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      if (timeMatch) {
-        let hours = parseInt(timeMatch[1], 10);
-        const period = timeMatch[3].toUpperCase();
-        if (period === 'PM' && hours !== 12) hours += 12;
-        if (period === 'AM' && hours === 12) hours = 0;
-        
-        // If start time is 11:30 PM (23:30) or later, end time will be next day
-        if (hours >= 23 || (hours === 23 && parseInt(timeMatch[2], 10) >= 30)) {
+      // Only add 1 day if the END time (after adding 30 min) is 12:00 AM or later
+      const normalizedEndTime = newEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      if (endTimeMatch) {
+        let endHours = parseInt(endTimeMatch[1], 10);
+        const endPeriod = endTimeMatch[3].toUpperCase();
+        // If end time is 12:00 AM, it means it rolled over to next day
+        if (endPeriod === 'AM' && endHours === 12) {
           // Add 1 day to end date
           const nextDay = new Date(date);
           nextDay.setDate(nextDay.getDate() + 1);
           newEndDate = nextDay;
+        } else {
+          // End time is same day, ensure end date matches start date
+          newEndDate = date;
         }
       }
     }
@@ -1318,11 +1325,22 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       endDateTime.setHours(finalEndHours, endMinutes, 0, 0);
 
       // Validate that end date/time is strictly after start date/time
-      if (endDateTime <= startDateTime) {
+      // If end time is 12:00 AM, it means it's on the next day, so add 1 day to endDateTime for comparison
+      const endDateTimeForComparison = new Date(endDateTime);
+      if (endPeriod === 'AM' && endHours === 12) {
+        endDateTimeForComparison.setDate(endDateTimeForComparison.getDate() + 1);
+      }
+      
+      if (endDateTimeForComparison <= startDateTime) {
         const startDateOnly = new Date(startDate);
         startDateOnly.setHours(0, 0, 0, 0);
         const endDateOnly = new Date(endDate);
         endDateOnly.setHours(0, 0, 0, 0);
+        
+        // If end time is 12:00 AM, it's actually on the next day
+        if (endPeriod === 'AM' && endHours === 12) {
+          endDateOnly.setDate(endDateOnly.getDate() + 1);
+        }
 
         let errorMessage = '';
         if (endDateOnly < startDateOnly) {
@@ -1912,11 +1930,33 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         const apiResponse = await api('POST', '/updateevents', updatePayload);
         console.log('API response data (create):', apiResponse.data);
 
-        await getUserEvents(activeAccount.userName, api);
+        // Optimistically add event to local state for immediate UI feedback (like tasks)
+        if (userEvents && Array.isArray(userEvents)) {
+          const newEvent = {
+            uid: eventData.uid,
+            title: eventData.title,
+            description: eventData.description,
+            fromTime: eventData.fromTime,
+            toTime: eventData.toTime,
+            list: eventData.list || [],
+          };
+          setUserEvents([...userEvents, newEvent]);
+          console.log('✅ Event added optimistically to local state');
+          console.log('✅ Event list includes guests:', eventData.list?.filter((item: any) => item.key === 'guest') || []);
+        }
 
+        // Refresh events in background (non-blocking) - this will merge with optimistic event
+        getUserEvents(activeAccount.userName, api).catch(err => {
+          console.error('Background event refresh failed:', err);
+        });
+
+        // Navigate back immediately (don't wait for refresh)
         navigation.goBack();
 
-        showAlert('Event Created', 'Event created successfully!', 'success');
+        // Show success alert after navigation
+        setTimeout(() => {
+          showAlert('Event Created', 'Event created successfully!', 'success');
+        }, 300);
       } else {
         showAlert('Event Creation Failed', 'Failed to create event. Please try again.', 'error');
       }
@@ -2123,8 +2163,23 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             return `PT${numericValue}S`; // fallback to seconds
         }
       })();
-      // Prepare event data in the new format
-      const eventData = {
+      // Build recurrence data from current state
+      const repeatEventValue = selectedRecurrence !== 'Does not repeat' ? selectedRecurrence : '';
+
+      // Build custom recurrence string if it's a custom recurrence
+      let customRepeatEventValue = '';
+      if (selectedRecurrence.startsWith('Every ') && selectedRecurrence !== 'Every Weekday (Monday to Friday)') {
+        // This is a custom recurrence, format it
+        const { repeatEvery, repeatUnit, repeatOn, endsType, endsAfter, endsDate } = customRecurrence;
+        // Format endsDate as YYYYMMDD if it's a Date object
+        const formattedEndsDate = endsDate
+          ? `${endsDate.getFullYear()}${String(endsDate.getMonth() + 1).padStart(2, '0')}${String(endsDate.getDate()).padStart(2, '0')}`
+          : '';
+        customRepeatEventValue = `${repeatEvery}|${repeatUnit}|${repeatOn.join(',')}|${endsType}|${endsAfter}|${formattedEndsDate}`;
+      }
+
+      // Prepare event data in the new format (before building metadata)
+      const eventDataForMetadata = {
         uuid: editEventData?.uuid || '', // Keep uuid if editing
         uid: editEventData?.id || editEventData?.uid || generateEventUID(), // Generate UID using the utility method
         title: title.trim(),
@@ -2159,8 +2214,46 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           selectedRecurrence !== 'Does not repeat'
             ? selectedRecurrence
             : undefined,
-        customRepeatEvent: undefined,
-        list: [],
+        customRepeatEvent: customRepeatEventValue || undefined,
+        list: mode === 'edit' && editEventData?.list ? editEventData.list : [], // Preserve existing list for edit mode
+      };
+
+      // Build complete metadata list using buildEventMetadata (includes guests, location, etc.)
+      console.log('🔍 Building metadata with guests:', selectedGuests);
+      console.log('🔍 Event data for metadata:', {
+        guests: eventDataForMetadata.guests,
+        location: eventDataForMetadata.location,
+        organizer: eventDataForMetadata.organizer,
+      });
+      
+      const metadataList = buildEventMetadata(eventDataForMetadata as any, null);
+      
+      console.log('🔍 Metadata list built:', metadataList);
+      console.log('🔍 Guest items in metadata:', metadataList.filter((item: any) => item.key === 'guest'));
+
+      // If editing, merge with existing list to preserve items like isDeleted, etc.
+      let finalList = metadataList;
+      if (mode === 'edit' && editEventData?.list && Array.isArray(editEventData.list)) {
+        // Preserve special items from existing list (but not guests, location, etc. - those come from new metadata)
+        const preservedItems = editEventData.list.filter((item: any) => 
+          item.key === 'isDeleted' || 
+          item.key === 'deletedTime' || 
+          item.key === 'isPermanentDelete' ||
+          item.key === 'task' ||
+          item.key === 'done'
+        );
+        
+        // Use the new metadata list (which includes updated guests, location, etc.)
+        // Combine preserved items with new metadata
+        finalList = [...preservedItems, ...metadataList];
+      }
+
+      console.log('🔍 Final list with guests:', finalList.filter((item: any) => item.key === 'guest'));
+
+      // Prepare final event data with complete list
+      const eventData = {
+        ...eventDataForMetadata,
+        list: finalList,
       };
 
 
@@ -2180,7 +2273,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       // return;
       if (mode == 'edit') {
         await handleEditEvent(eventData, activeAccount);
-        return;
       } else {
         await handleCreateEvent(eventData, activeAccount);
       }
@@ -2192,7 +2284,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       );
     } finally {
       setIsLoading(false);
-      return;
     }
   };
 
@@ -2216,30 +2307,15 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         />
       )}
 
-      {/* Header */}
+      {/* Header - Match task screen design */}
       <View style={styles.header}>
         <TouchableOpacity style={styles.closeButton} onPress={handleClose}>
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
 
-        <View style={styles.headerTitleContainer}>
-          <Text style={styles.headerTitle}>
-            {mode === 'edit' ? 'Edit ' : 'Create '}
-          </Text>
-          <TouchableOpacity
-            style={styles.eventTypeContainer}
-            onPress={() => {
-              if (!isLoading) {
-                setShowEventTypeDropdown(!showEventTypeDropdown);
-              }
-            }}
-            disabled={isLoading}
-          >
-            <Text style={styles.eventTypeText}>
-              {selectedEventType}
-            </Text>
-          </TouchableOpacity>
-        </View>
+        <Text style={styles.headerTitle}>
+          {mode === 'edit' ? 'Edit Event' : 'Create Event'}
+        </Text>
       </View>
 
       {/* Event Type Dropdown */}
@@ -2311,88 +2387,112 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               ) : null}
             </View>
 
-            {/* Date Field */}
+            {/* Pick date and time */}
             <View
               ref={dateTimeSectionRef}
-              style={styles.fieldContainer}
+              style={styles.dateTimeSection}
               collapsable={false}
             >
-              <Text style={styles.labelText}>Date</Text>
-              <TouchableOpacity
-                style={[styles.datePicker, activeField === 'date' && styles.fieldActive]}
-                onPress={() => {
-                  if (!isLoading) {
-                    setActiveField('date');
-                    setCalendarMode('from');
-                    setShowCalendarModal(true);
-                  }
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.selectorText}>
-                  {selectedStartDate
-                    ? selectedStartDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                    : "Select"}
-                </Text>
-                <CalendarIcon width={20} height={20} fill="#6C6C6C" />
-              </TouchableOpacity>
-              {(startDateError || dateTimeError) && (
-                <Text style={styles.fieldErrorText}>
-                  {startDateError || dateTimeError}
-                </Text>
-              )}
-            </View>
+              <View style={styles.dateTimeDisplay}>
+                <Text style={styles.dateTimeLabel}>Date & Time</Text>
+                <View style={styles.dateTimeRow}>
+                  <View style={styles.timeSlotContainer}>
+                    <TouchableOpacity
+                      style={styles.timeSlot}
+                      onPress={() => {
+                        if (!isLoading) {
+                          setCalendarMode('from');
+                          setShowCalendarModal(true);
+                        }
+                      }}
+                      disabled={isLoading}
+                    >
+                      <Text style={styles.timeSlotLabel}>From</Text>
+                      <Text style={[
+                        styles.timeSlotValue,
+                        (!selectedStartDate || (!isAllDayEvent && !selectedStartTime)) && styles.timeSlotValuePlaceholder
+                      ]}>
+                        {selectedStartDate ? (
+                          isAllDayEvent ? (
+                            // ✅ All-day: Show only date
+                            selectedStartDate.toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })
+                          ) : selectedStartTime ? (
+                            // ✅ Timed: Show date and time
+                            `${selectedStartDate.toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })} ${selectedStartTime}`
+                          ) : (
+                            'Select start time'
+                          )
+                        ) : (
+                          'Select start date'
+                        )}
+                      </Text>
+                    </TouchableOpacity>
+                    {(startDateError || startTimeError) && (
+                      <Text style={styles.fieldErrorText}>
+                        {startDateError || startTimeError}
+                      </Text>
+                    )}
+                  </View>
 
-            {/* Start Time Field */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.labelText}>Start Time</Text>
-              <TouchableOpacity
-                style={[styles.datePicker, activeField === 'startTime' && styles.fieldActive]}
-                onPress={() => {
-                  if (!isLoading) {
-                    setActiveField('startTime');
-                    setCalendarMode('from');
-                    setShowCalendarModal(true);
-                  }
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.selectorText}>
-                  {selectedStartTime || "Select"}
-                </Text>
-                <ClockIcon width={20} height={20} fill="#6C6C6C" />
-              </TouchableOpacity>
-              {startTimeError && (
-                <Text style={styles.fieldErrorText}>
-                  {startTimeError}
-                </Text>
-              )}
-            </View>
-
-            {/* End Time Field */}
-            <View style={styles.fieldContainer}>
-              <Text style={styles.labelText}>End Time</Text>
-              <TouchableOpacity
-                style={[styles.datePicker, activeField === 'endTime' && styles.fieldActive]}
-                onPress={() => {
-                  if (!isLoading) {
-                    setActiveField('endTime');
-                    setCalendarMode('to');
-                    setShowCalendarModal(true);
-                  }
-                }}
-                disabled={isLoading}
-              >
-                <Text style={styles.selectorText}>
-                  {selectedEndTime || "Select"}
-                </Text>
-                <ClockIcon width={20} height={20} fill="#6C6C6C" />
-              </TouchableOpacity>
-              {endTimeError && (
-                <Text style={styles.fieldErrorText}>
-                  {endTimeError}
-                </Text>
-              )}
+                  <View style={styles.timeSlotContainer}>
+                    <TouchableOpacity
+                      style={styles.timeSlot}
+                      onPress={() => {
+                        if (!isLoading) {
+                          setCalendarMode('to');
+                          setShowCalendarModal(true);
+                        }
+                      }}
+                      disabled={isLoading}
+                    >
+                      <Text style={styles.timeSlotLabel}>To</Text>
+                      <Text style={[
+                        styles.timeSlotValue,
+                        (!selectedEndDate || (!isAllDayEvent && !selectedEndTime)) && styles.timeSlotValuePlaceholder
+                      ]}>
+                        {selectedEndDate ? (
+                          isAllDayEvent ? (
+                            // ✅ All-day: Show only date
+                            selectedEndDate.toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                              year: 'numeric'
+                            })
+                          ) : selectedEndTime ? (
+                            // ✅ Timed: Show date and time
+                            `${selectedEndDate.toLocaleDateString('en-US', {
+                              month: 'short',
+                              day: 'numeric',
+                            })} ${selectedEndTime}`
+                          ) : (
+                            'Select end time'
+                          )
+                        ) : (
+                          'Select end date'
+                        )}
+                      </Text>
+                    </TouchableOpacity>
+                    {(endDateError || endTimeError) && (
+                      <Text style={styles.fieldErrorText}>
+                        {endDateError || endTimeError}
+                      </Text>
+                    )}
+                  </View>
+                </View>
+                {/* Date/Time relationship validation error - shown below both fields */}
+                {dateTimeError && (
+                  <View style={styles.dateTimeErrorContainer}>
+                    <Text style={styles.dateTimeErrorText}>{dateTimeError}</Text>
+                  </View>
+                )}
+              </View>
             </View>
 
         <TouchableOpacity
@@ -2470,60 +2570,60 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   }}
                   disabled={isLoading}
                 >
-                  <Text style={styles.selectorText}>{selectedRecurrence}</Text>
+                  <Text style={[styles.selectorText, selectedRecurrence && selectedRecurrence !== "Does not repeat" && styles.selectorTextFilled]}>{selectedRecurrence}</Text>
                   <ArrowDownIcon
                     width={20}
                     height={20}
                     fill="#6C6C6C"
                   />
                 </TouchableOpacity>
-              </View>
-            )}
 
-            {/* Repeat Dropdown - Match task screen design */}
-            {showRecurrenceDropdown && (
-              <View style={styles.repeatDropdown}>
-                <ScrollView
-                  style={styles.repeatOptionsWrapper}
-                  contentContainerStyle={styles.repeatOptionsContent}
-                  showsVerticalScrollIndicator={true}
-                  nestedScrollEnabled={true}
-                  bounces={false}
-                  scrollEnabled={true}
-                  keyboardShouldPersistTaps="handled"
-                  alwaysBounceVertical={false}
-                  removeClippedSubviews={false}
-                >
-                  {recurrenceOptions.map((option, index) => (
-                    <TouchableOpacity
-                      key={`${option}-${index}`}
-                      style={[
-                        styles.repeatOption,
-                        selectedRecurrence === option && styles.repeatOptionSelected,
-                      ]}
-                      onPress={() => {
-                        if (!isLoading) {
-                          handleRecurrenceSelect(option);
-                        }
-                      }}
-                      disabled={isLoading}
-                      activeOpacity={0.7}
+                {/* Repeat Dropdown - Match task screen design */}
+                {showRecurrenceDropdown && (
+                  <View style={styles.repeatDropdown}>
+                    <ScrollView
+                      style={styles.repeatOptionsWrapper}
+                      contentContainerStyle={styles.repeatOptionsContent}
+                      showsVerticalScrollIndicator={true}
+                      nestedScrollEnabled={true}
+                      bounces={false}
+                      scrollEnabled={true}
+                      keyboardShouldPersistTaps="handled"
+                      alwaysBounceVertical={false}
+                      removeClippedSubviews={false}
                     >
-                      <Text
-                        style={[
-                          styles.repeatOptionText,
-                          selectedRecurrence === option && styles.repeatOptionTextSelected,
-                        ]}
-                        numberOfLines={1}
-                      >
-                        {option}
-                      </Text>
-                      {selectedRecurrence === option && (
-                        <FeatherIcon name="check" size={18} color={colors.primaryBlue} />
-                      )}
-                    </TouchableOpacity>
-                  ))}
-                </ScrollView>
+                      {recurrenceOptions.map((option, index) => (
+                        <TouchableOpacity
+                          key={`${option}-${index}`}
+                          style={[
+                            styles.repeatOption,
+                            selectedRecurrence === option && styles.repeatOptionSelected,
+                          ]}
+                          onPress={() => {
+                            if (!isLoading) {
+                              handleRecurrenceSelect(option);
+                            }
+                          }}
+                          disabled={isLoading}
+                          activeOpacity={0.7}
+                        >
+                          <Text
+                            style={[
+                              styles.repeatOptionText,
+                              selectedRecurrence === option && styles.repeatOptionTextSelected,
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {option}
+                          </Text>
+                          {selectedRecurrence === option && (
+                            <FeatherIcon name="check" size={18} color={colors.primaryBlue} />
+                          )}
+                        </TouchableOpacity>
+                      ))}
+                    </ScrollView>
+                  </View>
+                )}
               </View>
             )}
 
@@ -2578,11 +2678,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 <Text style={styles.selectorText}>
                   {selectedVideoConferencing || "Select"}
                 </Text>
-                <ArrowDownIcon
-                  width={20}
-                  height={20}
-                  fill="#6C6C6C"
-                />
+                <FeatherIcon name="plus" size={20} color="#6C6C6C" />
               </TouchableOpacity>
             </View>
 
@@ -2605,7 +2701,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               disabled={isLoading}
             >
               <View style={styles.videoConferencingIconContainer}>
-                <FeatherIcon name="map-pin" size={16} color="#6C6C6C" />
+                <FeatherIcon name="map-pin" size={16} color="#A4A7AE" />
               </View>
               <Text
                 style={[
@@ -2669,51 +2765,29 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           </View>
         )}
 
-        {/* Add location */}
+        {/* Add location - Match task screen design */}
         <View
           ref={locationSectionRef}
+          style={styles.fieldContainer}
           collapsable={false}
         >
-          <View
-            style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              marginBottom: spacing.lg,
+          <Text style={styles.labelText}>Add Location</Text>
+          <TouchableOpacity
+            style={[styles.datePicker, activeField === 'location' && styles.fieldActive]}
+            onPress={() => {
+              if (!isLoading) {
+                setActiveField('location');
+                handleOpenLocationModal();
+              }
             }}
+            disabled={isLoading}
           >
-            <FeatherIcon name="map-pin" size={20} color="#6C6C6C" />
-
-            <TouchableOpacity
-              style={{ flex: 1, flexDirection: 'row', alignItems: 'center' }}
-              onPress={handleOpenLocationModal}
-              activeOpacity={1}
-              disabled={isLoading}
-            >
-              <TextInput
-                style={[
-                  styles.selectorText,
-                  { flex: 1, marginHorizontal: spacing.sm },
-                ]}
-                placeholder="Add location"
-                placeholderTextColor={colors.grey400}
-                value={location}
-                onFocus={handleOpenLocationModal}
-                editable={false}
-                pointerEvents="none"
-              />
-            </TouchableOpacity>
-
-            <TouchableOpacity onPress={handleOpenLocationModal}>
-              <Image
-                style={{
-                  marginLeft: scaleWidth(10),
-                  height: scaleHeight(12.87),
-                  width: scaleWidth(12.87),
-                }}
-                source={require('../assets/images/addIcon.png')}
-              />
-            </TouchableOpacity>
-          </View>
+            <FeatherIcon name="map-pin" size={20} color="#A4A7AE" />
+            <Text style={[styles.selectorText, location && styles.selectorTextFilled]}>
+              {location || "Add Location"}
+            </Text>
+            <FeatherIcon name="plus" size={20} color="#6C6C6C" />
+          </TouchableOpacity>
           {locationError ? (
             <Text style={styles.fieldErrorText}>{locationError}</Text>
           ) : null}
@@ -2735,7 +2809,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               }
               keyboardType="numeric"
               placeholder="10"
-              placeholderTextColor="#9E9E9E"
+              placeholderTextColor="#A4A7AE"
               maxLength={3}
               scrollEnabled={false}
               multiline={false}
@@ -2798,8 +2872,20 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               />
             </View>
 
-            {/* Create Button - Match task screen design */}
-            <View style={styles.buttonContainer}>
+            {/* Bottom Action Bar - Advanced Options and Create Button Inline */}
+            <View style={styles.bottomActionBar}>
+              <TouchableOpacity
+                style={styles.advanceOptionsButton}
+                onPress={() => {
+                  if (!isLoading) {
+                    setShowAdvanced(!showAdvanced);
+                  }
+                }}
+                disabled={isLoading}
+              >
+                <Text style={styles.advanceOptionsText} numberOfLines={1}>Advanced options</Text>
+              </TouchableOpacity>
+              
               <TouchableOpacity
                 style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
                 disabled={isLoading}
@@ -2813,21 +2899,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Bottom Action Bar - Advanced Options */}
-      <View style={styles.bottomActionBar}>
-        <TouchableOpacity
-          style={styles.advanceOptionsButton}
-          onPress={() => {
-            if (!isLoading) {
-              setShowAdvanced(!showAdvanced);
-            }
-          }}
-          disabled={isLoading}
-        >
-          <Text style={styles.advanceOptionsText}>Advanced options</Text>
-        </TouchableOpacity>
-      </View>
 
 
       {/* Calendar with Time Modal */}
@@ -2918,14 +2989,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 style={styles.timezoneModalOkButton}
                 onPress={() => setShowTimezoneModal(false)}
               >
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.timezoneModalOkGradient}
-                >
-                  <Text style={styles.timezoneModalOkText}>Ok</Text>
-                </LinearGradient>
+                <Text style={styles.timezoneModalOkText}>Ok</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -2943,7 +3007,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           <View style={styles.customRecurrenceModalContainer}>
             {/* Modal Header */}
             <View style={styles.customModalHeader}>
-              <Text style={styles.customModalTitle}>Custom recurrence</Text>
+              <Text style={styles.customModalTitle}>Custom repeat</Text>
             </View>
             <ScrollView
               style={{ flexGrow: 0 }}
@@ -2956,9 +3020,11 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   <Text style={styles.customRecurrenceSectionTitle}>
                     Repeat every
                   </Text>
-                  <View style={styles.customRepeatEveryRow}>
+                  <View style={styles.customRepeatEveryColumn}>
                     <TextInput
                       style={styles.customRepeatEveryInput}
+                      placeholder="Enter number"
+                      placeholderTextColor="#A4A7AE"
                       value={customRecurrence.repeatEvery}
                       onChangeText={text => {
                         // Only allow positive integers (1-99)
@@ -2982,20 +3048,38 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       keyboardType="numeric"
                       maxLength={2}
                     />
-                    <TouchableOpacity
-                      style={styles.customRepeatUnitDropdown}
-                      onPress={() => setShowUnitDropdown(prev => !prev)}
-                    >
-                      <Text style={styles.customRepeatUnitText}>
-                        {customRecurrence.repeatUnit}
-                      </Text>
-                      <FeatherIcon
-                        name="chevron-down"
-                        size={14}
-                        color="#6C6C6C"
-                        style={{ paddingTop: 3 }}
-                      />
-                    </TouchableOpacity>
+                    <View style={styles.customRepeatUnitContainer}>
+                      <TouchableOpacity
+                        style={styles.customRepeatUnitDropdown}
+                        onPress={() => setShowUnitDropdown(prev => !prev)}
+                      >
+                        <Text style={[styles.customRepeatUnitText, !repeatUnits.includes(customRecurrence.repeatUnit) ? styles.customRepeatUnitTextPlaceholder : null]}>
+                          {repeatUnits.includes(customRecurrence.repeatUnit) ? customRecurrence.repeatUnit : 'Select'}
+                        </Text>
+                        <FeatherIcon
+                          name="chevron-down"
+                          size={14}
+                          color="#6C6C6C"
+                          style={{ paddingTop: 3 }}
+                        />
+                      </TouchableOpacity>
+                      {showUnitDropdown && (
+                        <View style={styles.customUnitDropdownContainer}>
+                          {repeatUnits.map(unit => (
+                            <TouchableOpacity
+                              key={unit}
+                              style={styles.customUnitDropdownItem}
+                              onPress={() => {
+                                setCustomRecurrence(prev => ({ ...prev, repeatUnit: unit }));
+                                setShowUnitDropdown(false);
+                              }}
+                            >
+                              <Text style={styles.customUnitDropdownItemText}>{unit}</Text>
+                            </TouchableOpacity>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </View>
                 </View>
 
@@ -3007,35 +3091,24 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                     <Text style={styles.customRecurrenceSectionTitle}>
                       Repeat on
                     </Text>
-                    <ScrollView horizontal={true}
-                      showsHorizontalScrollIndicator={false}
-                      contentContainerStyle={{ alignItems: 'center' }}
-                    >
-                      <View style={styles.customDaysRow}>
-                        {dayAbbreviations.map((day, index) => (
-                          <TouchableOpacity
-                            key={index}
-                            style={[
-                              styles.customDayButton,
-                              customRecurrence.repeatOn.includes(dayNames[index]) &&
-                              styles.customDayButtonSelected,
-                            ]}
-                            onPress={() => handleDayToggle(dayNames[index])}
-                          >
-                            <Text
-                              style={[
-                                styles.customDayButtonText,
-                                customRecurrence.repeatOn.includes(
-                                  dayNames[index],
-                                ) && styles.customDayButtonTextSelected,
-                              ]}
-                            >
-                              {day}
-                            </Text>
-                          </TouchableOpacity>
-                        ))}
-                      </View>
-                    </ScrollView>
+                    <View style={styles.customDaysList}>
+                      {dayNames.map((day, index) => (
+                        <TouchableOpacity
+                          key={index}
+                          style={styles.customDayOption}
+                          onPress={() => handleDayToggle(day)}
+                        >
+                          <View style={[styles.customDayCheckbox, customRecurrence.repeatOn.includes(day) && styles.customDayCheckboxSelected]}>
+                            {customRecurrence.repeatOn.includes(day) && (
+                              <FeatherIcon name="check" size={14} color="#000000" />
+                            )}
+                          </View>
+                          <Text style={[styles.customDayOptionText, customRecurrence.repeatOn.includes(day) && styles.customDayOptionTextSelected]}>
+                            {day}
+                          </Text>
+                        </TouchableOpacity>
+                      ))}
+                    </View>
                   </View>
                 )}
 
@@ -3052,12 +3125,12 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       }))
                     }
                   >
-                    <View style={styles.customRadioButton}>
+                    <View style={[styles.customCheckbox, customRecurrence.endsType === endsOptions[0] && styles.customCheckboxSelected]}>
                       {customRecurrence.endsType === endsOptions[0] && (
-                        <View style={styles.customRadioButtonSelected} />
+                        <FeatherIcon name="check" size={14} color="#000000" />
                       )}
                     </View>
-                    <Text style={styles.customEndsOptionText}>
+                    <Text style={[styles.customEndsOptionText, customRecurrence.endsType === endsOptions[0] && styles.customEndsOptionTextSelected]}>
                       {endsOptions[0]}
                     </Text>
                   </TouchableOpacity>
@@ -3071,12 +3144,12 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       }))
                     }
                   >
-                    <View style={styles.customRadioButton}>
+                    <View style={[styles.customCheckbox, customRecurrence.endsType === endsOptions[1] && styles.customCheckboxSelected]}>
                       {customRecurrence.endsType === endsOptions[1] && (
-                        <View style={styles.customRadioButtonSelected} />
+                        <FeatherIcon name="check" size={14} color="#000000" />
                       )}
                     </View>
-                    <Text style={styles.customEndsOptionText}>
+                    <Text style={[styles.customEndsOptionText, customRecurrence.endsType === endsOptions[1] && styles.customEndsOptionTextSelected]}>
                       {endsOptions[1]}
                     </Text>
                     <TouchableOpacity
@@ -3120,12 +3193,12 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       }))
                     }
                   >
-                    <View style={styles.customRadioButton}>
+                    <View style={[styles.customCheckbox, customRecurrence.endsType === endsOptions[2] && styles.customCheckboxSelected]}>
                       {customRecurrence.endsType === endsOptions[2] && (
-                        <View style={styles.customRadioButtonSelected} />
+                        <FeatherIcon name="check" size={14} color="#000000" />
                       )}
                     </View>
-                    <Text style={styles.customEndsOptionText}>
+                    <Text style={[styles.customEndsOptionText, customRecurrence.endsType === endsOptions[2] && styles.customEndsOptionTextSelected]}>
                       {endsOptions[2]}
                     </Text>
                     <TextInput
@@ -3150,21 +3223,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   </TouchableOpacity>
                 </View>
               </View>
-              {showUnitDropdown && (
-                <View style={styles.dropdownOverlay}>
-                  <View style={styles.dropdownContainer}>
-                    {repeatUnits.map(unit => (
-                      <TouchableOpacity
-                        key={unit}
-                        style={styles.dropdownItem}
-                        onPress={() => handleUnitSelect(unit)}
-                      >
-                        <Text style={styles.dropdownItemText}>{unit}</Text>
-                      </TouchableOpacity>
-                    ))}
-                  </View>
-                </View>
-              )}
 
             </ScrollView>
             
@@ -3231,14 +3289,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 style={styles.customDoneButton}
                 onPress={handleCustomRecurrenceDone}
               >
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.customDoneButtonGradient}
-                >
-                  <Text style={styles.customDoneButtonText}>Done</Text>
-                </LinearGradient>
+                <Text style={styles.customDoneButtonText}>Done</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -3259,12 +3310,12 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           {/* Keep the original TextInput visible at the top */}
           <View style={styles.locationInputContainer}>
             <View style={styles.locationInputRow}>
-              <FeatherIcon name="map-pin" size={20} color="#6C6C6C" />
+              <FeatherIcon name="map-pin" size={20} color="#A4A7AE" />
               <TextInput
                 ref={locationModalInputRef}
                 style={styles.locationModalInput}
                 placeholder="Add location"
-                placeholderTextColor={colors.grey400}
+                placeholderTextColor="#A4A7AE"
                 value={location}
                 onChangeText={text => {
                   // Check for invalid characters
@@ -3432,9 +3483,9 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: scaleHeight(18),
-    paddingBottom: scaleHeight(12),
-    paddingHorizontal: scaleWidth(18),
+    paddingTop: scaleHeight(40),
+    paddingBottom: spacing.lg,
+    paddingHorizontal: scaleWidth(10),
     width: '100%',
     backgroundColor: colors.white,
     borderBottomWidth: 1,
@@ -3554,7 +3605,7 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 18,
     letterSpacing: 0,
-    color: colors.textPrimary,
+    color: '#252B37',
     paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.sm,
     borderWidth: 1,
@@ -3573,13 +3624,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.md,
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: 8,
     paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.sm,
     backgroundColor: colors.white,
+    minHeight: scaleHeight(44),
   },
   selectorText: {
     fontSize: 14,
@@ -3587,8 +3638,12 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 18,
     letterSpacing: 0,
-    color: colors.blackText,
+    color: '#A4A7AE', // Text color for placeholder/empty state
     flex: 1,
+    marginLeft: spacing.sm,
+  },
+  selectorTextFilled: {
+    color: '#252B37', // Text color when value is entered
   },
   inputUnderline: {
     height: 1,
@@ -3616,9 +3671,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   dateTimeLabel: {
-    fontSize: fontSize.textSize14,
+    fontSize: 12,
+    fontFamily: Fonts.latoMedium,
+    lineHeight: 12,
+    letterSpacing: 0,
     color: colors.grey400,
-    fontWeight: '500',
     marginBottom: spacing.xs,
   },
   dateTimeRow: {
@@ -3653,24 +3710,32 @@ const styles = StyleSheet.create({
     paddingLeft: spacing.xs,
   },
   timeSlot: {
-    backgroundColor: '#F6F7F9',
-    borderRadius: borderRadius.sm,
-    padding: spacing.sm,
+    backgroundColor: colors.white,
+    borderRadius: 8,
     borderWidth: 1,
-    borderColor: '#E5E5E5',
-    minHeight: scaleHeight(60),
+    borderColor: '#DCE0E5',
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: spacing.sm,
+    minHeight: scaleHeight(44),
     justifyContent: 'center',
   },
   timeSlotLabel: {
-    fontSize: fontSize.textSize12,
+    fontSize: 12,
+    fontFamily: Fonts.latoMedium,
+    lineHeight: 12,
+    letterSpacing: 0,
     color: colors.grey400,
-    fontWeight: '500',
     marginBottom: spacing.xs,
   },
   timeSlotValue: {
-    fontSize: fontSize.textSize14,
-    color: colors.blackText,
-    fontWeight: '600',
+    fontSize: 12,
+    fontFamily: Fonts.latoRegular,
+    lineHeight: 18,
+    letterSpacing: 0,
+    color: '#252B37',
+  },
+  timeSlotValuePlaceholder: {
+    color: '#A4A7AE',
   },
   divider: {
     height: 1,
@@ -3748,41 +3813,41 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     lineHeight: 18,
     letterSpacing: 0,
-    color: colors.textPrimary,
+    color: '#252B37',
     padding: spacing.md,
     minHeight: scaleHeight(150),
   },
   bottomActionBar: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.xl,
-    paddingHorizontal: scaleWidth(20),
-    paddingBottom: scaleHeight(50),
-    width: '100%',
-  },
-  buttonContainer: {
-    width: '100%',
-    alignItems: 'center',
-    marginTop: scaleHeight(32),
+    justifyContent: 'space-between',
+    marginTop: scaleHeight(20),
     marginBottom: scaleHeight(20),
+    gap: scaleWidth(12),
   },
   advanceOptionsButton: {
-    paddingVertical: spacing.sm,
+    flex: 1,
+    paddingVertical: scaleHeight(14),
     paddingHorizontal: spacing.md,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    backgroundColor: colors.white,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   advanceOptionsText: {
-    fontSize: fontSize.textSize18,
-    color: colors.dimGray,
+    fontSize: fontSize.textSize14,
+    color: colors.blackText,
     fontWeight: '600',
+    fontFamily: Fonts.latoSemiBold,
   },
   saveButton: {
-    width: '100%',
-    maxWidth: scaleWidth(335),
+    flex: 1,
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primaryBlue, // Solid blue #00AEEF - Match task screen
+    backgroundColor: colors.primaryBlue,
     paddingVertical: scaleHeight(14),
     paddingHorizontal: spacing.xl,
     ...shadows.sm,
@@ -3950,8 +4015,8 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   checkboxSelected: {
-    backgroundColor: Colors.primaryGreen,
-    borderColor: Colors.primaryGreen,
+    backgroundColor: colors.primaryBlue,
+    borderColor: colors.primaryBlue,
   },
   modalActions: {
     flexDirection: 'row',
@@ -4007,8 +4072,8 @@ const styles = StyleSheet.create({
   repeatDropdown: {
     position: 'absolute',
     top: '100%',
-    left: 0,
-    right: 0,
+    left: scaleWidth(10), // Add left margin to make it narrower
+    right: scaleWidth(10), // Add right margin to make it narrower
     marginTop: scaleHeight(4),
     borderRadius: 8,
     borderWidth: 1,
@@ -4020,25 +4085,25 @@ const styles = StyleSheet.create({
     shadowRadius: 8,
     shadowOffset: { width: 0, height: 2 },
     elevation: 15, // Higher elevation for Android
-    maxHeight: scaleHeight(300), // Fixed max height to force scrolling
+    maxHeight: scaleHeight(320), // Increased height to show more options
     overflow: 'hidden', // Ensure content doesn't overflow
   },
   repeatOptionsWrapper: {
-    height: scaleHeight(300), // Fixed height - CRITICAL for scrolling to work
+    height: scaleHeight(320), // Fixed height - forces scrolling when content exceeds this
   },
   repeatOptionsContent: {
-    paddingBottom: scaleHeight(20), // Add padding at bottom for last item
-    paddingTop: scaleHeight(8), // Add padding at top
+    paddingBottom: scaleHeight(12), // Compact padding at bottom
+    paddingTop: scaleHeight(4), // Compact padding at top
   },
   repeatOption: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: scaleWidth(16),
-    paddingVertical: scaleHeight(14),
+    paddingVertical: scaleHeight(10), // Reduced from 14 to make more compact
     borderBottomWidth: 1,
     borderBottomColor: '#F2F4F7',
-    minHeight: scaleHeight(44),
+    minHeight: scaleHeight(38), // Reduced from 44 to make more compact
     backgroundColor: colors.white,
   },
   repeatOptionSelected: {
@@ -4065,41 +4130,39 @@ const styles = StyleSheet.create({
 
   customRecurrenceContent: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    overflow: 'visible', // Add this
+    overflow: 'visible',
+    paddingHorizontal: spacing.md,
   },
   customRecurrenceSection: {
-    marginBottom: spacing.xl,
-    overflow: 'visible', // Add this
+    marginBottom: spacing.lg,
+    overflow: 'visible',
   },
   customRepeatEveryContainer: {
     position: 'relative',
     zIndex: 1000, // Add this
   },
-  customRepeatEveryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  customRepeatEveryColumn: {
+    flexDirection: 'column',
     width: '100%',
-    justifyContent: 'flex-start',
-    flexWrap: 'wrap',
-    marginBottom: spacing.xs,
     gap: spacing.sm,
   },
   customRepeatEveryInput: {
-    width: scaleWidth(70),
-    minWidth: scaleWidth(60),
-    maxWidth: scaleWidth(90),
+    width: '100%',
     height: scaleHeight(40),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
-    textAlign: 'center',
+    textAlign: 'left',
     fontSize: fontSize.textSize14,
-    color: colors.blackText,
-    paddingHorizontal: scaleWidth(10),
+    color: '#252B37',
+    paddingHorizontal: spacing.md,
     paddingVertical: 0,
     backgroundColor: colors.white,
-    flexShrink: 0,
+    fontFamily: Fonts.latoRegular,
+  },
+  customRepeatUnitContainer: {
+    position: 'relative',
+    width: '100%',
   },
   customRepeatUnitDropdown: {
     flexDirection: 'row',
@@ -4111,16 +4174,46 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     height: scaleHeight(40),
-    minWidth: scaleWidth(90),
-    maxWidth: scaleWidth(130),
-    flex: 0,
+    width: '100%',
     backgroundColor: colors.white,
+  },
+  customUnitDropdownContainer: {
+    position: 'absolute',
+    top: scaleHeight(45),
+    left: 0,
+    right: 0,
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.sm,
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 5,
+    zIndex: 1001,
+    maxHeight: scaleHeight(180),
+  },
+  customUnitDropdownItem: {
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  customUnitDropdownItemText: {
+    fontSize: fontSize.textSize14,
+    color: '#252B37',
+    fontFamily: Fonts.latoRegular,
   },
   customRepeatUnitText: {
     fontSize: fontSize.textSize14,
-    color: colors.blackText,
+    color: '#252B37',
     fontWeight: '400',
     marginRight: spacing.xs,
+    fontFamily: Fonts.latoRegular,
+  },
+  customRepeatUnitTextPlaceholder: {
+    color: '#A4A7AE',
   },
   dropdownContainer: {
     position: 'absolute',
@@ -4159,88 +4252,97 @@ const styles = StyleSheet.create({
   customRecurrenceModalContainer: {
     backgroundColor: colors.white,
     borderRadius: 20,
-    width: '100%',
-    maxHeight: '75%',     // 👈 fixed height for smaller screens
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.sm,
+    width: '92%',
+    maxWidth: scaleWidth(480),
+    maxHeight: '75%',
+    paddingVertical: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   customModalHeader: {
-    marginBottom: spacing.xl,
-    alignItems: 'center',
+    marginBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
   },
   customModalTitle: {
-    fontSize: fontSize.textSize20,
+    fontSize: fontSize.textSize18,
     fontWeight: '600',
-    color: colors.blackText,
+    color: '#252B37',
+    fontFamily: Fonts.latoBold,
   },
 
   customRecurrenceSectionTitle: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize14,
     fontWeight: '600',
-    color: colors.blackText,
+    color: '#414651',
     marginBottom: spacing.md,
+    fontFamily: Fonts.latoSemiBold,
   },
-
-
-  customDaysRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
+  customDaysList: {
+    flexDirection: 'column',
     gap: spacing.xs,
   },
-  customDayButton: {
-    width: scaleWidth(40),
-    height: scaleHeight(40),
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: '#DCE0E5',
-    backgroundColor: colors.white,
+  customDayOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: scaleHeight(8),
+  },
+  customDayCheckbox: {
+    width: scaleWidth(20),
+    height: scaleHeight(20),
+    borderRadius: 4,
+    borderWidth: 2,
+    borderColor: '#A4A7AE',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.white,
+    marginRight: spacing.md,
   },
-  customDayButtonSelected: {
-    backgroundColor: Colors.primaryblue,
-    borderColor: Colors.primaryblue,
+  customDayCheckboxSelected: {
+    backgroundColor: colors.white,
+    borderColor: '#000000',
   },
-  customDayButtonText: {
+  customDayOptionText: {
     fontSize: fontSize.textSize14,
-    fontWeight: '500',
-    color: colors.blackText,
+    fontWeight: '400',
+    color: '#A4A7AE',
+    fontFamily: Fonts.latoRegular,
   },
-  customDayButtonTextSelected: {
-    color: colors.white,
+  customDayOptionTextSelected: {
+    color: '#000000',
   },
   customEndsOption: {
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: spacing.sm,
     gap: spacing.sm,
-    flexWrap: 'wrap',
+    flexWrap: 'nowrap',
   },
-  customRadioButton: {
+  customCheckbox: {
     width: scaleWidth(20),
     height: scaleHeight(20),
-    borderRadius: 10,
+    borderRadius: 4,
     borderWidth: 2,
-    borderColor: '#DCE0E5',
+    borderColor: '#A4A7AE',
     justifyContent: 'center',
     alignItems: 'center',
+    backgroundColor: colors.white,
   },
-  customRadioButtonSelected: {
-    width: scaleWidth(10),
-    height: scaleHeight(10),
-    borderRadius: 5,
-    backgroundColor: Colors.primaryblue,
+  customCheckboxSelected: {
+    backgroundColor: colors.white,
+    borderColor: '#000000',
   },
   customEndsOptionText: {
     fontSize: fontSize.textSize14,
-    color: colors.blackText,
+    color: '#A4A7AE',
     fontWeight: '400',
     minWidth: scaleWidth(40),
-
+    fontFamily: Fonts.latoRegular,
+  },
+  customEndsOptionTextSelected: {
+    color: '#000000',
   },
   customEndsInput: {
-    minWidth: scaleWidth(100),
-    width: scaleWidth(110),
+    minWidth: scaleWidth(80),
+    maxWidth: scaleWidth(100),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
@@ -4259,6 +4361,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize12,
     color: colors.blackText,
     flexShrink: 0,
+    fontFamily: Fonts.latoRegular,
   },
   customEndsInputPlaceholder: {
     color: '#9E9E9E',
@@ -4298,42 +4401,42 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize14,
     color: colors.blackText,
     marginLeft: spacing.xs,
+    fontFamily: Fonts.latoRegular,
   },
   customModalActions: {
     flexDirection: 'row',
-    justifyContent: 'flex-end',
+    justifyContent: 'space-between',
     gap: spacing.md,
-    paddingHorizontal: spacing.lg, // Add horizontal padding to match content
-    paddingTop: spacing.sm, // Add top padding/spacing
-    // Add bottom padding
-    borderTopWidth: 1, // Optional: add a separator line
-    borderTopColor: '#E5E7EB', // Optional: separator color
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.lg,
     backgroundColor: colors.white,
   },
   customCancelButton: {
-    paddingVertical: 10, // Changed from spacing.md
+    paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.lg,
     borderRadius: borderRadius.md,
     backgroundColor: '#F3F4F6',
   },
   customCancelButtonText: {
-    fontSize: fontSize.textSize14, // Optional: reduce font size too
+    fontSize: fontSize.textSize14,
     fontWeight: '500',
     color: '#6B7280',
+    fontFamily: Fonts.latoMedium,
   },
   customDoneButton: {
     borderRadius: borderRadius.md,
-    overflow: 'hidden',
-  },
-  customDoneButtonGradient: {
-    paddingVertical: 10, // Changed from spacing.md
+    backgroundColor: colors.primaryBlue,
+    paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   customDoneButtonText: {
-    fontSize: fontSize.textSize14, // Optional: reduce font size too
+    fontSize: fontSize.textSize14,
     fontWeight: '600',
     color: colors.white,
+    fontFamily: Fonts.latoSemiBold,
   },
   // Timezone Styles
   timezoneTag: {
@@ -4375,6 +4478,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize18,
     fontWeight: '600',
     color: colors.blackText,
+    fontFamily: Fonts.latoSemiBold,
   },
   timezoneModalCloseButton: {
     width: moderateScale(24),
@@ -4399,6 +4503,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize16,
     color: colors.blackText,
     backgroundColor: colors.white,
+    fontFamily: Fonts.latoRegular,
   },
   timezoneList: {
     maxHeight: scaleHeight(250),
@@ -4417,10 +4522,12 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize16,
     color: colors.blackText,
     fontWeight: '400',
+    fontFamily: Fonts.latoRegular,
   },
   timezoneItemTextSelected: {
     color: '#0B6DE0',
     fontWeight: '500',
+    fontFamily: Fonts.latoMedium,
   },
   useCurrentTimezoneButton: {
     paddingVertical: spacing.sm,
@@ -4433,6 +4540,7 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize16,
     color: colors.blackText,
     fontWeight: '400',
+    fontFamily: Fonts.latoRegular,
   },
   timezoneModalFooter: {
     flexDirection: 'row',
@@ -4451,21 +4559,22 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize16,
     color: colors.blackText,
     fontWeight: '400',
+    fontFamily: Fonts.latoRegular,
   },
   timezoneModalOkButton: {
     flex: 0.5,
     borderRadius: borderRadius.md,
-    overflow: 'hidden',
-  },
-  timezoneModalOkGradient: {
+    backgroundColor: colors.primaryBlue,
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
     alignItems: 'center',
+    justifyContent: 'center',
   },
   timezoneModalOkText: {
     fontSize: fontSize.textSize14,
     color: colors.white,
     fontWeight: '600',
+    fontFamily: Fonts.latoSemiBold,
   },
   // Loading, Error, and Empty States
   loadingContainer: {
@@ -4542,7 +4651,7 @@ const styles = StyleSheet.create({
   locationModalInput: {
     flex: 1,
     fontSize: fontSize.textSize16,
-    color: colors.blackText,
+    color: '#252B37',
     marginLeft: spacing.sm,
     marginRight: spacing.sm,
   },
@@ -4581,9 +4690,12 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   allDayText: {
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
+    fontSize: 14,
+    fontFamily: Fonts.latoRegular,
     fontWeight: '400',
+    lineHeight: 18,
+    letterSpacing: 0,
+    color: colors.blackText,
     marginLeft: spacing.sm,
   },
   dropdownWrapper: {

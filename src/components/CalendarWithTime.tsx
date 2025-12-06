@@ -10,9 +10,9 @@ import {
   Alert,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
-import LinearGradient from 'react-native-linear-gradient';
 import { moderateScale, scaleWidth } from '../utils/dimensions';
 import { colors, fontSize, spacing, borderRadius } from '../utils/LightTheme';
+import { Fonts } from '../constants/Fonts';
 
 interface CalendarWithTimeProps {
   isVisible: boolean;
@@ -326,16 +326,11 @@ const CalendarWithTime: React.FC<CalendarWithTimeProps> = ({
                       disabled={!isSelectable}
                     >
                       {isSelectedDate(date) ? (
-                        <LinearGradient
-                          colors={['#18F06E', '#0B6DE0']}
-                          start={{ x: 0, y: 0 }}
-                          end={{ x: 1, y: 0 }}
-                          style={styles.selectedDateGradient}
-                        >
+                        <View style={styles.selectedDateContainer}>
                           <Text style={styles.selectedDateText}>
                             {date.getDate()}
                           </Text>
-                        </LinearGradient>
+                        </View>
                       ) : (
                         <Text
                           style={[
@@ -404,14 +399,9 @@ const CalendarWithTime: React.FC<CalendarWithTimeProps> = ({
           </TouchableOpacity>
 
           <TouchableOpacity style={styles.doneButton} onPress={handleDone}>
-            <LinearGradient
-              colors={['#18F06E', '#0B6DE0']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.doneButtonGradient}
-            >
+            <View style={styles.doneButtonContainer}>
               <Text style={styles.doneButtonText}>Done</Text>
-            </LinearGradient>
+            </View>
           </TouchableOpacity>
         </View>
       </View>
@@ -475,18 +465,22 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   monthYearText: {
-    fontSize: fontSize.textSize16,
+    fontSize: 12,
     color: colors.black,
-    fontWeight: '600',
+    fontFamily: Fonts.latoMedium,
+    lineHeight: 12,
+    letterSpacing: 0,
   },
   daysHeader: {
     flexDirection: 'row',
     marginBottom: spacing.sm,
   },
   dayHeaderText: {
-    fontSize: fontSize.textSize12,
+    fontSize: 12,
     color: '#6F7C8E',
-    fontWeight: '500',
+    fontFamily: Fonts.latoMedium,
+    lineHeight: 12,
+    letterSpacing: 0,
     width: '14.28%', // Match dateButton width for perfect alignment
     textAlign: 'center',
   },
@@ -502,17 +496,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginBottom: spacing.xs,
   },
-  selectedDateGradient: {
+  selectedDateContainer: {
     width: moderateScale(36),
     height: moderateScale(36),
     borderRadius: moderateScale(8),
+    backgroundColor: '#00AEEF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   dateText: {
-    fontSize: fontSize.textSize15,
+    fontSize: 12,
     color: colors.blackText,
-    fontWeight: '500',
+    fontFamily: Fonts.latoRegular,
+    lineHeight: 18,
+    letterSpacing: 0,
   },
   inactiveDateText: {
     color: colors.grey400,
@@ -525,7 +522,10 @@ const styles = StyleSheet.create({
   },
   selectedDateText: {
     color: colors.white,
-    fontWeight: '600',
+    fontFamily: Fonts.latoRegular,
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: 0,
   },
   repeatButton: {
     backgroundColor: colors.grey20,
@@ -535,9 +535,11 @@ const styles = StyleSheet.create({
     alignSelf: 'flex-start',
   },
   repeatButtonText: {
-    fontSize: fontSize.textSize12,
+    fontSize: 12,
     color: colors.grey400,
-    fontWeight: '500',
+    fontFamily: Fonts.latoMedium,
+    lineHeight: 12,
+    letterSpacing: 0,
   },
   timeSection: {
     flex: 1,
@@ -548,9 +550,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   timeHeaderText: {
-    fontSize: fontSize.textSize15,
+    fontSize: 12,
     color: colors.black,
-    fontWeight: '600',
+    fontFamily: Fonts.latoMedium,
+    lineHeight: 12,
+    letterSpacing: 0,
     textAlign: 'center',
   },
   timeScrollView: {
@@ -569,19 +573,23 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectedTimeSlot: {
-    borderColor: '#18F06E',
-    backgroundColor: '#00C78B1A',
+    borderColor: '#00AEEF',
+    backgroundColor: '#00AEEF1A',
   },
   timeText: {
-    fontSize: fontSize.textSize15,
+    fontSize: 12,
     color: colors.textPrimary,
     textAlign: 'center',
-    fontWeight: '400',
+    fontFamily: Fonts.latoRegular,
+    lineHeight: 18,
+    letterSpacing: 0,
   },
   selectedTimeText: {
     color: '#14181F',
-    fontWeight: '400',
-    fontSize: fontSize.textSize15,
+    fontFamily: Fonts.latoRegular,
+    fontSize: 12,
+    lineHeight: 18,
+    letterSpacing: 0,
   },
   actionButtons: {
     flexDirection: 'row',
@@ -603,9 +611,11 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: 12,
     color: colors.grey400,
-    fontWeight: '500',
+    fontFamily: Fonts.latoMedium,
+    lineHeight: 18,
+    letterSpacing: 0,
   },
   doneButton: {
     flex: 1,
@@ -613,14 +623,18 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     overflow: 'hidden',
   },
-  doneButtonGradient: {
+  doneButtonContainer: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
     alignItems: 'center',
+    backgroundColor: '#00AEEF',
+    borderRadius: borderRadius.md,
   },
   doneButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: 12,
     color: colors.white,
-    fontWeight: '600',
+    fontFamily: Fonts.latoRegular,
+    lineHeight: 18,
+    letterSpacing: 0,
   },
 });

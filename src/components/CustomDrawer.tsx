@@ -9,11 +9,11 @@ import {
   Image,
   ActivityIndicator,
   Easing,
-  Switch,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import CalenderIcon from 'react-native-vector-icons/MaterialIcons';
 import { useNavigation, useRoute } from '@react-navigation/native';
+import { Screen } from '../navigations/appNavigation.type';
 import {
   moderateScale,
   scaleHeight,
@@ -31,7 +31,6 @@ import { useToken } from '../stores/useTokenStore';
 import { useEventsStore } from '../stores/useEventsStore';
 import { Colors } from '../constants/Colors';
 import { Fonts } from '../constants/Fonts';
-import { useSettingsStore } from '../stores/useSetting';
 // Import SVG icons
 import DIcon from '../assets/svgs/DIcon.svg';
 import CrossIcon from '../assets/svgs/crossIcon.svg';
@@ -64,8 +63,21 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   const slideAnim = useRef(new Animated.Value(-scaleWidth(280))).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<any>();
+  
+  // Helper to safely navigate
+  const safeNavigate = (routeName: string) => {
+    try {
+      if (navigation && navigation.navigate) {
+        navigation.navigate(routeName as never);
+        return true;
+      }
+      return false;
+    } catch (error) {
+      console.error('Navigation error for route:', routeName, error);
+      return false;
+    }
+  };
   const route = useRoute();
-  const { selectedTheme, setSelectedTheme } = useSettingsStore();
   
   // State to track current route name
   const [currentRouteName, setCurrentRouteName] = useState<string | undefined>(route?.name);
@@ -113,7 +125,11 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   const [accountBtnLayout, setAccountBtnLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
   const { token, setToken } = useToken();
   const doNavigate = (route: string) => {
-    navigation.navigate(route);
+    console.log('doNavigate called with route:', route);
+    const success = safeNavigate(route);
+    if (!success) {
+      console.error('Failed to navigate to:', route);
+    }
   };
   const [accounts, setaccounts] = useState<Account[]>([]);
   const { getUserEvents, clearAllEventsData } = useEventsStore();
@@ -467,23 +483,50 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               <TouchableOpacity
                 style={[
                   styles.navItem,
-                  (currentRouteName === 'HomeScreen' || currentRouteName === 'ScheduleScreen') && styles.navItemActive
+                  currentRouteName === 'HomeScreen' && styles.navItemActive
                 ]}
                 onPress={() => {
-                  doNavigate('ScheduleScreen');
+                  doNavigate('HomeScreen');
                   onClose();
                 }}
               >
                 <HomeIcon 
                   width={22} 
                   height={22} 
-                  fill={(currentRouteName === 'HomeScreen' || currentRouteName === 'ScheduleScreen') ? colors.primaryBlue : '#414651'} 
+                  fill={currentRouteName === 'HomeScreen' ? colors.primaryBlue : '#414651'} 
                 />
                 <Text style={[
                   styles.navText,
-                  (currentRouteName === 'HomeScreen' || currentRouteName === 'ScheduleScreen') && styles.navTextActive
+                  currentRouteName === 'HomeScreen' && styles.navTextActive
                 ]}>
                   Home
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Schedule */}
+            <View style={styles.navItemContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.navItem,
+                  currentRouteName === 'ScheduleScreen' && styles.navItemActive
+                ]}
+                onPress={() => {
+                  console.log('Schedule button pressed');
+                  doNavigate(Screen.ScheduleScreen);
+                  onClose();
+                }}
+              >
+                <CalendarIcon 
+                  width={22} 
+                  height={22} 
+                  fill={currentRouteName === 'ScheduleScreen' ? colors.primaryBlue : '#414651'} 
+                />
+                <Text style={[
+                  styles.navText,
+                  currentRouteName === 'ScheduleScreen' && styles.navTextActive
+                ]}>
+                  Schedule
                 </Text>
               </TouchableOpacity>
             </View>
@@ -743,23 +786,6 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
           </View> */}
 
         </ScrollView>
-
-          {/* Dark Mode Toggle - Fixed at bottom */}
-          <View style={styles.darkModeWrapper}>
-            <View style={styles.navItemContainer}>
-              <View style={styles.darkModeSection}>
-                <Text style={styles.darkModeText}>Dark mode</Text>
-                <Switch
-                  value={selectedTheme === 'dark'}
-                  onValueChange={(value) => {
-                    setSelectedTheme(value ? 'dark' : 'light');
-                  }}
-                  trackColor={{ false: '#D1D5DB', true: colors.primaryBlue }}
-                  thumbColor={colors.white}
-                />
-              </View>
-            </View>
-          </View>
         </View>
         {showCreateMenu && (
           <View
@@ -972,28 +998,6 @@ const styles = StyleSheet.create({
   navTextActive: {
     color: colors.primaryBlue, // Blue when selected
     fontWeight: '400', // Keep Regular
-    fontFamily: Fonts.latoRegular,
-    lineHeight: 14,
-    letterSpacing: 0,
-  },
-  darkModeWrapper: {
-    paddingHorizontal: spacing.md,
-    marginTop: scaleHeight(100), // Large margin to push it far down from settings
-    marginBottom: scaleHeight(10),
-    paddingBottom: scaleHeight(10),
-  },
-  darkModeSection: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    width: '100%',
-  },
-  darkModeText: {
-    fontSize: 14,
-    color: '#414651',
-    fontWeight: '400',
     fontFamily: Fonts.latoRegular,
     lineHeight: 14,
     letterSpacing: 0,
