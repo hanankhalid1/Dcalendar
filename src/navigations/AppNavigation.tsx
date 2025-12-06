@@ -1,6 +1,7 @@
 import React from 'react';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import HomeScreen from '../screens/HomeScreen';
+import ScheduleScreen from '../screens/ScheduleScreen';
 import WeekScreen from '../screens/WeekScreen';
 import DailyCalendarScreen from '../screens/DailyCalendarScreen';
 import RemindersScreen from '../screens/RemindersScreen';
@@ -15,13 +16,19 @@ import WalletScreen from '../screens/wallet/WalletScreen';
 import AccountSelection from '../screens/wallet/AccountSelection';
 import HelpScreen from '../screens/HelpScreen';
 import DeletedEventsScreen from '../screens/DeletedEventsScreen';
+import SplashScreen from '../screens/SplashScreen';
 
 const Stack = createNativeStackNavigator();
 
 // 🔹 Stack Navigator (for Main App Screens)
 const StackNavigator = () => {
   return (
-    <Stack.Navigator initialRouteName="Wallet">
+    <Stack.Navigator initialRouteName="SplashScreen">
+      <Stack.Screen
+        name="SplashScreen"
+        component={SplashScreen}
+        options={{ headerShown: false, gestureEnabled: false }}
+      />
       <Stack.Screen
         name="SignInScreen"
         component={SignInScreen}
@@ -54,7 +61,7 @@ const StackNavigator = () => {
       />
       <Stack.Screen
         name="ScheduleScreen"
-        component={HomeScreen}
+        component={ScheduleScreen}
         options={{ headerShown: false }}
       />
       <Stack.Screen

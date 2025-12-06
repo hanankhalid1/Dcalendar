@@ -3,7 +3,8 @@ export const Colors = {
   white100: '#0000001A',
   black: '#131717',
   primaryGreen: '#18F06E',
-  primaryblue: '#0B6DE0',
+  primaryblue: '#00AEEF',
+  primaryBlue: '#00AEEF', // New primary blue color
   grey: '#A3ABAD',
   black800: '#565656',
   gray50: '#F9FAFB',
@@ -15,6 +16,6 @@ export const Colors = {
   gray600: '#4B5563',
   gray10:'#FBFBFB',
   gray700:'#949494',
-  red:'red'
-
+  red:'red',
+  lightGrayBg: '#f5f5f5', // Light gray background color
 };

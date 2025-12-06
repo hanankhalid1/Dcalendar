@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { TouchableOpacity, StyleSheet, Text, View } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
+import AddIcon from '../assets/svgs/add.svg';
 import {
   moderateScale,
   scaledSize,
@@ -21,7 +21,6 @@ import MenuOptionsComponent from './MenuOptionsComponent';
 interface FloatingActionButtonProps {
   onPress?: () => void;
   onOptionSelect?: (option: string) => void;
-  icon?: string;
   size?: 'small' | 'medium' | 'large';
   showMenu?: boolean;
 }
@@ -29,7 +28,6 @@ interface FloatingActionButtonProps {
 const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   onPress,
   onOptionSelect,
-  icon = '+',
   size = 'medium',
   showMenu = true,
 }) => {
@@ -54,56 +52,20 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     }
   };
 
-  const getSize = () => {
-    switch (size) {
-      case 'small':
-        return moderateScale(40);
-      case 'large':
-        return moderateScale(64);
-      default:
-        return moderateScale(52); // Figma design: 52px
-    }
-  };
-
-  const getIconSize = () => {
-    switch (size) {
-      case 'small':
-        return moderateScale(20);
-      case 'large':
-        return moderateScale(36);
-      default:
-        return moderateScale(28); // Figma design: 28px icon size
-    }
-  };
-
   return (
     <>
       <TouchableOpacity
-        style={[
-          styles.container,
-          {
-            width: getSize(),
-            height: getSize(),
-            borderRadius: moderateScale(14), // Figma design: 14px radius
-          },
-        ]}
+        style={styles.container}
         onPress={handleFABPress}
         activeOpacity={0.8}
       >
-        <LinearGradient
-          colors={colors.fabGradient} // Teal to blue gradient from theme
-          start={{ x: 0, y: 0 }} // Top-left corner
-          end={{ x: 1, y: 1 }} // Bottom-right corner
-          style={styles.gradientBackground}
-        >
-          <Text style={[styles.icon, { 
-            fontSize: getIconSize(),
-            width: getIconSize(),
-            height: getIconSize(),
-            textAlign: 'center',
-            lineHeight: getIconSize(),
-          }]}>{icon}</Text>
-        </LinearGradient>
+        <View style={styles.buttonBackground}>
+          <AddIcon
+            width={scaleWidth(28)}
+            height={scaleHeight(28)}
+            fill={colors.white}
+          />
+        </View>
       </TouchableOpacity>
 
       {/* Menu Options Component */}
@@ -119,25 +81,28 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    bottom: scaleHeight(24),
-    right: scaleWidth(24),
-    // Figma shadow properties: X: 0, Y: 4, Blur: 14, Spread: 0, Opacity: 20%
+    top: scaleHeight(720),
+    left: scaleWidth(303),
+    width: scaleWidth(52),
+    height: scaleHeight(52),
+    borderRadius: scaleWidth(12),
+    // Box shadow: 0px 4px 14px 0px #00000033
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2, // 20% opacity as shown in Figma
+    shadowOpacity: 0.2, // #00000033 = rgba(0,0,0,0.2)
     shadowRadius: 14,
     elevation: 8,
   },
-  gradientBackground: {
+  buttonBackground: {
     flex: 1,
-    borderRadius: moderateScale(14), // Figma design: 14px radius
+    width: '100%',
+    height: '100%',
+    borderRadius: scaleWidth(12),
+    backgroundColor: '#00AEEF', // Solid blue color
     justifyContent: 'center',
     alignItems: 'center',
-    padding: moderateScale(12), // Figma design: 12px padding
-  },
-  icon: {
-    color: colors.white,
-    fontWeight: 'bold',
+    padding: scaleWidth(12),
+    gap: scaleWidth(14),
   },
 });
 

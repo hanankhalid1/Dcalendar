@@ -12,16 +12,18 @@ import {
   Dimensions,
   Platform,
   ScrollView,
+  Image,
 } from 'react-native';
 import Share from 'react-native-share';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import SearchIcon from '../assets/svgs/search.svg';
+import MenuIcon from '../assets/svgs/menu.svg';
 import { useRoute } from '@react-navigation/native';
 import Header from '../components/Header';
 import { Fonts } from '../constants/Fonts';
 import { Colors } from '../constants/Colors';
 import { useSettingsStore } from '../stores/useSetting';
 import { BlockchainService } from '../services/BlockChainService';
-import WeekHeader from '../components/WeekHeader';
 import { ExportService } from '../services/ExportService';
 import { ImportService } from '../services/ImportService';
 import { useEventsStore } from '../stores/useEventsStore';
@@ -54,34 +56,48 @@ const SettingRow = ({
   subtitle,
   hasDropdown = false,
   hasSwitch = false,
-  hasButton = false, // <-- NEW PROP
-  buttonText = 'Action', // <-- NEW PROP for button label
+  hasButton = false,
+  hasArrow = false,
+  isLogout = false,
+  isLast = false,
+  buttonText = 'Action',
   switchValue,
   onSwitchChange,
   onPress,
-  onButtonPress // <-- NEW PROP for button action
+  onButtonPress
 }) => (
   <TouchableOpacity
-    style={styles.settingRow}
+    style={[
+      styles.settingRow,
+      isLogout && styles.logoutRow,
+    ]}
     onPress={onPress}
-    // Only disable the row touch if it has a Switch, as a button needs its own press handler.
     disabled={hasSwitch}
+    activeOpacity={0.7}
   >
+    {isLogout && (
+      <MaterialIcons name="arrow-back" size={20} color="#FF4444" style={styles.logoutIcon} />
+    )}
     <View style={styles.settingContent}>
-      <Text style={styles.settingTitle}>{title}</Text>
+      <Text style={[styles.settingTitle, isLogout && styles.logoutTitle]}>{title}</Text>
       {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
     </View>
 
     {/* Dropdown Indicator */}
-    {hasDropdown && !hasSwitch && !hasButton && (
+    {hasDropdown && !hasSwitch && !hasButton && !hasArrow && (
       <MaterialIcons name="keyboard-arrow-down" size={24} color="#666" />
+    )}
+
+    {/* Arrow for navigation items */}
+    {hasArrow && !hasSwitch && !hasButton && (
+      <MaterialIcons name="chevron-right" size={24} color="#666" />
     )}
 
     {hasSwitch && (
       <Switch
         value={switchValue}
         onValueChange={onSwitchChange}
-        trackColor={{ false: '#E0E0E0', true: '#00BCD4' }}
+        trackColor={{ false: '#E0E0E0', true: '#000' }}
         thumbColor="#fff"
         ios_backgroundColor="#E0E0E0"
       />
@@ -143,6 +159,8 @@ const BottomSheetModal = ({ visible, onClose, children }) => {
             }
           ]}
         >
+          {/* Draggable indicator */}
+          <View style={styles.dragIndicator} />
           {children}
         </Animated.View>
       </View>
@@ -177,6 +195,7 @@ const DaySelectionModal = React.memo(({ visible, onClose, selectedDay, onSelectD
       setTempSelectedDay(selectedDay);
       setIsSaving(false);
     }
+<<<<<<< HEAD
   }, [visible, selectedDay]);
 
   // Memoize the day select handler to prevent unnecessary re-renders
@@ -212,6 +231,10 @@ const DaySelectionModal = React.memo(({ visible, onClose, selectedDay, onSelectD
     } else {
       console.log('ℹ️ Start of week unchanged:', selectedDay);
     }
+=======
+    
+    // Close modal after selection
+>>>>>>> new-design
     onClose();
   }, [tempSelectedDay, selectedDay, account?.userName, onSelectDay, onClose]);
 
@@ -226,9 +249,19 @@ const DaySelectionModal = React.memo(({ visible, onClose, selectedDay, onSelectD
     <BottomSheetModal visible={visible} onClose={onClose}>
       <View style={styles.modalHeader}>
         <Text style={styles.modalTitle}>Start of the week</Text>
+        <TouchableOpacity
+          onPress={onClose}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialIcons name="close" size={24} color="#000" />
+        </TouchableOpacity>
       </View>
 
+      <View style={styles.modalDivider} />
+
       <View style={styles.modalBody}>
+<<<<<<< HEAD
         {WEEK_DAYS.map((day) => {
           const isSelected = tempSelectedDay === day;
           return (
@@ -282,6 +315,25 @@ const DaySelectionModal = React.memo(({ visible, onClose, selectedDay, onSelectD
           </LinearGradient>
         </TouchableOpacity>
       </View>
+=======
+        {days.map((day) => (
+          <TouchableOpacity
+            key={day}
+            style={[
+              styles.dayOption,
+              selectedDay === day && styles.dayOptionSelected
+            ]}
+            onPress={() => handleDaySelect(day)}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.dayText}>{day}</Text>
+            {selectedDay === day && (
+              <MaterialIcons name="check" size={24} color="#00AEEF" />
+            )}
+          </TouchableOpacity>
+        ))}
+      </View>
+>>>>>>> new-design
     </BottomSheetModal>
   );
 });
@@ -289,12 +341,14 @@ const DaySelectionModal = React.memo(({ visible, onClose, selectedDay, onSelectD
 // Theme Selection Modal Component
 const ThemeSelectionModal = ({ visible, onClose, selectedTheme, onSelectTheme }) => {
   const themes = [
-    { id: 'system', label: 'System Default' },
+    { id: 'system', label: 'System default' },
     { id: 'light', label: 'Light mode' },
     { id: 'dark', label: 'Dark mode' }
   ];
 
-  const handleConfirm = () => {
+  const handleThemeSelect = (themeId: string) => {
+    onSelectTheme(themeId);
+    // Close modal after selection
     onClose();
   };
 
@@ -302,44 +356,34 @@ const ThemeSelectionModal = ({ visible, onClose, selectedTheme, onSelectTheme })
     <BottomSheetModal visible={visible} onClose={onClose}>
       <View style={styles.modalHeader}>
         <Text style={styles.modalTitle}>Theme</Text>
+        <TouchableOpacity
+          onPress={onClose}
+          activeOpacity={0.7}
+          hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+        >
+          <MaterialIcons name="close" size={24} color="#000" />
+        </TouchableOpacity>
       </View>
+
+      <View style={styles.modalDivider} />
 
       <View style={styles.modalBody}>
         {themes.map((theme) => (
           <TouchableOpacity
             key={theme.id}
-            style={styles.radioOption}
-            onPress={() => onSelectTheme(theme.id)}
+            style={[
+              styles.dayOption,
+              selectedTheme === theme.id && styles.dayOptionSelected
+            ]}
+            onPress={() => handleThemeSelect(theme.id)}
+            activeOpacity={0.7}
           >
-            <View style={styles.radioButton}>
-              {selectedTheme === theme.id && (
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.radioButtonSelected}
-                />)}
-            </View>
-            <Text style={styles.radioText}>{theme.label}</Text>
+            <Text style={styles.dayText}>{theme.label}</Text>
+            {selectedTheme === theme.id && (
+              <MaterialIcons name="check" size={24} color="#00AEEF" />
+            )}
           </TouchableOpacity>
         ))}
-      </View>
-
-      <View style={styles.modalButtons}>
-        <TouchableOpacity style={styles.cancelButton} onPress={onClose}>
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={{ flex: 1 }} onPress={handleConfirm} activeOpacity={0.8}>
-          <LinearGradient
-            colors={['#18F06E', '#0B6DE0']}
-            start={{ x: 0, y: 0.5 }}
-            end={{ x: 1, y: 0.5 }}
-            style={styles.confirmButton}>
-            <Text style={styles.confirmButtonText}>Confirm</Text>
-          </LinearGradient>
-        </TouchableOpacity>
-
-
       </View>
     </BottomSheetModal>
   );
@@ -482,6 +526,7 @@ const SettingsScreen = () => {
     showDeclinedEvents,
     calendarNotifications,
     taskNotifications,
+    birthdayNotifications,
     taskOverdueNotification,
     setSelectedDay,
     setSelectedTheme,
@@ -491,6 +536,7 @@ const SettingsScreen = () => {
     toggleShowDeclinedEvents,
     toggleCalendarNotifications,
     toggleTaskNotifications,
+    toggleBirthdayNotifications,
     toggleTaskOverdueNotification,
   } = useSettingsStore();
 
@@ -716,87 +762,97 @@ const SettingsScreen = () => {
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#fff" />
-      <PlainHeader onMenuPress={handleMenuPress} title="Settings" />
+      {/* Custom Header with Settings title and search */}
+      <View style={styles.headerContainer}>
+        <StatusBar barStyle="dark-content" backgroundColor="#fff" />
+        <View style={styles.header}>
+          <TouchableOpacity
+            style={styles.menuButton}
+            onPress={handleMenuPress}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <MenuIcon width={24} height={24} />
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>Settings</Text>
+          <TouchableOpacity
+            style={styles.searchButton}
+            activeOpacity={0.7}
+            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+          >
+            <SearchIcon width={24} height={24} />
+          </TouchableOpacity>
+        </View>
+      </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
-        <SettingRow
-          title="Start of the week"
-          subtitle={selectedDay}
-          hasDropdown={true}
-          onPress={() => setShowDayModal(true)}
-        />
+      <ScrollView 
+        style={styles.content} 
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Notification settings Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>Notification settings</Text>
+          <SettingRow
+            title="Event notification"
+            hasSwitch={true}
+            switchValue={calendarNotifications}
+            onSwitchChange={toggleCalendarNotifications}
+            isLast={false}
+          />
+          <SettingRow
+            title="Task notification"
+            hasSwitch={true}
+            switchValue={taskNotifications}
+            onSwitchChange={toggleTaskNotifications}
+            isLast={false}
+          />
+          <SettingRow
+            title="Birthday notification"
+            hasSwitch={true}
+            switchValue={birthdayNotifications}
+            onSwitchChange={toggleBirthdayNotifications}
+            isLast={false}
+          />
+          <SettingRow
+            title="Show completed tasks & events"
+            hasSwitch={true}
+            switchValue={showCompletedEvents}
+            onSwitchChange={toggleShowCompletedEvents}
+            isLast={false}
+          />
+        </View>
 
-        <SettingRow
-          title="Time Zone"
-          subtitle={getTimeZoneLabel(selectedTimeZone)}
-          hasDropdown={true}
-          onPress={() => setShowTimeZoneModal(true)}
-        />
+        {/* App settings Section */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>App settings</Text>
+          <SettingRow
+            title="Start of the week"
+            subtitle={selectedDay}
+            hasDropdown={true}
+            onPress={() => setShowDayModal(true)}
+            isLast={false}
+          />
+          <SettingRow
+            title="Theme"
+            subtitle={getThemeLabel(selectedTheme)}
+            hasDropdown={true}
+            onPress={() => setShowThemeModal(true)}
+            isLast={false}
+          />
+        </View>
 
-        {/* <SettingRow
-          title="Theme"
-          subtitle={getThemeLabel(selectedTheme)}
-          hasDropdown={true}
-          onPress={() => setShowThemeModal(true)}
-        />
-
-        <SettingRow
-          title="Show week number"
-          hasSwitch={false}
-        />
-
-        <SettingRow
-          title="Show completed events"
-          hasSwitch={true}
-          switchValue={showCompletedEvents}
-          onSwitchChange={toggleShowCompletedEvents}
-        />
-
-        <SettingRow
-          title="Show declined events"
-          hasSwitch={true}
-          switchValue={showDeclinedEvents}
-          onSwitchChange={toggleShowDeclinedEvents}
-        />
-
-        <SettingRow
-          title="Calendar notifications"
-          hasSwitch={true}
-          switchValue={calendarNotifications}
-          onSwitchChange={toggleCalendarNotifications}
-        />
-
-        <SettingRow
-          title="Task notifications"
-          hasSwitch={true}
-          switchValue={taskNotifications}
-          onSwitchChange={toggleTaskNotifications}
-        />
-
-        <SettingRow
-          title="Task overdue notification"
-          hasSwitch={true}
-          switchValue={taskOverdueNotification}
-          onSwitchChange={toggleTaskNotifications}
-        /> */}
-
-        <SettingRow
-          title="Export Events"
-          subtitle="You can download all calendars you can view and modify in a single file."
-          buttonText="Export"
-          hasButton={true}
-          onButtonPress={handleExportEvents}
-        />
-        <SettingRow
-          title="Import Events"
-          subtitle="You can import all events from a single .ical/.ics file."
-          buttonText="Import"
-          hasButton={true}
-          onButtonPress={handleImportEvents}
-        />
-
-        {/* Integration Component */}
-        <IntegrationsComponent initialExpanded={expandIntegration || false} />
+        {/* Logout Button */}
+        <View style={styles.logoutContainer}>
+          <SettingRow
+            title="Logout"
+            isLogout={true}
+            onPress={() => {
+              // Handle logout
+              console.log('Logout pressed');
+            }}
+          />
+        </View>
 
       </ScrollView>
 
@@ -842,55 +898,101 @@ const SettingsScreen = () => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#fff',
+    backgroundColor: '#F5F5F5', // Gray background
   },
-  header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    backgroundColor: '#fff',
+  headerContainer: {
+    backgroundColor: '#fff', // White background for header
     borderBottomWidth: 1,
     borderBottomColor: '#f0f0f0',
   },
-  headerLeft: {
+  header: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    height: scaleHeight(60),
+  },
+  menuButton: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    justifyContent: 'center',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 18,
-    fontWeight: '600',
-    marginLeft: 12,
-    color: '#333',
+    fontSize: moderateScale(20),
+    fontWeight: '700',
+    color: '#000',
+    fontFamily: Fonts.latoBold,
+    marginLeft: scaleWidth(12),
+    flex: 1,
+  },
+  searchButton: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   content: {
     flex: 1,
-    backgroundColor: '#fff',
-    paddingTop: 8,
+    backgroundColor: '#F5F5F5', // Gray background
+  },
+  section: {
+    marginBottom: scaleHeight(16),
+  },
+  sectionTitle: {
+    fontSize: moderateScale(14),
+    fontWeight: '500',
+    color: '#666',
+    paddingHorizontal: scaleWidth(20),
+    paddingBottom: scaleHeight(8),
+    fontFamily: Fonts.latoMedium,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     backgroundColor: '#fff',
-    paddingHorizontal: 16,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderRadius: moderateScale(12),
+    marginHorizontal: scaleWidth(20),
+    marginBottom: scaleHeight(10),
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(14),
+  },
+  logoutRow: {
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    marginHorizontal: scaleWidth(20),
+    marginBottom: scaleHeight(12),
+  },
+  logoutIcon: {
+    marginRight: scaleWidth(8),
+  },
+  logoutTitle: {
+    color: '#FF4444',
   },
   settingContent: {
     flex: 1,
   },
   settingTitle: {
-    fontSize: 16,
-    color: '#333',
+    fontSize: moderateScale(16),
+    color: '#000', // Black text
     fontWeight: '400',
+    fontFamily: Fonts.latoRegular,
   },
   settingSubtitle: {
-    fontSize: 14,
+    fontSize: moderateScale(14),
     color: '#666',
-    marginTop: 2,
+    marginTop: scaleHeight(2),
+    fontFamily: Fonts.latoRegular,
+  },
+  logoutContainer: {
+    marginTop: scaleHeight(4),
+    marginBottom: scaleHeight(0),
+  },
+  scrollContent: {
+    paddingTop: scaleHeight(20),
+    paddingBottom: scaleHeight(20),
   },
   settingButton: {
     paddingHorizontal: 10,
@@ -917,90 +1019,66 @@ const styles = StyleSheet.create({
     borderTopRightRadius: moderateScale(16),
     maxHeight: SCREEN_HEIGHT * 0.7,
     paddingBottom: Platform.OS === 'ios' ? scaleHeight(20) : 0,
+    paddingTop: scaleHeight(8),
     width: '100%',
     alignSelf: 'center',
   },
+  dragIndicator: {
+    width: scaleWidth(40),
+    height: scaleHeight(4),
+    backgroundColor: '#E0E0E0',
+    borderRadius: moderateScale(2),
+    alignSelf: 'center',
+    marginBottom: scaleHeight(8),
+  },
   modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: moderateScale(20),
     paddingTop: scaleHeight(20),
     paddingBottom: scaleHeight(16),
-    borderBottomWidth: 1,
-    borderBottomColor: '#f0f0f0',
+    borderBottomWidth: 0,
+  },
+  modalDivider: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: moderateScale(20),
   },
   modalTitle: {
-    fontSize: fontSize.textSize18,
+    fontSize: moderateScale(18),
     fontWeight: '600',
-    color: '#333',
+    color: '#000',
+    fontFamily: Fonts.latoBold,
   },
   modalBody: {
     paddingVertical: scaleHeight(8),
   },
-  radioOption: {
+  dayOption: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     paddingHorizontal: moderateScale(20),
     paddingVertical: scaleHeight(14),
-    minHeight: scaleHeight(48), // Minimum touch target size
+    minHeight: scaleHeight(48),
+    marginHorizontal: moderateScale(20),
+    marginVertical: scaleHeight(2),
+    borderRadius: moderateScale(8),
   },
-  radioButton: {
-    width: moderateScale(22),
-    height: moderateScale(22),
-    borderRadius: moderateScale(11),
-    borderWidth: 2,
-    borderColor: '#00BCD4',
-    marginRight: moderateScale(14),
-    alignItems: 'center',
-    justifyContent: 'center',
+  dayOptionSelected: {
+    backgroundColor: '#F5F5F5',
   },
-  radioButtonSelected: {
-    width: moderateScale(12),
-    height: moderateScale(12),
-    borderRadius: moderateScale(6),
-  },
-  radioText: {
-    fontSize: fontSize.textSize16,
-    color: '#333',
+  dayText: {
+    fontSize: moderateScale(16),
+    color: '#000',
+    fontFamily: Fonts.latoRegular,
     flex: 1,
   },
-  modalButtons: {
-    flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: '#f0f0f0',
-    minHeight: scaleHeight(56),
-    width: '100%',
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: scaleHeight(18),
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRightWidth: 1,
-    borderRightColor: '#f0f0f0',
-    minHeight: scaleHeight(56),
-    backgroundColor: '#fff',
-  },
-  confirmButtonWrapper: {
-    flex: 1,
-    minHeight: scaleHeight(56),
-    overflow: 'hidden',
-  },
-  confirmButton: {
-    flex: 1,
-    paddingVertical: scaleHeight(18),
-    alignItems: 'center',
-    justifyContent: 'center',
-    minHeight: scaleHeight(56),
-    borderRadius: 0,
-  },
-  cancelButtonText: {
-    fontSize: fontSize.textSize16,
-    color: '#333',
-    fontWeight: '600',
-  },
-  confirmButtonText: {
-    fontSize: fontSize.textSize16,
-    color: '#fff',
-    fontWeight: '600',
+  settingDivider: {
+    height: 1,
+    backgroundColor: '#E0E0E0',
+    marginHorizontal: scaleWidth(20),
+    marginVertical: scaleHeight(10),
   },
   containerStyle: {
     flexDirection: 'row',

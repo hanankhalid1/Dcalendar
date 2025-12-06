@@ -37,9 +37,12 @@ export const colors = {
   figmaPink: '#FF88FA', // Pink
   figmaLightBlue: '#ACCFFF', // Light blue with 10% opacity
   navired: '#eb4232',
+  // Primary Blue Color
+  primaryBlue: '#00AEEF', // Primary blue color for buttons and UI elements
+  
   // FloatingActionButton Gradient
-  fabGradient: ['#18F06E', '#0B6DE0'], // Teal to blue gradient
-figmaPurpleOpacity20: '#9976FF1A',
+  fabGradient: ['#18F06E', '#00AEEF'], // Teal to blue gradient
+  figmaPurpleOpacity20: '#9976FF1A',
   // Legacy Colors (keeping for compatibility)
   black: '#000000',
   raisinBlack: '#222222',
@@ -67,6 +70,8 @@ figmaPurpleOpacity20: '#9976FF1A',
   // Additional Colors
   error: '#FF4444',
   info: '#2196F3',
+  primaryBlue: '#00AEEF', // Primary blue color - use this for all blue UI elements
+  lightGrayBg: '#f5f5f5', // Light gray background color
 };
 
 export const fontSize = {

@@ -5,9 +5,16 @@ import { Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../navigations/appNavigation.type';
 import FloatingActionButton from '../components/FloatingActionButton';
+<<<<<<< HEAD
 import WeekHeader from '../components/WeekHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
+=======
+import CustomeHeader from '../global/CustomeHeader';
+import { Screen } from '../navigations/appNavigation.type';
+import { useCalendarStore } from '../stores/useCalendarStore';
+import { useSettingsStore } from '../stores/useSetting';
+>>>>>>> new-design
 import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST, isEventInPast } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
@@ -986,9 +993,117 @@ const WeekScreen = () => {
     }
 
     return (
+<<<<<<< HEAD
       <View style={styles.weekRow}>
         {days}
       </View>
+=======
+        <View style={styles.container}>
+            <CustomeHeader
+                onMenuPress={handleMenuPress}
+                currentMonth={currentMonth}
+                onMonthPress={handleMonthPress}
+                onMonthSelect={handleMonthSelect}
+            />
+
+            {/* Loading indicator */}
+            {userEventsLoading && (
+                <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Loading events...</Text>
+                </View>
+            )}
+
+            {/* Error indicator */}
+            {userEventsError && (
+                <View style={styles.errorContainer}>
+                    <Text style={styles.errorText}>Error: {userEventsError}</Text>
+                </View>
+            )}
+
+            <WeekView
+                key={`weekview-${adjustedSelectedDate.getFullYear()}-${adjustedSelectedDate.getMonth()}-${adjustedSelectedDate.getDate()}-${weekdayNumber}`}
+                events={myEvents}
+                selectedDate={adjustedSelectedDate}
+                numberOfDays={7}
+                pageStartAt={{ weekday: weekdayNumber }}
+                formatDateHeader="ddd D"
+                showTitle={false} // Hide the default title
+                headerStyle={styles.headerStyle}
+                headerTextStyle={styles.headerTextStyle}
+                hourTextStyle={styles.hourTextStyle}
+                eventContainerStyle={styles.eventContainerStyle}
+                gridRowStyle={styles.gridRowStyle}
+                gridColumnStyle={{ borderColor: '#EFEFEF', borderWidth: 1 }}
+                startHour={10}
+                hoursInDisplay={12}
+                timeStep={60}
+                formatTimeLabel="h A"
+                rightToLeft={false}
+                showNowLine={true}
+                timesColumnWidth={0.15}
+                DayHeaderComponent={CustomDayHeader}
+                EventComponent={CustomEventComponent}
+                onSwipeNext={handleSwipeNext}
+                onSwipePrev={handleSwipePrev}
+                onDayPress={handleDateSelect}
+                onEventPress={handleEventPress}
+            />
+
+            {isPaging && (
+                <View style={styles.loadingContainer}>
+                    <Text style={styles.loadingText}>Loading…</Text>
+                </View>
+            )}
+
+            {/* Floating Action Button matching the design */}
+            <FloatingActionButton
+                onOptionSelect={option => {
+                    console.log('Selected option:', option);
+                    // Handle different menu options
+                    switch (option) {
+                        case 'goal':
+                            console.log('Create Goal');
+                            break;
+                        case 'reminder':
+                            navigation.navigate(Screen.RemindersScreen as never);
+                            break;
+                        case 'task':
+                            navigation.navigate(Screen.CreateTaskScreen as never);
+                            break;
+                        case 'event':
+                            navigation.navigate(Screen.CreateEventScreen as never);
+                            break;
+                        default:
+                            break;
+                    }
+                }}
+            />
+
+            {/* Custom Drawer */}
+            <CustomDrawer
+                isOpen={isDrawerOpen}
+                onClose={handleDrawerClose}
+            />
+
+            {/* Custom Alert */}
+            <CustomAlert
+                visible={alertVisible}
+                title={alertTitle}
+                message={alertMessage}
+                type={alertType}
+                onClose={() => setAlertVisible(false)}
+            />
+
+            {/* Event Details Modal */}
+            <EventDetailsModal
+                visible={isEventModalVisible}
+                onClose={handleCloseEventModal}
+                event={selectedEvent}
+                onEdit={handleEditEvent}
+                onDelete={handleDeleteEvent}
+            />
+        </View>
+>>>>>>> new-design
     );
   };
 

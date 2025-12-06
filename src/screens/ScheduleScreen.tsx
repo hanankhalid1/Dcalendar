@@ -50,10 +50,10 @@ import CalendarIcon from '../assets/svgs/calendar.svg';
 import TaskCompleteIcon from '../assets/svgs/taskComplete.svg';
 
 
-const HomeScreen = () => {
+const ScheduleScreen = () => {
     const navigation = useNavigation<AppNavigationProp>();
     const { setCurrentMonthByIndex } = useCalendarStore();
-    const { selectedTimeZone, selectedDay } = useSettingsStore();
+    const { selectedTimeZone } = useSettingsStore();
     // const [currentView, setCurrentView] = useState('Week');
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
     const { api } = useApiClient();
@@ -530,31 +530,12 @@ const HomeScreen = () => {
         }
 
         if (view === 'Week') {
-            // ✅ Helper function to convert day name to numeric value (0=Sunday, 1=Monday, etc.)
-            const getDayNumber = (dayName: string): number => {
-                const dayMap: { [key: string]: number } = {
-                    'Sunday': 0,
-                    'Monday': 1,
-                    'Tuesday': 2,
-                    'Wednesday': 3,
-                    'Thursday': 4,
-                    'Friday': 5,
-                    'Saturday': 6,
-                };
-                return dayMap[dayName] || 0;
-            };
-            
-            const startDayNumber = getDayNumber(selectedDay);
-            
-            // Get start and end of current week based on setting
+            // Get start and end of current week
             const startOfWeek = new Date(today);
-            const todayDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-            let diff = todayDay - startDayNumber;
-            if (diff < 0) diff += 7; // If negative, add 7 to go back to previous week
-            startOfWeek.setDate(today.getDate() - diff);
+            startOfWeek.setDate(today.getDate() - today.getDay()); // Sunday
 
-            const endOfWeek = new Date(startOfWeek);
-            endOfWeek.setDate(startOfWeek.getDate() + 6); // 6 days after start
+            const endOfWeek = new Date(today);
+            endOfWeek.setDate(startOfWeek.getDate() + 6); // Saturday
 
             return allEvents.filter(dayGroup => {
                 const dayDate = new Date(dayGroup.events[0]?.date);
@@ -654,11 +635,7 @@ const HomeScreen = () => {
                 activeOpacity={0.1}
             />
 
-            <ScrollView 
-                style={styles.content} 
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
+            <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
                 {loading ? (
                     <CustomLoader />
                 ) : events.length === 0 ? (
@@ -891,4 +868,4 @@ const styles = StyleSheet.create({
     },
 });
 
-export default HomeScreen;
+export default ScheduleScreen;

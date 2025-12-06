@@ -5,4 +5,12 @@ export const Fonts = {
   light: 'Poppins-Light',
   extraBold: 'Poppins-ExtraBold',
   semiBold: 'Poppins-SemiBold',
+  // Lato fonts
+  latoRegular: 'Lato-Regular',
+  latoMedium: 'Lato-Medium',
+  latoSemiBold: 'Lato-SemiBold',
+  latoBold: 'Lato-Bold',
+  latoExtraBold: 'Lato-ExtraBold',
+  // Outfit fonts
+  outfitSemiBold: 'Outfit-SemiBold',
 };

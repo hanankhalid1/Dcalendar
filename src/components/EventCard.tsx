@@ -1,6 +1,6 @@
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import Feather from 'react-native-vector-icons/Feather';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
@@ -21,6 +21,11 @@ import { useToken } from '../stores/useTokenStore';
 import { NECJSPRIVATE_KEY } from '../constants/Config';
 import CustomLoader from '../global/CustomLoader';
 import { useEventsStore } from '../stores/useEventsStore';
+import ClockIcon from '../assets/svgs/clock.svg';
+import CalendarIcon from '../assets/svgs/calendar.svg';
+import EventIcon from '../assets/svgs/eventIcon.svg';
+import TaskIcon from '../assets/svgs/taskIcon.svg';
+import { Fonts } from '../constants/Fonts';
 
 interface EventTag {
   id: string;
@@ -119,12 +124,7 @@ const EventCard: React.FC<EventCardProps> = ({
   const [editingEvent, setEditingEvent] = useState(null);
   const token = useToken(state => state.token);
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-  const { 
-    getUserEvents, 
-    optimisticallyDeleteEvent,
-    revertOptimisticUpdate,
-    userEvents 
-  } = useEventsStore();
+  const { getUserEvents, setUserEvents, userEvents } = useEventsStore();
 
 
   // In your React Native component (e.g., EventCard or a wrapper screen)
@@ -228,64 +228,102 @@ const EventCard: React.FC<EventCardProps> = ({
         <ContainerComponent
           style={[
             expanded ? styles.compactContainerExpanded : styles.compactContainer,
-            {
-              backgroundColor: `${color}20`, // Add 20% opacity to the color
-              borderLeftWidth: 1, // Remove left border since it's nested
-            },
           ]}
           {...containerProps}
         >
-          {/* Compact Header - Time, Title, Edit Button, and Chevron */}
-          <View style={expanded ? styles.compactHeader1 : styles.compactHeader2}>
-            <View style={styles.compactTitleContainer}>
-              <View
-                style={[styles.compactColorIndicator, { backgroundColor: color }]}
-              />
-              {expanded ? (
-                <View style={styles.compactTitleRow}>
-                  <Text
-                    numberOfLines={2}
-                    ellipsizeMode="tail"
-                    style={styles.compactTitle}
-                  >
-                    {title}
+          {/* Card Content */}
+          <View style={styles.compactCardContent}>
+            <Text
+              numberOfLines={2}
+              ellipsizeMode="tail"
+              style={styles.compactTitle}
+            >
+              {title}
+            </Text>
+            
+            {/* Badges Row */}
+            <View style={styles.compactBadgesRow}>
+              {/* Time Badge */}
+              <View style={styles.compactBadge}>
+                <ClockIcon height={14} width={14} />
+                <Text style={styles.compactBadgeText}>{time}</Text>
+              </View>
+
+              {/* Recurrence Badge */}
+              {recurrenceInfo && (
+                <View style={styles.compactBadge}>
+                  <CalendarIcon height={14} width={14} />
+                  <Text style={styles.compactBadgeText}>
+                    {recurrenceInfo.repeatOn?.value || 'Recurring'}
                   </Text>
-                  <TouchableOpacity
-                    style={styles.compactEditButton}
-                    onPress={() => onEdit?.(event)}
-                  >
-                    {renderIcon('edit', 'MaterialIcons', 18, colors.black)}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.compactTimeTitleColumn}>
-                  <View style={styles.compactTitleRow}>
-                    <Text
-                      numberOfLines={2} // Allow 2 lines for longer titles
-                      ellipsizeMode="tail"
-                      style={styles.compactTitle}
-                    >
-                      {title}
-                    </Text>
-                    <TouchableOpacity
-                      style={styles.compactEditButton}
-                      onPress={() => onEdit?.(event)}
-                    >
-                      {renderIcon('edit', 'MaterialIcons', 18, colors.black)}
-                    </TouchableOpacity>
-                  </View>
-                  <Text style={styles.compactTime}>{time}</Text>
                 </View>
               )}
+
+              {/* Type Badge */}
+              <View style={[styles.compactBadge, {
+                borderColor: isTask ? '#8DC63F' : '#00AEEF',
+              }]}>
+                {isTask ? <TaskIcon height={14} width={14} /> : <EventIcon height={14} width={14} />}
+                <Text style={styles.compactBadgeText}>
+                  {isTask ? 'Task' : 'Event'}
+                </Text>
+              </View>
             </View>
-            {/* Show chevron for all events */}
-            <View style={styles.chevronContainer}>
-              <AntDesign
-                name={expanded ? 'up' : 'down'}
-                size={screenWidth < 375 ? 12 : 14} // Smaller icon on small screens
-                color={colors.textSecondary}
-              />
-            </View>
+
+            {/* Guest Avatars */}
+            {eventGuests.length > 0 && (
+              <View style={styles.compactGuestsRow}>
+                {eventGuests.slice(0, 5).map((guest, index) => {
+                  const initials = getGuestInitials(guest.email);
+                  const gradientColors = getGuestBackgroundColor(guest.email);
+                  const hasAvatar = guest.avatar && typeof guest.avatar === 'string' && guest.avatar.trim() !== '';
+                  const imageFailed = failedImages.has(guest.email);
+                  const marginLeft = index > 0 ? -12 : 0;
+
+                  return (
+                    <View
+                      key={`${guest.email}-${index}`}
+                      style={[
+                        styles.compactGuestAvatar,
+                        {
+                          marginLeft,
+                          zIndex: 5 - index,
+                          borderWidth: 2,
+                          borderColor: colors.white,
+                        },
+                      ]}
+                    >
+                      {hasAvatar && !imageFailed ? (
+                        <Image
+                          source={{ uri: guest.avatar }}
+                          style={styles.compactGuestAvatarImage}
+                          onError={() => setFailedImages(prev => new Set(prev).add(guest.email))}
+                        />
+                      ) : (
+                        <View style={[styles.compactGuestAvatarPlaceholder, { backgroundColor: gradientColors[0] }]}>
+                          <Text style={styles.compactGuestInitials}>{initials}</Text>
+                        </View>
+                      )}
+                    </View>
+                  );
+                })}
+                {eventGuests.length > 5 && (
+                  <View style={[styles.compactGuestAvatar, styles.compactGuestRemaining]}>
+                    <Text style={styles.compactGuestRemainingText}>+{eventGuests.length - 5}</Text>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {/* Progress Bar */}
+            {progress > 0 && (
+              <View style={styles.compactProgressContainer}>
+                <View style={styles.compactProgressBar}>
+                  <View style={[styles.compactProgressFill, { width: `${progress}%` }]} />
+                </View>
+                <Text style={styles.compactProgressText}>{progress}%</Text>
+              </View>
+            )}
           </View>
 
           {/* Compact Expanded Content - Show when expanded */}
@@ -589,20 +627,15 @@ const styles = StyleSheet.create({
     fontWeight: '500',
   },
 
-  // Compact styles for single-border layout
+  // Compact styles for single-border layout - matching DeletedEventsScreen design
   compactContainer: {
-    backgroundColor: '#F6F7F9', // Light beige background for both collapsed and expanded states
-    paddingVertical: screenWidth < 375 ? scaleHeight(4) : scaleHeight(6), // Further reduced padding
-    paddingHorizontal: screenWidth < 375 ? spacing.xs : spacing.sm, // Further reduced padding
-    width: '100%',
-    marginBottom: spacing.xs,
-    borderLeftWidth: 0, // Remove left border since it's nested
-    borderRadius: borderRadius.md,
-    overflow: 'hidden',
-    alignSelf: 'stretch', // Stretch to fill available width
-    minWidth: 120, // Minimum width for readability
-    borderWidth: 1,
-    borderColor: 'rgba(0, 0, 0, 0.1)', // Subtle border
+    backgroundColor: '#fff',
+    borderRadius: moderateScale(12),
+    padding: scaleWidth(16),
+    borderLeftWidth: 4,
+    borderLeftColor: '#00AEEF',
+    ...shadows.sm,
+    marginBottom: scaleHeight(12),
   },
   // Expanded container style for when event is expanded
   compactContainerExpanded: {
@@ -677,12 +710,12 @@ const styles = StyleSheet.create({
     flexShrink: 0, // Prevent time from shrinking
   },
   compactTitle: {
-    fontSize: screenWidth < 375 ? fontSize.textSize14 : fontSize.textSize16, // Smaller font on small screens
-    fontWeight: '500',
-    color: colors.black,
-    flex: 1,
-    minWidth: 0, // Allow title to shrink and ellipsize
-    lineHeight: screenWidth < 375 ? 18 : 20, // Set line height for better readability
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: scaleHeight(8),
+    fontFamily: Fonts.latoBold,
+    flexWrap: 'wrap',
   },
   compactEditButton: {
     padding: spacing.xs,
@@ -770,6 +803,98 @@ const styles = StyleSheet.create({
   expandedContentContainer: {
     paddingBottom: spacing.sm, // Add bottom padding for better spacing
     width: '100%', // Ensure full width
+  },
+  // New styles for card design matching DeletedEventsScreen
+  compactCardContent: {
+    flex: 1,
+  },
+  compactBadgesRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: scaleWidth(8),
+    marginTop: scaleHeight(8),
+  },
+  compactBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: scaleWidth(8),
+    paddingVertical: scaleHeight(4),
+    borderRadius: moderateScale(16),
+    backgroundColor: 'transparent',
+    borderWidth: 0.5,
+    borderColor: '#D5D7DA',
+    gap: scaleWidth(4),
+  },
+  compactBadgeText: {
+    fontSize: moderateScale(10),
+    fontWeight: '500',
+    color: '#717680',
+    fontFamily: Fonts.latoBold,
+  },
+  compactGuestsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: scaleHeight(8),
+  },
+  compactGuestAvatar: {
+    width: moderateScale(36),
+    height: moderateScale(36),
+    borderRadius: moderateScale(18),
+    overflow: 'hidden',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactGuestAvatarImage: {
+    width: '100%',
+    height: '100%',
+    resizeMode: 'cover',
+  },
+  compactGuestAvatarPlaceholder: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactGuestInitials: {
+    color: colors.white,
+    fontWeight: '600',
+    fontSize: moderateScale(12),
+    fontFamily: Fonts.latoBold,
+  },
+  compactGuestRemaining: {
+    backgroundColor: '#FFB6C1',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  compactGuestRemainingText: {
+    color: colors.white,
+    fontWeight: '600',
+    fontSize: moderateScale(12),
+    fontFamily: Fonts.latoBold,
+  },
+  compactProgressContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: scaleHeight(8),
+    gap: scaleWidth(8),
+  },
+  compactProgressBar: {
+    flex: 1,
+    height: scaleHeight(8),
+    backgroundColor: '#E0E0E0',
+    borderRadius: moderateScale(4),
+    overflow: 'hidden',
+  },
+  compactProgressFill: {
+    height: '100%',
+    backgroundColor: '#00AEEF',
+    borderRadius: moderateScale(4),
+  },
+  compactProgressText: {
+    fontSize: moderateScale(12),
+    fontWeight: '500',
+    color: '#717680',
+    fontFamily: Fonts.latoMedium,
   },
 
 });

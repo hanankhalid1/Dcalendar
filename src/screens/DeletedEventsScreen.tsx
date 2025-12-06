@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import {
     View,
     Text,
@@ -7,16 +7,19 @@ import {
     TouchableOpacity,
     Alert,
     StatusBar,
-    Image,
+    Modal,
 } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST } from '../utils';
+import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
+import Feather from 'react-native-vector-icons/Feather';
 import {
     moderateScale,
     scaleHeight,
     scaleWidth,
     screenHeight,
+    screenWidth,
 } from '../utils/dimensions';
 import {
     colors,
@@ -25,13 +28,13 @@ import {
     borderRadius,
     shadows,
 } from '../utils/LightTheme';
+import { Fonts } from '../constants/Fonts';
 import CustomLoader from '../global/CustomLoader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { BlockchainService } from '../services/BlockChainService';
 import { useToken } from '../stores/useTokenStore';
 import { useApiClient } from '../hooks/useApi';
-import { get } from 'react-native/Libraries/TurboModule/TurboModuleRegistry';
 import PlainHeader from '../components/PlainHeader';
 import { buildEventMetadata, prepareEventForBlockchain, encryptWithNECJS } from '../utils/eventUtils';
 import moment from 'moment';
@@ -48,12 +51,30 @@ const DeletedEventsScreen: React.FC = () => {
         revertOptimisticDeletedUpdate
     } = useEventsStore();
     const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+    const [selectedEventMenu, setSelectedEventMenu] = useState<string | null>(null);
+    const [menuPosition, setMenuPosition] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+    const [showClearBinModal, setShowClearBinModal] = useState(false);
+    const [showDeleteModal, setShowDeleteModal] = useState(false);
+    const [eventToDelete, setEventToDelete] = useState<any>(null);
+    const menuButtonRefs = React.useRef<{ [key: string]: View | null }>({});
     const activeAccount = useActiveAccount(state => state.account);
     const blockchainService = React.useMemo(() => new BlockchainService(), []);
     const token = useToken.getState().token;
     const { api } = useApiClient();
 
-    console.log('Deleted Events in delete screen:', deletedUserEvents);
+    // Debug: Log when modal state changes
+    useEffect(() => {
+        console.log('🔔 MODAL STATE CHANGE:');
+        console.log('  showDeleteModal:', showDeleteModal);
+        console.log('  eventToDelete:', eventToDelete);
+        console.log('  eventToDelete?.title:', eventToDelete?.title);
+        if (showDeleteModal) {
+            console.log('✅ Modal should be VISIBLE now!');
+        } else {
+            console.log('❌ Modal is HIDDEN');
+        }
+    }, [showDeleteModal, eventToDelete]);
+
     const handleMenuPress = () => {
         setIsDrawerOpen(true);
     };
@@ -62,15 +83,14 @@ const DeletedEventsScreen: React.FC = () => {
         setIsDrawerOpen(false);
     };
 
-    const formatDate = (dateString: string) => {
+    const formatDateHeader = (dateString: string) => {
         const date = parseTimeToPST(dateString);
         if (!date) return 'Invalid Date';
 
         return date.toLocaleDateString('en-US', {
-            weekday: 'short',
-            year: 'numeric',
-            month: 'short',
             day: 'numeric',
+            month: 'long',
+            year: 'numeric',
         });
     };
 
@@ -82,259 +102,224 @@ const DeletedEventsScreen: React.FC = () => {
             hour: '2-digit',
             minute: '2-digit',
             hour12: true,
-        });
+        }).toLowerCase().replace(' ', '');
     };
 
-    const getDeletedTime = (event: any) => {
-        const deletedTimeItem = event.list?.find((item: any) => item.key === 'deletedTime');
-        if (deletedTimeItem) {
-            // Parse the deleted time (format: 20250919T080201)
-            const deletedTimeStr = deletedTimeItem.value;
-            const year = deletedTimeStr.substring(0, 4);
-            const month = deletedTimeStr.substring(4, 6);
-            const day = deletedTimeStr.substring(6, 8);
-            const hour = deletedTimeStr.substring(9, 11);
-            const minute = deletedTimeStr.substring(11, 13);
-            const second = deletedTimeStr.substring(13, 15);
+    const calculateDuration = (fromTime: string, toTime: string) => {
+        const from = parseTimeToPST(fromTime);
+        const to = parseTimeToPST(toTime);
+        if (!from || !to) return '0h';
 
-            const deletedDate = new Date(
-                parseInt(year),
-                parseInt(month) - 1,
-                parseInt(day),
-                parseInt(hour),
-                parseInt(minute),
-                parseInt(second)
-            );
+        const diffMs = to.getTime() - from.getTime();
+        const diffHours = Math.round(diffMs / (1000 * 60 * 60));
+        return `${diffHours}h`;
+    };
 
-            return deletedDate.toLocaleDateString('en-US', {
-                year: 'numeric',
-                month: 'short',
-                day: 'numeric',
-                hour: '2-digit',
-                minute: '2-digit',
-                hour12: true,
-            });
+    const getEventType = (event: any) => {
+        // Check if it's a task or event based on event properties
+        const typeItem = event.list?.find((item: any) => item.key === 'type');
+        if (typeItem?.value === 'task' || event.type === 'task') {
+            return 'task';
         }
-        return 'Unknown';
+        return 'event';
     };
 
-
-
-    const handleRestoreEvent = (event: any) => {
-        Alert.alert(
-            'Restore Event',
-            `Are you sure you want to restore "${event.title}"?`,
-            [
-                {
-                    text: 'Cancel',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Restore',
-                    style: 'default',
-                    onPress: async () => {
-                        // Store current deleted events for potential revert
-                        const previousDeletedEvents = [...(deletedUserEvents || [])];
-                        
-                        try {
-                            // ✅ OPTIMISTIC UPDATE: Remove from deleted events immediately
-                            optimisticallyRestoreEvent(event.uid);
-                            
-                            // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background (non-blocking)
-                            (async () => {
-                                try {
-                                    // Restore event on blockchain (this will take time, but UI already updated)
-                                    await blockchainService.restoreEvent(event, activeAccount, token, api);
-                                    
-                                    // No immediate refresh needed - optimistic update already updated UI
-                                    // Skip getUserEvents to avoid loading screen - UI is already correct
-                                } catch (err) {
-                                    console.error("Restore Event Failed:", err);
-                                    // Revert optimistic update on error
-                                    revertOptimisticDeletedUpdate(previousDeletedEvents);
-                                    Alert.alert("Error", "Failed to restore event. Please try again.");
-                                }
-                            })();
-                        } catch (error: any) {
-                            console.error('❌ Error in handleRestoreEvent:', error);
-                            // Revert optimistic update on error
-                            revertOptimisticDeletedUpdate(previousDeletedEvents);
-                            Alert.alert('Error', error?.message || 'Failed to restore event. Please try again.');
-                        }
-                    },
-                },
-            ]
-        );
+    const groupEventsByDate = () => {
+        const grouped: { [key: string]: any[] } = {};
+        // Remove duplicates by UID before grouping
+        const uniqueEventsMap = new Map();
+        deletedUserEvents.forEach((event) => {
+            if (event.uid && !uniqueEventsMap.has(event.uid)) {
+                uniqueEventsMap.set(event.uid, event);
+            }
+        });
+        const uniqueEvents = Array.from(uniqueEventsMap.values());
+        
+        uniqueEvents.forEach((event) => {
+            const dateKey = formatDateHeader(event.fromTime);
+            if (!grouped[dateKey]) {
+                grouped[dateKey] = [];
+            }
+            grouped[dateKey].push(event);
+        });
+        return grouped;
     };
 
-    const handlePermanentDelete = (event: any) => {
-        Alert.alert(
-            'Permanently Delete',
-            `Are you sure you want to permanently delete "${event.title}"? This action cannot be undone.`,
-            [
-                {
-                    text: 'Cancel',
-                    style: 'cancel',
-                },
-                {
-                    text: 'Delete Forever',
-                    style: 'destructive',
-                    onPress: async () => {
-                        // Store current deleted events for potential revert
-                        const previousDeletedEvents = [...(deletedUserEvents || [])];
-                        
-                        // ✅ START CONTRACT CALLS IMMEDIATELY (before optimistic update) for wallet auth
-                        // Pre-fetch data in parallel to trigger wallet auth as fast as possible
-                        const publicKeyPromise = blockchainService.hostContract.methods
-                            .getPublicKeyOfUser(activeAccount?.userName)
-                            .call()
-                            .catch(err => {
-                                console.warn('Pre-fetch public key failed, will fetch later:', err);
-                                return null;
-                            });
+    const handleClearBin = () => {
+        setShowClearBinModal(true);
+    };
 
-                        const allEventsPromise = blockchainService.getAllEvents(activeAccount.userName)
-                            .catch(err => {
-                                console.warn('Pre-fetch events failed, will fetch later:', err);
-                                return { events: [] };
-                            });
+    const handleConfirmClearBin = async () => {
+        setShowClearBinModal(false);
+        // Delete all events permanently
+        for (const event of deletedUserEvents) {
+            await blockchainService.deleteEventPermanent(event.uid, activeAccount, token, api);
+        }
+    };
 
-                        // ✅ OPTIMISTIC UPDATE: Remove from deleted events immediately (instant UI update)
-                        optimisticallyPermanentDeleteEvent(event.uid);
-                        
-                        // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background (non-blocking)
-                        (async () => {
-                            try {
-                                // ✅ Wait for pre-fetched data in parallel
-                                const [publicKey, allEvents] = await Promise.all([publicKeyPromise, allEventsPromise]);
-                                
-                                // Find the event and its UUID
-                                const selected = (allEvents.events || []).find((ev: any) =>
-                                    ev && (ev.uid === event.uid)
-                                );
+    const handleRestore = async (event: any) => {
+        setSelectedEventMenu(null);
+        setMenuPosition(null);
+        try {
+            // Optimistically restore event by removing isDeleted flag
+            const { setUserEvents, userEvents, deletedUserEvents } = useEventsStore.getState();
+            // Combine all events and remove duplicates by UID (keep the first occurrence)
+            const allEventsMap = new Map();
+            [...(userEvents || []), ...(deletedUserEvents || [])].forEach((ev: any) => {
+                if (!allEventsMap.has(ev.uid)) {
+                    allEventsMap.set(ev.uid, ev);
+                }
+            });
+            const allEvents = Array.from(allEventsMap.values());
+            
+            const updatedEvents = allEvents.map((ev: any) => {
+                if (ev.uid === event.uid) {
+                    const existingList = ev.list || [];
+                    const filteredList = existingList.filter((item: any) => 
+                        item.key !== 'isDeleted' && item.key !== 'deletedTime'
+                    );
+                    return {
+                        ...ev,
+                        list: filteredList
+                    };
+                }
+                return ev;
+            });
+            setUserEvents(updatedEvents);
 
-                                if (!selected) {
-                                    throw new Error('Event not found');
-                                }
+            // Restore on blockchain
+            await blockchainService.restoreEvent(event, activeAccount, token, api);
+            
+            // Refresh events in background
+            getUserEvents(activeAccount.userName, api).catch(err => {
+                console.error('Background event refresh failed:', err);
+            });
+        } catch (err) {
+            console.error("Restore Event Failed:", err);
+            Alert.alert("Error", "Failed to restore the event");
+            // Refresh to revert optimistic update
+            getUserEvents(activeAccount.userName, api);
+        }
+    };
 
-                                // Prepare event data for permanent delete (same as blockchain service)
-                                const listValue = (selected.list || []).filter((data: any) =>
-                                    !(data.key === "isDeleted" || data.key === "deletedTime")
-                                );
+    const handleDelete = (event: any) => {
+        console.log('========== handleDelete START ==========');
+        console.log('handleDelete called with event:', event);
+        console.log('Event UID:', event?.uid);
+        console.log('Event title:', event?.title);
+        
+        // Close menu modal first
+        console.log('Closing menu modal...');
+        setSelectedEventMenu(null);
+        setMenuPosition(null);
+        
+        // Set event and show modal immediately
+        console.log('Setting eventToDelete and showDeleteModal...');
+        setEventToDelete(event);
+        setShowDeleteModal(true);
+        
+        console.log('showDeleteModal should now be: true');
+        console.log('eventToDelete should now be:', event);
+        console.log('========== handleDelete END ==========');
+    };
 
-                                const updatedEvent = {
-                                    ...selected,
-                                    list: [
-                                        ...listValue,
-                                        { key: "isDeleted", value: "true" },
-                                        { key: "isPermanentDelete", value: "true" },
-                                        { key: "deletedTime", value: moment.utc().format("YYYYMMDDTHHmmss") }
-                                    ]
-                                };
-
-                                const uid = updatedEvent.uid;
-                                const uuid = selected.uuid;
-
-                                // Prepare encryption data
-                                const conferencingData = null;
-                                const metadata = buildEventMetadata(updatedEvent as any, conferencingData);
-                                const eventParams = prepareEventForBlockchain(updatedEvent as any, metadata, uid);
-                                const encryptionData = JSON.stringify(eventParams);
-
-                                // ✅ TRIGGER WALLET AUTHENTICATION IMMEDIATELY (like create/update)
-                                // Start encryption as soon as we have public key - this shows the wallet modal FAST
-                                // This triggers wallet authentication modal immediately
-                                if (publicKey) {
-                                    console.log('🔐 Triggering wallet authentication for permanent delete...');
-                                    // Start encryption immediately - this triggers wallet auth modal
-                                    // Don't await - let it run in parallel with blockchain operations
-                                    encryptWithNECJS(
-                                        encryptionData,
-                                        publicKey,
-                                        token,
-                                        [uuid] // Use the existing UUID
-                                    ).then(() => {
-                                        console.log('✅ Wallet authentication triggered for permanent delete');
-                                    }).catch(err => {
-                                        console.error('❌ Early encryption failed (will retry in blockchain service):', err);
-                                    });
-                                } else {
-                                    console.warn('⚠️ No public key available for wallet authentication');
-                                }
-
-                                // ✅ Continue with blockchain operations (they will also encrypt, but auth is already triggered)
-                                // Wallet auth modal should already be showing from the early encryption call above
-                                await blockchainService.deleteEventPermanent(event.uid, activeAccount, token, api);
-                                
-                                // No refresh needed - optimistic update already removed it from UI
-                                // Skip getUserEvents to avoid loading screen - UI is already correct
-                            } catch (err) {
-                                console.error("Permanent Delete Event Failed:", err);
-                                // Revert optimistic update on error
-                                revertOptimisticDeletedUpdate(previousDeletedEvents);
-                                Alert.alert("Error", "Failed to permanently delete event. Please try again.");
-                            }
-                        })();
-                    },
-                },
-            ]
-        );
+    const handleConfirmDelete = async () => {
+        if (eventToDelete) {
+            setShowDeleteModal(false);
+            try {
+                await blockchainService.deleteEventPermanent(eventToDelete.uid, activeAccount, token, api);
+                // Refresh events after deletion
+                await getUserEvents(activeAccount.userName, api);
+            } catch (error) {
+                console.error('Error deleting event permanently:', error);
+                Alert.alert('Error', 'Failed to permanently delete the event');
+            } finally {
+                setEventToDelete(null);
+            }
+        }
     };
 
     const renderEventCard = (event: any, index: number) => {
+        const eventType = getEventType(event);
+        const duration = calculateDuration(event.fromTime, event.toTime);
+        const startTime = formatTime(event.fromTime);
+        const endTime = formatTime(event.toTime);
+        const timeRange = `${startTime}-${endTime}`;
+
         return (
-            <View key={event.uid || index} style={styles.eventCard}>
-                <View style={styles.eventHeader}>
-                    <Text style={styles.eventTitle} numberOfLines={2}>
+            <View key={event.uid || `event-${index}`} style={styles.eventCard}>
+                <View style={styles.eventContent}>
+                    <Text style={styles.eventTitle} numberOfLines={2} ellipsizeMode="tail">
                         {event.title}
                     </Text>
-                    <View style={styles.eventActions}>
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.restoreButton]}
-                            onPress={() => handleRestoreEvent(event)}
-                        >
-                            <Text style={styles.restoreButtonText}>Restore</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity
-                            style={[styles.actionButton, styles.deleteButton]}
-                            onPress={() => handlePermanentDelete(event)}
-                        >
-                            <Text style={styles.deleteButtonText}>Delete</Text>
-                        </TouchableOpacity>
+                    
+                    <View style={styles.eventLabels}>
+                        {/* Time/Duration Label */}
+                        <View style={styles.timeLabel}>
+                            <View style={styles.strikethroughIcon}>
+                                <Feather name="clock" size={12} color="#717680" />
+                            </View>
+                            <Text style={styles.timeLabelText} numberOfLines={1}>
+                                {duration} ({timeRange})
+                            </Text>
+                        </View>
+
+                        {/* Event/Task Type Label */}
+                        <View style={[
+                            styles.typeLabel,
+                            eventType === 'task' ? styles.taskLabel : styles.eventLabel
+                        ]}>
+                            <View style={styles.strikethroughIcon}>
+                                {eventType === 'task' ? (
+                                    <Feather name="clipboard" size={12} color="#717680" />
+                                ) : (
+                                    <Feather name="calendar" size={12} color="#717680" />
+                                )}
+                            </View>
+                            <Text style={[
+                                styles.typeLabelText,
+                                eventType === 'task' ? styles.taskLabelText : styles.eventLabelText
+                            ]} numberOfLines={1}>
+                                {eventType === 'task' ? 'Task' : 'Event'}
+                            </Text>
+                        </View>
                     </View>
                 </View>
 
-                {event.description && (
-                    <Text style={styles.eventDescription} numberOfLines={3}>
-                        {event.description}
-                    </Text>
-                )}
-
-                <View style={styles.eventDetails}>
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Date:</Text>
-                        <Text style={styles.detailValue}>{formatDate(event.fromTime)}</Text>
-                    </View>
-
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Time:</Text>
-                        <Text style={styles.detailValue}>
-                            {formatTime(event.fromTime)} - {formatTime(event.toTime)}
-                        </Text>
-                    </View>
-
-                    <View style={styles.detailRow}>
-                        <Text style={styles.detailLabel}>Deleted:</Text>
-                        <Text style={styles.detailValue}>{getDeletedTime(event)}</Text>
-                    </View>
+                {/* Three Dots Menu */}
+                <View 
+                    ref={(ref) => {
+                        if (ref) menuButtonRefs.current[event.uid] = ref;
+                    }}
+                    style={styles.menuButtonContainer}
+                >
+                    <TouchableOpacity
+                        style={styles.menuButton}
+                        onPress={() => {
+                            const ref = menuButtonRefs.current[event.uid];
+                            if (ref) {
+                                ref.measure((x, y, width, height, pageX, pageY) => {
+                                    setMenuPosition({ x: pageX, y: pageY, width, height });
+                                    setSelectedEventMenu(event.uid);
+                                });
+                            } else {
+                                setSelectedEventMenu(event.uid);
+                            }
+                        }}
+                    >
+                        <MaterialIcons name="more-vert" size={20} color="#000" />
+                    </TouchableOpacity>
                 </View>
             </View>
         );
     };
 
+    const groupedEvents = groupEventsByDate();
+    const totalCount = deletedUserEvents.length;
+
     return (
         <View style={styles.container}>
-            <PlainHeader onMenuPress={handleMenuPress} title="Deleted Events" />
+            <PlainHeader onMenuPress={handleMenuPress} title="Recycle bin" />
 
             {userEventsLoading ? (
                 <CustomLoader />
@@ -347,23 +332,186 @@ const DeletedEventsScreen: React.FC = () => {
                     </Text>
                 </View>
             ) : (
-                <ScrollView
-                    style={styles.content}
-                    showsVerticalScrollIndicator={false}
-                    contentContainerStyle={styles.scrollContent}
-                >
-                    <View style={styles.header}>
-                        <Text style={styles.headerTitle}>
-                            {deletedUserEvents.length} Deleted Event{deletedUserEvents.length !== 1 ? 's' : ''}
-                        </Text>
-                        <Text style={styles.headerSubtitle}>
-                            Tap "Restore" to bring back an event or "Delete" to remove it permanently.
-                        </Text>
-                    </View>
+                <>
+                    <ScrollView
+                        style={styles.content}
+                        showsVerticalScrollIndicator={false}
+                        contentContainerStyle={styles.scrollContent}
+                    >
+                        {/* Header with Completed activities and Clear bin */}
+                        <View style={styles.headerSection}>
+                            <Text style={styles.headerTitle}>
+                                Completed activities ({totalCount})
+                            </Text>
+                            <TouchableOpacity onPress={handleClearBin}>
+                                <Text style={styles.clearBinButton}>Clear bin</Text>
+                            </TouchableOpacity>
+                        </View>
 
-                    {deletedUserEvents.map((event, index) => renderEventCard(event, index))}
+                    {/* Grouped Events by Date */}
+                    {Object.entries(groupedEvents).map(([dateKey, events]) => (
+                        <View key={dateKey} style={styles.dateGroup}>
+                            <View style={styles.dateHeader}>
+                                <Text style={styles.dateHeaderText} numberOfLines={1}>
+                                    {dateKey}
+                                </Text>
+                                <View style={styles.dateDivider} />
+                            </View>
+                            {events.map((event, index) => renderEventCard(event, index))}
+                        </View>
+                    ))}
                 </ScrollView>
+                
+                {/* Menu Modal - positioned correctly */}
+                {selectedEventMenu && menuPosition && (
+                    <Modal
+                        transparent={true}
+                        visible={true}
+                        onRequestClose={() => {
+                            setSelectedEventMenu(null);
+                            setMenuPosition(null);
+                        }}
+                        animationType="fade"
+                    >
+                        <TouchableOpacity
+                            style={styles.menuOverlay}
+                            activeOpacity={1}
+                            onPress={() => {
+                                setSelectedEventMenu(null);
+                                setMenuPosition(null);
+                            }}
+                        >
+                            <View style={[
+                                styles.menuPopup,
+                                {
+                                    position: 'absolute',
+                                    top: menuPosition.y + menuPosition.height + scaleHeight(4),
+                                    right: screenWidth - menuPosition.x - menuPosition.width,
+                                }
+                            ]}>
+                                <TouchableOpacity
+                                    style={styles.menuItem}
+                                    onPress={() => {
+                                        const event = deletedUserEvents.find(e => e.uid === selectedEventMenu);
+                                        if (event) {
+                                            handleRestore(event);
+                                        }
+                                    }}
+                                >
+                                    <Text style={styles.menuItemText}>Restore</Text>
+                                </TouchableOpacity>
+                                <TouchableOpacity
+                                    style={styles.menuItem}
+                                    onPress={() => {
+                                        console.log('Delete button clicked in menu');
+                                        console.log('selectedEventMenu:', selectedEventMenu);
+                                        const event = deletedUserEvents.find(e => e.uid === selectedEventMenu);
+                                        console.log('Found event:', event);
+                                        if (event) {
+                                            console.log('Calling handleDelete with event:', event);
+                                            handleDelete(event);
+                                            setMenuPosition(null);
+                                        } else {
+                                            console.log('Event not found for uid:', selectedEventMenu);
+                                        }
+                                    }}
+                                >
+                                    <Text style={styles.menuItemDelete}>Delete</Text>
+                                </TouchableOpacity>
+                            </View>
+                        </TouchableOpacity>
+                    </Modal>
+                )}
+                </>
             )}
+
+            {/* Clear Bin Confirmation Modal */}
+            <Modal
+                transparent={true}
+                visible={showClearBinModal}
+                animationType="fade"
+                onRequestClose={() => setShowClearBinModal(false)}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => setShowClearBinModal(false)}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={(e) => e.stopPropagation()}
+                        style={styles.modalContainer}
+                    >
+                        <Text style={styles.modalTitle}>Clear bin?</Text>
+                        <Text style={styles.modalMessage}>
+                            Are you sure you want to delete all the completed activities in the bin? They will be permanently deleted and you cannot restore them.
+                        </Text>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={styles.modalCancelButton}
+                                onPress={() => setShowClearBinModal(false)}
+                            >
+                                <Text style={styles.modalCancelText}>Cancel</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={styles.modalClearButton}
+                                onPress={handleConfirmClearBin}
+                            >
+                                <Text style={styles.modalClearText}>Clear</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
+
+            {/* Permanently Delete Confirmation Modal */}
+            <Modal
+                transparent={true}
+                visible={showDeleteModal}
+                animationType="fade"
+                onRequestClose={() => {
+                    console.log('Modal onRequestClose called');
+                    setShowDeleteModal(false);
+                    setEventToDelete(null);
+                }}
+            >
+                <TouchableOpacity
+                    style={styles.modalOverlay}
+                    activeOpacity={1}
+                    onPress={() => {
+                        setShowDeleteModal(false);
+                        setEventToDelete(null);
+                    }}
+                >
+                    <TouchableOpacity
+                        activeOpacity={1}
+                        onPress={(e) => e.stopPropagation()}
+                        style={styles.modalContainer}
+                    >
+                        <Text style={styles.modalTitle}>Permanently Delete</Text>
+                        <Text style={styles.modalMessage}>
+                            Are you sure you want to permanently delete "{eventToDelete?.title}"? This action cannot be undone.
+                        </Text>
+                        <View style={styles.modalButtons}>
+                            <TouchableOpacity
+                                style={[styles.modalCancelButton, { backgroundColor: 'transparent' }]}
+                                onPress={() => {
+                                    setShowDeleteModal(false);
+                                    setEventToDelete(null);
+                                }}
+                            >
+                                <Text style={[styles.modalCancelText, { color: '#000000' }]}>CANCEL</Text>
+                            </TouchableOpacity>
+                            <TouchableOpacity
+                                style={[styles.modalDeleteButton, { backgroundColor: '#FF4444' }]}
+                                onPress={handleConfirmDelete}
+                            >
+                                <Text style={[styles.modalDeleteText, { color: '#FFFFFF' }]}>DELETE</Text>
+                            </TouchableOpacity>
+                        </View>
+                    </TouchableOpacity>
+                </TouchableOpacity>
+            </Modal>
 
             {/* Custom Drawer */}
             <CustomDrawer
@@ -377,106 +525,177 @@ const DeletedEventsScreen: React.FC = () => {
 const styles = StyleSheet.create({
     container: {
         flex: 1,
-        backgroundColor: colors.background,
+        backgroundColor: '#F5F5F5',
     },
     content: {
         flex: 1,
     },
     scrollContent: {
-        padding: spacing.md,
+        paddingBottom: spacing.xl,
     },
-    header: {
-        marginBottom: spacing.lg,
-        paddingBottom: spacing.md,
-        borderBottomWidth: 1,
-        borderBottomColor: colors.lightGrayishBlue,
-    },
-    headerTitle: {
-        fontSize: fontSize.textSize20,
-        fontWeight: '700',
-        color: colors.blackText,
-        marginBottom: spacing.xs,
-    },
-    headerSubtitle: {
-        fontSize: fontSize.textSize14,
-        color: colors.mediumgray,
-        lineHeight: 20,
-    },
-    eventCard: {
-        backgroundColor: '#F6F7F9', // Match EventCard background
-        borderRadius: borderRadius.lg,
-        padding: spacing.md,
-        marginBottom: spacing.md,
-        borderLeftWidth: 4,
-        borderLeftColor: colors.error,
-        borderWidth: 1,
-        borderColor: '#ACCFFF', // Match DaySection border color
-    },
-    eventHeader: {
+    headerSection: {
         flexDirection: 'row',
         justifyContent: 'space-between',
+        alignItems: 'center',
+        paddingHorizontal: scaleWidth(20),
+        paddingTop: scaleHeight(20),
+        paddingBottom: scaleHeight(16),
+    },
+    headerTitle: {
+        fontSize: moderateScale(18),
+        fontWeight: '700',
+        color: '#000',
+        fontFamily: Fonts.latoBold,
+    },
+    clearBinButton: {
+        fontSize: moderateScale(16),
+        fontWeight: '500',
+        color: '#00AEEF',
+        fontFamily: Fonts.latoMedium,
+    },
+    dateGroup: {
+        marginBottom: scaleHeight(24),
+        paddingHorizontal: scaleWidth(20),
+    },
+    dateHeader: {
+        fontSize: moderateScale(16),
+        fontWeight: '600',
+        color: '#000',
+        marginBottom: scaleHeight(12),
+        fontFamily: Fonts.latoBold,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    dateHeaderText: {
+        fontSize: moderateScale(16),
+        fontWeight: '600',
+        color: '#000',
+        fontFamily: Fonts.latoBold,
+        marginRight: scaleWidth(12),
+    },
+    dateDivider: {
+        flex: 1,
+        height: 1,
+        backgroundColor: '#E0E0E0',
+    },
+    eventCardWrapper: {
+        position: 'relative',
+        marginBottom: scaleHeight(12),
+    },
+    eventCard: {
+        backgroundColor: '#fff',
+        borderRadius: moderateScale(12),
+        padding: scaleWidth(16),
+        borderLeftWidth: 4,
+        borderLeftColor: '#00AEEF',
+        ...shadows.sm,
+        flexDirection: 'row',
         alignItems: 'flex-start',
-        marginBottom: spacing.sm,
+        justifyContent: 'space-between',
+        marginBottom: scaleHeight(12),
+    },
+    eventContent: {
+        flex: 1,
     },
     eventTitle: {
-        fontSize: fontSize.textSize16,
+        fontSize: moderateScale(16),
         fontWeight: '600',
-        color: colors.blackText,
-        flex: 1,
-        marginRight: spacing.sm,
+        color: '#717680',
+        marginBottom: scaleHeight(8),
+        fontFamily: Fonts.latoBold,
+        flexWrap: 'wrap',
+        textDecorationLine: 'line-through',
     },
-    eventActions: {
+    eventLabels: {
         flexDirection: 'row',
-        gap: spacing.xs,
+        flexWrap: 'wrap',
+        gap: scaleWidth(8),
     },
-    actionButton: {
-        paddingHorizontal: spacing.sm,
-        paddingVertical: spacing.xs,
-        borderRadius: borderRadius.sm,
-        minWidth: scaleWidth(60),
-        alignItems: 'center',
-        ...shadows.sm,
-    },
-    restoreButton: {
-        backgroundColor: colors.primary,
-    },
-    restoreButtonText: {
-        color: colors.white,
-        fontSize: fontSize.textSize12,
-        fontWeight: '600',
-    },
-    deleteButton: {
-        backgroundColor: colors.error,
-    },
-    deleteButtonText: {
-        color: colors.white,
-        fontSize: fontSize.textSize12,
-        fontWeight: '600',
-    },
-    eventDescription: {
-        fontSize: fontSize.textSize14,
-        color: colors.mediumgray,
-        marginBottom: spacing.sm,
-        lineHeight: 20,
-    },
-    eventDetails: {
-        gap: spacing.xs,
-    },
-    detailRow: {
+    timeLabel: {
         flexDirection: 'row',
         alignItems: 'center',
+        paddingHorizontal: scaleWidth(8),
+        paddingVertical: scaleHeight(4),
+        borderRadius: moderateScale(16),
+        backgroundColor: 'transparent',
+        borderWidth: 0.5,
+        borderColor: '#D5D7DA',
+        gap: scaleWidth(4),
     },
-    detailLabel: {
-        fontSize: fontSize.textSize12,
-        color: colors.mediumgray,
+    timeLabelText: {
+        fontSize: moderateScale(12),
         fontWeight: '500',
-        width: scaleWidth(60),
+        color: '#717680',
+        fontFamily: Fonts.latoMedium,
+        textDecorationLine: 'line-through',
     },
-    detailValue: {
-        fontSize: fontSize.textSize12,
-        color: colors.blackText,
-        fontWeight: '400',
+    typeLabel: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: scaleWidth(8),
+        paddingVertical: scaleHeight(4),
+        borderRadius: moderateScale(16),
+        borderWidth: 0.5,
+        gap: scaleWidth(4),
+    },
+    eventLabel: {
+        backgroundColor: 'transparent',
+        borderColor: '#00AEEF',
+        borderWidth: 1,
+    },
+    taskLabel: {
+        backgroundColor: 'transparent',
+        borderColor: '#10B981',
+        borderWidth: 1,
+    },
+    typeLabelText: {
+        fontSize: moderateScale(12),
+        fontWeight: '500',
+        color: '#717680',
+        fontFamily: Fonts.latoMedium,
+        textDecorationLine: 'line-through',
+    },
+    eventLabelText: {
+        color: '#717680',
+    },
+    taskLabelText: {
+        color: '#717680',
+    },
+    menuButtonContainer: {
+        marginLeft: scaleWidth(8),
+    },
+    menuButton: {
+        padding: scaleWidth(4),
+    },
+    menuPopup: {
+        backgroundColor: '#fff',
+        borderRadius: moderateScale(8),
+        paddingVertical: scaleHeight(4),
+        minWidth: scaleWidth(120),
+        ...shadows.md,
+    },
+    strikethroughIcon: {
+        opacity: 0.6,
+    },
+    menuOverlay: {
         flex: 1,
+        backgroundColor: 'transparent',
+    },
+    menuItem: {
+        paddingHorizontal: scaleWidth(16),
+        paddingVertical: scaleHeight(12),
+    },
+    menuItemText: {
+        fontSize: moderateScale(16),
+        fontWeight: '400',
+        color: '#000',
+        fontFamily: Fonts.latoRegular,
+    },
+    menuItemDelete: {
+        fontSize: moderateScale(16),
+        fontWeight: '400',
+        color: '#FF4444',
+        fontFamily: Fonts.latoRegular,
     },
     emptyState: {
         flex: 1,
@@ -501,8 +720,91 @@ const styles = StyleSheet.create({
         textAlign: 'center',
         lineHeight: 20,
     },
+    modalOverlay: {
+        flex: 1,
+        backgroundColor: 'rgba(0, 0, 0, 0.5)',
+        justifyContent: 'center',
+        alignItems: 'center',
+        paddingHorizontal: scaleWidth(20),
+        zIndex: 10000,
+        elevation: 10000,
+    },
+    modalContainer: {
+        backgroundColor: colors.white,
+        borderRadius: moderateScale(16),
+        padding: scaleWidth(24),
+        width: '100%',
+        maxWidth: scaleWidth(340),
+        zIndex: 10001,
+        elevation: 10001,
+        shadowColor: '#000',
+        shadowOffset: {
+            width: 0,
+            height: 4,
+        },
+        shadowOpacity: 0.3,
+        shadowRadius: 8,
+    },
+    modalTitle: {
+        fontSize: fontSize.textSize18,
+        fontWeight: '700',
+        color: '#000',
+        fontFamily: Fonts.latoBold,
+        marginBottom: scaleHeight(16),
+        textAlign: 'left',
+    },
+    modalMessage: {
+        fontSize: fontSize.textSize14,
+        fontWeight: '400',
+        color: '#717680',
+        fontFamily: Fonts.latoRegular,
+        marginBottom: scaleHeight(24),
+        lineHeight: scaleHeight(20),
+        textAlign: 'left',
+    },
+    modalButtons: {
+        flexDirection: 'row',
+        justifyContent: 'flex-end',
+        gap: scaleWidth(12),
+    },
+    modalCancelButton: {
+        paddingVertical: scaleHeight(12),
+        paddingHorizontal: scaleWidth(24),
+        borderRadius: moderateScale(8),
+        backgroundColor: 'transparent',
+    },
+    modalCancelText: {
+        fontSize: fontSize.textSize14,
+        fontWeight: '600',
+        color: '#000',
+        fontFamily: Fonts.latoSemiBold,
+        letterSpacing: 0,
+    },
+    modalClearButton: {
+        paddingVertical: scaleHeight(12),
+        paddingHorizontal: scaleWidth(24),
+        borderRadius: moderateScale(8),
+        backgroundColor: '#FF4444',
+    },
+    modalClearText: {
+        fontSize: fontSize.textSize14,
+        fontWeight: '500',
+        color: colors.white,
+        fontFamily: Fonts.latoSemiBold,
+    },
+    modalDeleteButton: {
+        paddingVertical: scaleHeight(12),
+        paddingHorizontal: scaleWidth(24),
+        borderRadius: moderateScale(8),
+        backgroundColor: '#FF4444',
+    },
+    modalDeleteText: {
+        fontSize: fontSize.textSize14,
+        fontWeight: '600',
+        color: '#FFFFFF',
+        fontFamily: Fonts.latoSemiBold,
+        letterSpacing: 0,
+    },
 });
-
-
 
 export default DeletedEventsScreen;

@@ -4,7 +4,7 @@ import { Calendar } from 'react-native-calendars';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../navigations/appNavigation.type';
 import FloatingActionButton from '../components/FloatingActionButton';
-import WeekHeader from '../components/WeekHeader';
+import CustomeHeader from '../global/CustomeHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
@@ -45,6 +45,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const navigation = useNavigation();
   const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
   const { account } = useActiveAccount();
+<<<<<<< HEAD
   const { 
     userEvents, 
     userEventsLoading, 
@@ -52,6 +53,9 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     optimisticallyDeleteEvent,
     revertOptimisticUpdate
   } = useEventsStore();
+=======
+  const { userEvents, userEventsLoading, getUserEvents, setUserEvents, deletedUserEvents } = useEventsStore();
+>>>>>>> new-design
   const { selectedDate, setSelectedDate } = useCalendarStore();
   // ✅ Get start of week setting from store
 
@@ -825,8 +829,47 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       // Store current events for potential revert
       const currentEvents = [...(userEvents || [])];
       
+<<<<<<< HEAD
       // ✅ OPTIMISTIC UPDATE: Remove event from UI immediately
       optimisticallyDeleteEvent(event.uid);
+=======
+      // Optimistically mark event as deleted instead of removing it
+      // This ensures it appears in the deleted events list immediately
+      if (userEvents && Array.isArray(userEvents)) {
+        const updatedEvents = userEvents.map((ev: any) => {
+          if (ev.uid === event.uid || ev.eventId === event.uid || ev.id === event.uid) {
+            // Mark as deleted by adding isDeleted flag to list
+            const existingList = ev.list || [];
+            // Remove any existing isDeleted or deletedTime items
+            const filteredList = existingList.filter((item: any) => 
+              item.key !== 'isDeleted' && item.key !== 'deletedTime'
+            );
+            // Add isDeleted and deletedTime
+            const updatedList = [
+              ...filteredList,
+              { key: 'isDeleted', value: 'true' },
+              { key: 'deletedTime', value: new Date().toISOString().replace(/[-:]/g, '').split('.')[0] }
+            ];
+            return {
+              ...ev,
+              list: updatedList
+            };
+          }
+          return ev;
+        });
+        // Include all events (active + deleted) so setUserEvents can properly filter them
+        // Remove duplicates by UID to prevent duplicate key errors
+        const allEventsMap = new Map();
+        [...updatedEvents, ...(deletedUserEvents || [])].forEach((ev: any) => {
+            if (!allEventsMap.has(ev.uid)) {
+                allEventsMap.set(ev.uid, ev);
+            }
+        });
+        const allEvents = Array.from(allEventsMap.values());
+        // setUserEvents will automatically filter into userEvents and deletedUserEvents
+        setUserEvents(allEvents);
+      }
+>>>>>>> new-design
 
       // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background
       (async () => {
@@ -953,14 +996,11 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         onDelete={handleDeleteEvent}
       />
 
-      <WeekHeader
+      <CustomeHeader
         onMenuPress={handleMenuPress}
         currentMonth={currentMonth}
         onMonthPress={handleMonthPress}
         onMonthSelect={handleMonthSelect}
-        onDateSelect={handleDateSelect}
-        currentDate={selectedDate}
-        selectedDate={selectedDate}
       />
 
       <ScrollView
