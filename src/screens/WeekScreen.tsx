@@ -1,20 +1,14 @@
-import React, { useEffect, useMemo, useState, useRef } from 'react';
+import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import { InteractionManager } from 'react-native';
 import { View, StyleSheet, Text, Alert, TouchableOpacity, ScrollView, Image, FlatList } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../navigations/appNavigation.type';
 import FloatingActionButton from '../components/FloatingActionButton';
-<<<<<<< HEAD
 import WeekHeader from '../components/WeekHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
-=======
-import CustomeHeader from '../global/CustomeHeader';
-import { Screen } from '../navigations/appNavigation.type';
-import { useCalendarStore } from '../stores/useCalendarStore';
-import { useSettingsStore } from '../stores/useSetting';
->>>>>>> new-design
 import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST, isEventInPast } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
@@ -238,16 +232,14 @@ const WeekScreen = () => {
     const maxDate = new Date(viewEndDate);
     maxDate.setHours(23, 59, 59, 999);
 
-    const isAnnualEvent = repeatTypeLower.includes('year') || repeatTypeLower.includes('annual') || customUnit === 'year';
-    const yearsToGenerate = isAnnualEvent ? 10 : 1;
-
-    const limitFromNow = new Date();
-    limitFromNow.setFullYear(limitFromNow.getFullYear() + yearsToGenerate);
-
-    let limitDate = maxDate < limitFromNow ? maxDate : limitFromNow;
+    // For week view, limit to only generate instances within the week range (much faster!)
+    let limitDate = maxDate;
     if (customEndDate && customEndDate < limitDate) {
       limitDate = customEndDate;
     }
+    
+    // Limit iterations to prevent long processing
+    const maxIterations = 50; // Reduced from 366*2 for week view
 
     const dayNameToNumber: { [key: string]: number } = {
       sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
@@ -278,7 +270,6 @@ const WeekScreen = () => {
 
     let iteration = 0;
     let occurrenceCount = 1;
-    const maxIterations = isAnnualEvent ? 50 : 366 * 2;
 
     while (nextDate <= limitDate && iteration < maxIterations) {
       iteration++;
@@ -439,38 +430,79 @@ const WeekScreen = () => {
         occurrenceCount++;
       }
 
-      if (instances.length > 366) {
-        console.warn('Too many recurring instances generated, stopping at 366');
-        break;
+      // For week view, limit instances to prevent slow processing
+      if (instances.length > 50) {
+        break; // Stop after 50 instances for week view (much faster)
       }
     }
 
     return instances;
   };
 
-  const { markedDates, eventsByDate } = useMemo(() => {
+  // Cache for event processing - keyed by week start date
+  const eventsCacheRef = useRef<Map<string, { markedDatesBase: any; eventsByDate: any }>>(new Map());
+  const [isProcessingEvents, setIsProcessingEvents] = useState(false);
+  
+  // Process events ONLY for the current visible week - much faster!
+  const processEventsForWeek = useCallback((weekStart: Date) => {
+    const cacheKey = `${formatDate(weekStart)}-${selectedTimeZone}-${selectedDay}`;
+    
+    // Check cache first
+    if (eventsCacheRef.current.has(cacheKey)) {
+      return eventsCacheRef.current.get(cacheKey)!;
+    }
+
     const marked: any = {};
     const byDate: { [key: string]: any[] } = {};
 
-    // For week view, show current week plus buffer
-    const weekStart = new Date(selectedDate);
-    const day = weekStart.getDay();
-    const startDayNumber = getFirstDayNumber(selectedDay);
-    let diff = day - startDayNumber;
-    if (diff < 0) diff += 7;
-    weekStart.setDate(weekStart.getDate() - diff);
-    weekStart.setHours(0, 0, 0, 0);
-
+    // Only process events for THIS week (no buffer for speed)
     const weekEnd = new Date(weekStart);
     weekEnd.setDate(weekEnd.getDate() + 6);
     weekEnd.setHours(23, 59, 59, 999);
 
     const viewStartDate = new Date(weekStart);
-    viewStartDate.setDate(viewStartDate.getDate() - 7);
+    viewStartDate.setHours(0, 0, 0, 0);
     const viewEndDate = new Date(weekEnd);
-    viewEndDate.setDate(viewEndDate.getDate() + 7);
+    viewEndDate.setHours(23, 59, 59, 999);
 
-    (userEvents || []).forEach(ev => {
+    // AGGRESSIVE FILTERING: Only process events that could be in this week
+    // This is the key optimization - skip events that are clearly not relevant
+    const relevantEvents = (userEvents || []).filter(ev => {
+      if (!ev.fromTime) return false;
+      
+      // Quick timezone conversion (lightweight check)
+      try {
+        const startTimeData = convertToSelectedTimezone(ev.fromTime, selectedTimeZone);
+        if (!startTimeData?.date) return false;
+        
+        const eventStart = startTimeData.date;
+        const eventEnd = convertToSelectedTimezone(ev.toTime, selectedTimeZone)?.date || eventStart;
+        
+        // Fast range check: event must overlap with week range
+        const eventEndTime = eventEnd.getTime();
+        const viewStartTime = viewStartDate.getTime();
+        const viewEndTime = viewEndDate.getTime();
+        
+        // Event overlaps if: eventStart <= viewEnd AND eventEnd >= viewStart
+        if (eventStart.getTime() > viewEndTime || eventEndTime < viewStartTime) {
+          // Check if it's a recurring event that might recur into this week
+          const repeatType = ev.repeatEvent || ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+          if (!repeatType || repeatType === 'Does not repeat') {
+            return false; // Non-recurring event outside range - skip it
+          }
+          
+          // For recurring events, only process if within reasonable range (30 days)
+          const daysDiff = Math.abs((eventStart.getTime() - viewStartTime) / (1000 * 60 * 60 * 24));
+          return daysDiff < 30; // Only process recurring events within 30 days
+        }
+        
+        return true; // Event overlaps with week range
+      } catch (e) {
+        return false; // Skip invalid events
+      }
+    });
+
+    relevantEvents.forEach(ev => {
       const startTimeData = convertToSelectedTimezone(ev.fromTime, selectedTimeZone);
       const endTimeData = convertToSelectedTimezone(ev.toTime, selectedTimeZone);
 
@@ -597,18 +629,97 @@ const WeekScreen = () => {
       });
     });
 
+    const result = { markedDatesBase: marked, eventsByDate: byDate };
+    
+    // Cache the result (limit cache size)
+    if (eventsCacheRef.current.size > 20) {
+      const firstKey = eventsCacheRef.current.keys().next().value;
+      eventsCacheRef.current.delete(firstKey);
+    }
+    eventsCacheRef.current.set(cacheKey, result);
+    
+    return result;
+  }, [userEvents, selectedTimeZone, selectedDay]);
+
+  // Calculate current week start
+  const currentWeekStart = useMemo(() => {
+    const weekStart = new Date(selectedDate);
+    const day = weekStart.getDay();
+    const startDayNumber = getFirstDayNumber(selectedDay);
+    let diff = day - startDayNumber;
+    if (diff < 0) diff += 7;
+    weekStart.setDate(weekStart.getDate() - diff);
+    weekStart.setHours(0, 0, 0, 0);
+    return weekStart;
+  }, [selectedDate, selectedDay]);
+
+  // Process events for current week - use InteractionManager to defer heavy work
+  const [markedDatesBase, setMarkedDatesBase] = useState<any>({});
+  const [eventsByDate, setEventsByDate] = useState<{ [key: string]: any[] }>({});
+  const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    // Clear any pending processing
+    if (processingTimeoutRef.current) {
+      clearTimeout(processingTimeoutRef.current);
+    }
+
+    // Update UI immediately with cached data if available
+    const cacheKey = `${formatDate(currentWeekStart)}-${selectedTimeZone}-${selectedDay}`;
+    const cached = eventsCacheRef.current.get(cacheKey);
+    if (cached) {
+      setMarkedDatesBase(cached.markedDatesBase);
+      setEventsByDate(cached.eventsByDate);
+      setIsProcessingEvents(false);
+      return;
+    }
+
+    // Show loading state immediately for better UX
+    setIsProcessingEvents(true);
+
+    // Debounce processing - wait 100ms after last change before processing
+    // This prevents processing on every scroll/click
+    processingTimeoutRef.current = setTimeout(() => {
+      // Defer heavy processing until after interactions complete
+      const interaction = InteractionManager.runAfterInteractions(() => {
+        const result = processEventsForWeek(currentWeekStart);
+        setMarkedDatesBase(result.markedDatesBase);
+        setEventsByDate(result.eventsByDate);
+        setIsProcessingEvents(false);
+      });
+
+      // Cleanup on unmount
+      return () => {
+        interaction.cancel();
+      };
+    }, 100); // 100ms debounce - fast enough for good UX
+
+    return () => {
+      if (processingTimeoutRef.current) {
+        clearTimeout(processingTimeoutRef.current);
+      }
+    };
+  }, [currentWeekStart, selectedTimeZone, selectedDay, processEventsForWeek]);
+
+  // Only update selected date marker - this is fast and doesn't require recalculating all events
+  const markedDates = useMemo(() => {
+    const marked = { ...markedDatesBase };
+    
     if (marked[selectedDateString]) {
-      marked[selectedDateString].selected = true;
-      marked[selectedDateString].selectedColor = '#2196F3';
+      marked[selectedDateString] = {
+        ...marked[selectedDateString],
+        selected: true,
+        selectedColor: '#2196F3',
+      };
     } else {
       marked[selectedDateString] = {
         selected: true,
         selectedColor: '#2196F3',
       };
     }
-
-    return { markedDates: marked, eventsByDate: byDate };
-  }, [userEvents, selectedDateString, selectedDate, selectedTimeZone, selectedDay]);
+    
+    return marked;
+  }, [markedDatesBase, selectedDateString]);
 
   // Fetch events when component mounts or userName changes
   useEffect(() => {
@@ -649,11 +760,15 @@ const WeekScreen = () => {
     setIsDrawerOpen(false);
   };
 
-  const handleDayPress = (day: any) => {
+  // Debounce date changes to avoid excessive recalculations
+  const handleDayPress = useCallback((day: any) => {
     const newDate = new Date(day.timestamp);
-    setSelectedDate(newDate);
-    setCurrentMonthByIndex(newDate.getMonth());
-  };
+    // Use requestAnimationFrame for immediate UI update
+    requestAnimationFrame(() => {
+      setSelectedDate(newDate);
+      setCurrentMonthByIndex(newDate.getMonth());
+    });
+  }, []);
 
   const handleEventPress = (event: any) => {
     setSelectedEvent(event);
@@ -797,11 +912,15 @@ const WeekScreen = () => {
     return colorOptions[index];
   };
 
-  const selectedDateEvents = eventsByDate[selectedDateString] || [];
+  // Memoize selected date events for faster access
+  const selectedDateEvents = useMemo(() => {
+    return eventsByDate[selectedDateString] || [];
+  }, [eventsByDate, selectedDateString]);
 
   // Get screen width for calendar width
   const screenWidth = Dimensions.get('window').width;
-  const calendarWidth = screenWidth - (spacing.md * 2); // Account for margins
+  // Use full screen width for paging to work correctly
+  const calendarWidth = screenWidth;
 
   // Calculate the start of the current week
   const getWeekStart = (date: Date): Date => {
@@ -823,11 +942,14 @@ const WeekScreen = () => {
   const weekDates = useMemo(() => {
     const weeks: Date[] = [];
     const startWeek = getWeekStart(selectedDate);
+    // Normalize to midnight for consistent comparison
+    startWeek.setHours(0, 0, 0, 0);
     
     // Add 12 weeks before
     for (let i = 12; i > 0; i--) {
       const week = new Date(startWeek);
       week.setDate(week.getDate() - (i * 7));
+      week.setHours(0, 0, 0, 0);
       weeks.push(week);
     }
     
@@ -838,24 +960,39 @@ const WeekScreen = () => {
     for (let i = 1; i <= 12; i++) {
       const week = new Date(startWeek);
       week.setDate(week.getDate() + (i * 7));
+      week.setHours(0, 0, 0, 0);
       weeks.push(week);
     }
     
     return weeks;
   }, [selectedDate, selectedDay]);
 
-  // Find initial index (current week)
+  // Find initial index (current week) - normalize dates for comparison
   const initialWeekIndex = useMemo(() => {
-    return weekDates.findIndex(week => 
-      formatDate(week) === formatDate(weekStartDate)
-    );
+    const normalizedWeekStart = new Date(weekStartDate);
+    normalizedWeekStart.setHours(0, 0, 0, 0);
+    const weekStartStr = formatDate(normalizedWeekStart);
+    
+    const index = weekDates.findIndex(week => {
+      const normalizedWeek = new Date(week);
+      normalizedWeek.setHours(0, 0, 0, 0);
+      return formatDate(normalizedWeek) === weekStartStr;
+    });
+    
+    return index >= 0 ? index : 12; // Default to middle if not found
   }, [weekDates, weekStartDate]);
 
   const weekScrollRef = useRef<FlatList>(null);
   const [currentWeekIndex, setCurrentWeekIndex] = useState(() => {
-    const idx = weekDates.findIndex(week => 
-      formatDate(week) === formatDate(weekStartDate)
-    );
+    const normalizedWeekStart = new Date(weekStartDate);
+    normalizedWeekStart.setHours(0, 0, 0, 0);
+    const weekStartStr = formatDate(normalizedWeekStart);
+    
+    const idx = weekDates.findIndex(week => {
+      const normalizedWeek = new Date(week);
+      normalizedWeek.setHours(0, 0, 0, 0);
+      return formatDate(normalizedWeek) === weekStartStr;
+    });
     return idx >= 0 ? idx : 12; // Default to middle if not found
   });
 
@@ -877,22 +1014,32 @@ const WeekScreen = () => {
 
   // Calculate month progress and week information
   const getMonthProgress = (weekStart: Date) => {
-    const cacheKey = `${weekStart.getFullYear()}-${weekStart.getMonth()}-${weekStart.getDate()}`;
+    // Normalize weekStart to midnight for consistent calculation
+    const normalizedWeekStart = new Date(weekStart);
+    normalizedWeekStart.setHours(0, 0, 0, 0);
+    
+    const cacheKey = `${normalizedWeekStart.getFullYear()}-${normalizedWeekStart.getMonth()}-${normalizedWeekStart.getDate()}`;
     
     // Check cache first
     if (monthProgressCache.current.has(cacheKey)) {
       return monthProgressCache.current.get(cacheKey);
     }
 
-    const monthStart = new Date(weekStart.getFullYear(), weekStart.getMonth(), 1);
-    const monthEnd = new Date(weekStart.getFullYear(), weekStart.getMonth() + 1, 0);
+    const monthStart = new Date(normalizedWeekStart.getFullYear(), normalizedWeekStart.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
+    const monthEnd = new Date(normalizedWeekStart.getFullYear(), normalizedWeekStart.getMonth() + 1, 0);
+    monthEnd.setHours(0, 0, 0, 0);
+    
     const monthStartWeek = getWeekStart(monthStart);
+    monthStartWeek.setHours(0, 0, 0, 0);
     const monthEndWeek = getWeekStart(monthEnd);
+    monthEndWeek.setHours(0, 0, 0, 0);
     
     // Calculate which week of the month this is
-    const weeksDiff = Math.floor((weekStart.getTime() - monthStartWeek.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    const totalWeeks = Math.floor((monthEndWeek.getTime() - monthStartWeek.getTime()) / (7 * 24 * 60 * 60 * 1000)) + 1;
-    const currentWeek = Math.min(weeksDiff + 1, totalWeeks);
+    const weeksDiff = Math.round((normalizedWeekStart.getTime() - monthStartWeek.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const totalWeeksDiff = Math.round((monthEndWeek.getTime() - monthStartWeek.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const totalWeeks = Math.max(1, totalWeeksDiff + 1);
+    const currentWeek = Math.max(1, Math.min(weeksDiff + 1, totalWeeks));
     
     // Cache month name calculation
     const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
@@ -916,18 +1063,23 @@ const WeekScreen = () => {
     return result;
   };
 
-  const monthProgress = useMemo(() => {
-    // Use the currently visible week based on scroll position
+  // Use state for monthProgress to update immediately during scrolling
+  const [monthProgress, setMonthProgress] = useState(() => getMonthProgress(weekStartDate));
+
+  // Update monthProgress when currentWeekIndex changes (during scrolling)
+  useEffect(() => {
     const visibleWeek = weekDates[currentWeekIndex];
-    if (!visibleWeek) {
-      return getMonthProgress(weekStartDate);
+    if (visibleWeek) {
+      const progress = getMonthProgress(visibleWeek);
+      setMonthProgress(progress);
+    } else {
+      setMonthProgress(getMonthProgress(weekStartDate));
     }
-    return getMonthProgress(visibleWeek);
-  }, [currentWeekIndex, weekStartDate, selectedDay]);
+  }, [currentWeekIndex, weekDates, weekStartDate]);
 
 
-  // Render a single week (7 days)
-  const renderWeek = (weekStart: Date) => {
+  // Memoized week component for better performance
+  const WeekRow = React.memo(({ weekStart, markedDates, eventsByDate, selectedDateString, firstDayNumber, onDayPress }: any) => {
     const days = [];
     const weekStartStr = formatDate(weekStart);
     
@@ -954,7 +1106,7 @@ const WeekScreen = () => {
             styles.weekDayContainer,
             isSelected && styles.weekDaySelected,
           ]}
-          onPress={() => handleDayPress({ dateString: dayStr, timestamp: dayDate.getTime() })}
+          onPress={() => onDayPress({ dateString: dayStr, timestamp: dayDate.getTime() })}
         >
           <Text style={[styles.weekDayName, isSelected && styles.weekDayNameSelected]}>
             {reorderedDayNames[i]}
@@ -993,119 +1145,25 @@ const WeekScreen = () => {
     }
 
     return (
-<<<<<<< HEAD
       <View style={styles.weekRow}>
         {days}
       </View>
-=======
-        <View style={styles.container}>
-            <CustomeHeader
-                onMenuPress={handleMenuPress}
-                currentMonth={currentMonth}
-                onMonthPress={handleMonthPress}
-                onMonthSelect={handleMonthSelect}
-            />
-
-            {/* Loading indicator */}
-            {userEventsLoading && (
-                <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Loading events...</Text>
-                </View>
-            )}
-
-            {/* Error indicator */}
-            {userEventsError && (
-                <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>Error: {userEventsError}</Text>
-                </View>
-            )}
-
-            <WeekView
-                key={`weekview-${adjustedSelectedDate.getFullYear()}-${adjustedSelectedDate.getMonth()}-${adjustedSelectedDate.getDate()}-${weekdayNumber}`}
-                events={myEvents}
-                selectedDate={adjustedSelectedDate}
-                numberOfDays={7}
-                pageStartAt={{ weekday: weekdayNumber }}
-                formatDateHeader="ddd D"
-                showTitle={false} // Hide the default title
-                headerStyle={styles.headerStyle}
-                headerTextStyle={styles.headerTextStyle}
-                hourTextStyle={styles.hourTextStyle}
-                eventContainerStyle={styles.eventContainerStyle}
-                gridRowStyle={styles.gridRowStyle}
-                gridColumnStyle={{ borderColor: '#EFEFEF', borderWidth: 1 }}
-                startHour={10}
-                hoursInDisplay={12}
-                timeStep={60}
-                formatTimeLabel="h A"
-                rightToLeft={false}
-                showNowLine={true}
-                timesColumnWidth={0.15}
-                DayHeaderComponent={CustomDayHeader}
-                EventComponent={CustomEventComponent}
-                onSwipeNext={handleSwipeNext}
-                onSwipePrev={handleSwipePrev}
-                onDayPress={handleDateSelect}
-                onEventPress={handleEventPress}
-            />
-
-            {isPaging && (
-                <View style={styles.loadingContainer}>
-                    <Text style={styles.loadingText}>Loading…</Text>
-                </View>
-            )}
-
-            {/* Floating Action Button matching the design */}
-            <FloatingActionButton
-                onOptionSelect={option => {
-                    console.log('Selected option:', option);
-                    // Handle different menu options
-                    switch (option) {
-                        case 'goal':
-                            console.log('Create Goal');
-                            break;
-                        case 'reminder':
-                            navigation.navigate(Screen.RemindersScreen as never);
-                            break;
-                        case 'task':
-                            navigation.navigate(Screen.CreateTaskScreen as never);
-                            break;
-                        case 'event':
-                            navigation.navigate(Screen.CreateEventScreen as never);
-                            break;
-                        default:
-                            break;
-                    }
-                }}
-            />
-
-            {/* Custom Drawer */}
-            <CustomDrawer
-                isOpen={isDrawerOpen}
-                onClose={handleDrawerClose}
-            />
-
-            {/* Custom Alert */}
-            <CustomAlert
-                visible={alertVisible}
-                title={alertTitle}
-                message={alertMessage}
-                type={alertType}
-                onClose={() => setAlertVisible(false)}
-            />
-
-            {/* Event Details Modal */}
-            <EventDetailsModal
-                visible={isEventModalVisible}
-                onClose={handleCloseEventModal}
-                event={selectedEvent}
-                onEdit={handleEditEvent}
-                onDelete={handleDeleteEvent}
-            />
-        </View>
->>>>>>> new-design
     );
-  };
+  });
+
+  // Render a single week (7 days) - memoized for performance
+  const renderWeek = useCallback((weekStart: Date) => {
+    return (
+      <WeekRow
+        weekStart={weekStart}
+        markedDates={markedDates}
+        eventsByDate={eventsByDate}
+        selectedDateString={selectedDateString}
+        firstDayNumber={firstDayNumber}
+        onDayPress={handleDayPress}
+      />
+    );
+  }, [markedDates, eventsByDate, selectedDateString, firstDayNumber, handleDayPress]);
 
   return (
     <View style={styles.container}>
@@ -1144,40 +1202,84 @@ const WeekScreen = () => {
             ref={weekScrollRef}
             data={weekDates}
             keyExtractor={(item, index) => `week-${formatDate(item)}-${index}`}
-            renderItem={({ item }) => renderWeek(item)}
+            renderItem={({ item, index }) => {
+              return (
+                <View style={{ width: calendarWidth }}>
+                  {renderWeek(item)}
+                </View>
+              );
+            }}
             horizontal={true}
             pagingEnabled={true}
             showsHorizontalScrollIndicator={false}
+            decelerationRate="fast"
             getItemLayout={(data, index) => ({
               length: calendarWidth,
               offset: calendarWidth * index,
               index,
             })}
             onMomentumScrollEnd={(event) => {
-              const index = Math.round(event.nativeEvent.contentOffset.x / calendarWidth);
-              if (weekDates[index]) {
-                const newWeekStart = weekDates[index];
+              const offsetX = event.nativeEvent.contentOffset.x;
+              // Calculate index based on exact position
+              const calculatedIndex = offsetX / calendarWidth;
+              const index = Math.round(calculatedIndex);
+              const clampedIndex = Math.max(0, Math.min(index, weekDates.length - 1));
+              
+              // Ensure we're at the exact position for this index
+              const expectedOffset = clampedIndex * calendarWidth;
+              const offsetDiff = Math.abs(offsetX - expectedOffset);
+              
+              // If we're not at the exact position, scroll to it
+              if (offsetDiff > 1 && weekScrollRef.current) {
+                weekScrollRef.current.scrollToOffset({
+                  offset: expectedOffset,
+                  animated: true,
+                });
+              }
+              
+              if (weekDates[clampedIndex]) {
+                const newWeekStart = new Date(weekDates[clampedIndex]);
+                newWeekStart.setHours(0, 0, 0, 0);
                 // Update to middle of week (day 3 or 4)
                 const newDate = new Date(newWeekStart);
                 newDate.setDate(newWeekStart.getDate() + 3);
+                newDate.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
+                
+                // Update state
                 setSelectedDate(newDate);
                 setCurrentMonthByIndex(newDate.getMonth());
+                setCurrentWeekIndex(clampedIndex);
+                
+                // Update month progress
+                const progress = getMonthProgress(newWeekStart);
+                setMonthProgress(progress);
               }
             }}
             onScroll={(event) => {
               const offsetX = event.nativeEvent.contentOffset.x;
-              const index = Math.round(offsetX / calendarWidth);
-              if (index >= 0 && index < weekDates.length && index !== currentWeekIndex) {
-                setCurrentWeekIndex(index);
+              // Calculate index more accurately
+              const calculatedIndex = offsetX / calendarWidth;
+              const index = Math.round(calculatedIndex);
+              const clampedIndex = Math.max(0, Math.min(index, weekDates.length - 1));
+              
+              if (clampedIndex !== currentWeekIndex && weekDates[clampedIndex]) {
+                setCurrentWeekIndex(clampedIndex);
+                // Update monthProgress immediately during scroll for responsive UI
+                const visibleWeek = weekDates[clampedIndex];
+                if (visibleWeek) {
+                  const progress = getMonthProgress(visibleWeek);
+                  setMonthProgress(progress);
+                }
               }
             }}
             scrollEventThrottle={16}
             initialScrollIndex={initialWeekIndex >= 0 ? initialWeekIndex : 12}
             onScrollToIndexFailed={(info) => {
-              // Fallback if scroll fails
+              // Fallback if scroll fails - scroll to offset instead
+              const offset = info.index * calendarWidth;
               setTimeout(() => {
-                weekScrollRef.current?.scrollToIndex({
-                  index: info.index,
+                weekScrollRef.current?.scrollToOffset({
+                  offset: offset,
                   animated: false,
                 });
               }, 100);
@@ -1190,7 +1292,7 @@ const WeekScreen = () => {
 
           <View style={styles.eventsList}>
             {selectedDateEvents.length > 0 ? (
-              selectedDateEvents.map((event, index) => (
+              selectedDateEvents.slice(0, 20).map((event, index) => (
                 <View key={`${event.uid}-${index}`}
                   style={{ display: 'flex', flexDirection: 'column', marginBottom: 10 }}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
@@ -1410,20 +1512,20 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   calendarWrapper: {
-    marginHorizontal: spacing.md,
     marginTop: spacing.xs,
     marginBottom: spacing.lg,
     borderRadius: 14,
     overflow: 'hidden',
     backgroundColor: '#ffffff',
+    width: Dimensions.get('window').width, // Full width, no horizontal margins
   },
   weekRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    width: Dimensions.get('window').width - (spacing.md * 2),
+    width: '100%', // Use 100% to fill parent container
     paddingVertical: spacing.md,
-    paddingHorizontal: 0,
+    paddingHorizontal: 0, // No horizontal padding to ensure 7 days fit exactly
   },
   weekDayContainer: {
     alignItems: 'center',
@@ -1454,7 +1556,8 @@ const styles = StyleSheet.create({
     marginBottom: 4,
   },
   weekDayNumberSelected: {
-    backgroundColor: '#000',
+    backgroundColor: '#2196F3', // Exact blue color from monthly calendar selectedColor
+    borderRadius: 18, // Perfect circle like the monthly calendar
   },
   weekDayToday: {
     backgroundColor: 'transparent',

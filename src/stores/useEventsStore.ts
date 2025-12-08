@@ -279,15 +279,46 @@ export const useEventsStore = create<EventsStore>()(
             
             optimisticallyDeleteEvent: (uid: string) => {
                 const currentEvents = get().userEvents;
-                const filteredEvents = currentEvents.filter(event => event.uid !== uid);
-                // Filter and set events (bypassing setUserEvents to avoid recursion)
-                const activeEvents = filteredEvents.filter(ev => {
-                    if (!ev.list) return true;
-                    const isDeletedItem = ev.list.find(item => item.key === 'isDeleted');
-                    return !isDeletedItem || isDeletedItem.value !== 'true';
+                const currentDeletedEvents = get().deletedUserEvents;
+                
+                // Find the event to delete
+                const eventToDelete = currentEvents.find(event => event.uid === uid);
+                if (!eventToDelete) {
+                    console.log('⚠️ Event not found for deletion:', uid);
+                    return;
+                }
+                
+                // Mark event as deleted by adding isDeleted flag to list
+                const existingList = eventToDelete.list || [];
+                // Remove any existing isDeleted or deletedTime items
+                const filteredList = existingList.filter((item: any) => 
+                    item.key !== 'isDeleted' && item.key !== 'deletedTime'
+                );
+                // Add isDeleted and deletedTime
+                const deletedTime = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+                const updatedList = [
+                    ...filteredList,
+                    { key: 'isDeleted', value: 'true' },
+                    { key: 'deletedTime', value: deletedTime }
+                ];
+                
+                const markedAsDeletedEvent = {
+                    ...eventToDelete,
+                    list: updatedList
+                };
+                
+                // Remove from active events
+                const activeEvents = currentEvents.filter(event => event.uid !== uid);
+                
+                // Add to deleted events (avoid duplicates)
+                const updatedDeletedEvents = currentDeletedEvents.filter(event => event.uid !== uid);
+                updatedDeletedEvents.push(markedAsDeletedEvent);
+                
+                set({ 
+                    userEvents: activeEvents,
+                    deletedUserEvents: updatedDeletedEvents
                 });
-                set({ userEvents: activeEvents });
-                console.log('✅ Optimistically deleted event:', uid, '- Total events:', activeEvents.length);
+                console.log('✅ Optimistically deleted event:', uid, '- Active events:', activeEvents.length, '- Deleted events:', updatedDeletedEvents.length);
             },
             
             optimisticallyRestoreEvent: (uid: string) => {

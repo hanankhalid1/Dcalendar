@@ -2,9 +2,10 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
+  Animated,
+  Dimensions,
   FlatList,
   Image,
-  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -27,6 +28,7 @@ import {
   fontSize,
   shadows,
   spacing,
+  colors as themeColors,
 } from '../utils/LightTheme';
 import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
 import { Fonts } from '../constants/Fonts';
@@ -52,7 +54,6 @@ import {
 } from '../constants/dummyData';
 import { AppNavigationProp, Screen } from '../navigations/appNavigation.type';
 import { generateEventUID, buildEventMetadata, prepareEventForBlockchain, encryptWithNECJS } from '../utils/eventUtils';
-import { generateEventUID, buildEventMetadata } from '../utils/eventUtils';
 
 import GuestSelector from '../components/createEvent/GuestSelector';
 import { BlockchainService } from '../services/BlockChainService';
@@ -133,16 +134,7 @@ const CreateEventScreen = () => {
   });
   const [showEndsDatePicker, setShowEndsDatePicker] = useState(false);
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
-  // Initialize timezone: use from editEventData if editing, otherwise use current system timezone
-  const getInitialTimezone = () => {
-    if (editEventData?.timezone) {
-      return editEventData.timezone;
-    }
-    const currentTz = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    const timezoneData = timezones.find(tz => tz.id === currentTz);
-    return timezoneData?.id || currentTz;
-  };
-  const [selectedTimezone, setSelectedTimezone] = useState<string>(getInitialTimezone());
+  const [selectedTimezone, setSelectedTimezone] = useState(currentTimezone);
   const [timezoneSearchQuery, setTimezoneSearchQuery] = useState('');
   const [searchQuery, setsearchQuery] = useState("")
   const [locationSuggestions, setLocationSuggestions] = React.useState<any[]>([]);
@@ -153,18 +145,12 @@ const CreateEventScreen = () => {
   const titleInputRef = useRef<View>(null);
   const dateTimeSectionRef = useRef<View>(null);
   const locationSectionRef = useRef<View>(null);
-  const descriptionInputRef = useRef<TextInput>(null);
-  const descriptionContainerRef = useRef<View>(null);
-  const [descriptionYPosition, setDescriptionYPosition] = useState(0);
   const { api } = useApiClient();
   const [isAllDayEvent, setIsAllDayEvent] = useState(false);
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
-  const [repeatEveryError, setRepeatEveryError] = useState('');
-  const repeatEveryInputRef = React.useRef<TextInput>(null);
-  const isRepeatEveryFocused = React.useRef(false);
   const endsOptions = ['Never', 'On', 'After'];
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
-  const [integrationType, setIntegrationType] = useState<'google' | 'zoom'>('google');
+  const integrationModalSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
   
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
@@ -622,39 +608,6 @@ const CreateEventScreen = () => {
     validateDateTime();
   }, [validateDateTime]);
 
-  // Auto-calculate end time whenever start time changes (to ensure it's always 30 min after)
-  useEffect(() => {
-    if (selectedStartTime && selectedStartTime.trim() !== '' && selectedStartDate && !isAllDayEvent) {
-      const calculatedEndTime = addMinutesToTime(selectedStartTime, 30);
-      const normalizedEndTime = calculatedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      
-      if (endTimeMatch) {
-        let endHours = parseInt(endTimeMatch[1], 10);
-        const endPeriod = endTimeMatch[3].toUpperCase();
-        
-        // Only update if end time is different from current (to avoid infinite loops)
-        if (selectedEndTime !== calculatedEndTime) {
-          setSelectedEndTime(calculatedEndTime);
-          
-          // If end time is 12:00 AM, set end date to next day
-          if (endPeriod === 'AM' && endHours === 12) {
-            if (selectedEndDate && selectedEndDate.getTime() !== selectedStartDate.getTime() + 86400000) {
-              const nextDay = new Date(selectedStartDate);
-              nextDay.setDate(nextDay.getDate() + 1);
-              setSelectedEndDate(nextDay);
-            }
-          } else {
-            // End time is same day, ensure end date matches start date
-            if (selectedEndDate && selectedEndDate.getTime() !== selectedStartDate.getTime()) {
-              setSelectedEndDate(selectedStartDate);
-            }
-          }
-        }
-      }
-    }
-  }, [selectedStartTime, selectedStartDate, isAllDayEvent]); // Note: intentionally not including selectedEndTime to avoid loops
-
   useFocusEffect(
     React.useCallback(() => {
       // Just show the video conferencing options when Google is connected
@@ -666,22 +619,24 @@ const CreateEventScreen = () => {
   const handleGoogleMeetClick = () => {
     if (!googleIntegration.isConnected) {
       // Show modal first, then navigate on Continue
-      setIntegrationType('google');
       setShowIntegrationModal(true);
     } else {
       // Google is connected, allow selecting Google Meet
       setSelectedVideoConferencing('google');
+      setShowVideoConferencingOptions(false);
     }
   };
 
-  const handleZoomClick = () => {
-    if (!zoomIntegration.isConnected) {
-      // Show modal first, then navigate on Continue
-      setIntegrationType('zoom');
-      setShowIntegrationModal(true);
-    } else {
-      // Zoom is connected, allow selecting Zoom
-      setSelectedVideoConferencing('zoom');
+  // Helper function to get display label for video conferencing
+  const getVideoConferencingLabel = (value: string | null): string => {
+    if (!value || value === 'inperson') return "Select"; // Don't show "in person" in the field
+    switch (value) {
+      case 'google':
+        return 'Google Meet';
+      case 'zoom':
+        return 'Zoom';
+      default:
+        return value;
     }
   };
 
@@ -694,6 +649,23 @@ const CreateEventScreen = () => {
       }));
     }
   }, [selectedStartDate]);
+
+  // Animate integration modal slide
+  useEffect(() => {
+    if (showIntegrationModal) {
+      Animated.timing(integrationModalSlideAnim, {
+        toValue: 0,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    } else {
+      Animated.timing(integrationModalSlideAnim, {
+        toValue: Dimensions.get('window').height,
+        duration: 300,
+        useNativeDriver: true,
+      }).start();
+    }
+  }, [showIntegrationModal, integrationModalSlideAnim]);
 
   // Location search function
   const fetchSuggestions = async (query: string) => {
@@ -829,13 +801,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
   // Handle location selection
   const handleLocationSelect = (selectedLocation: any) => {
-    const locationValue = selectedLocation.label?.trim() || '';
-    // Reject empty or whitespace-only strings
-    if (!locationValue || locationValue.length === 0) {
-      setLocationError('Please select a valid location');
-      return;
-    }
-    setLocation(locationValue);
+    setLocation(selectedLocation.label);
     setShowLocationModal(false);
     setLocationSuggestions([]);
     if (locationError) setLocationError('');
@@ -938,30 +904,16 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   };
 
   const handleTimezoneSelect = (timezoneId: string) => {
-    // Close modal first to prevent visual glitch
+    setSelectedTimezone(timezoneId);
     setShowTimezoneModal(false);
     setTimezoneSearchQuery('');
-    // Update timezone after modal animation completes to prevent glitch
-    // Use requestAnimationFrame to ensure smooth transition
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setSelectedTimezone(timezoneId);
-      });
-    });
   };
 
   const handleUseCurrentTimezone = () => {
     const currentTz = getCurrentTimezone();
-    // Close modal first to prevent visual glitch
+    setSelectedTimezone(currentTz.id);
     setShowTimezoneModal(false);
     setTimezoneSearchQuery('');
-    // Update timezone after modal animation completes to prevent glitch
-    // Use requestAnimationFrame to ensure smooth transition
-    requestAnimationFrame(() => {
-      requestAnimationFrame(() => {
-        setSelectedTimezone(currentTz.id);
-      });
-    });
   };
 
   const getSelectedTimezoneData = () => {
@@ -1008,15 +960,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
   const closeGuestDropdown = () => {
     setShowGuestDropdown(false);
-  };
-
-  const handleToggleGuestModal = () => {
-    if (isLoading) {
-      return;
-    }
-    // Always reset the search query whenever the modal visibility changes
-    setGuestSearchQuery('');
-    setShowGuestModal(prev => !prev);
   };
 
   // Validate date/time and set error message
@@ -1205,6 +1148,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           previousEndTime: selectedEndTime,
           startDate: date.toISOString()
         });
+        setSelectedEndTime(suggestedEndTime);
         
         // Check if end time rolled over to next day (12:00 AM)
         // Only add 1 day if the END time (after adding 30 min) is 12:00 AM or later
@@ -1633,12 +1577,12 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
     // ✅ Only validate times if NOT an all-day event
     if (!isAllDayEvent) {
-      if (!selectedStartTime || !selectedStartTime.trim()) {
+      if (!selectedStartTime) {
         setStartTimeError('Start time is required');
         isValid = false;
         if (!firstErrorField) firstErrorField = 'startTime';
       }
-      if (!selectedEndTime || !selectedEndTime.trim()) {
+      if (!selectedEndTime) {
         setEndTimeError('End time is required');
         isValid = false;
         if (!firstErrorField) firstErrorField = 'endTime';
@@ -1800,72 +1744,63 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   };
 
   const handleEditEvent = async (eventData: any, activeAccount: any) => {
-    // Store current events for potential revert
-    const previousEvents = [...(userEvents || [])];
-    
     try {
-      // NOTE: Optimistic update and navigation already happened in handleSaveEvent
-      // This function only handles background blockchain/API operations
+      // ✅ If Google Meet is selected and user is connected to Google
+      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
+        console.log('Updating Google Meet meeting...');
 
-      // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background
-      (async () => {
+        const googleEvent = {
+          summary: eventData.title,
+          description: eventData.description,
+          start: {
+            dateTime: new Date(selectedStartDate).toISOString(),
+            timeZone: 'UTC', // match web
+          },
+          end: {
+            dateTime: new Date(selectedEndDate).toISOString(),
+            timeZone: 'UTC',
+          },
+          attendees: [
+            {
+              email: activeAccount.userName,
+              displayName: activeAccount.userName.split('@')[0] || 'Organizer',
+              responseStatus: 'accepted',
+            },
+            ...(eventData.guests?.map((email) => ({
+              email,
+              displayName: email.split('@')[0],
+              responseStatus: 'needsAction',
+            })) || []),
+          ],
+          conferenceData: {
+            createRequest: {
+              requestId: `meet_${Date.now()}`,
+            },
+          },
+        };
+
+        // Add recurrence if exists
+        if (eventData.recurrenceRule) {
+          googleEvent.recurrence = [eventData.recurrenceRule];
+        }
+
+        // Wrap same as web code
+        const payload = {
+          eventDetails: googleEvent,
+          user_name: activeAccount.userName,
+          eventId: eventData.meetingEventId, // must match backend parameter
+        };
+
+        console.log('Google Event Update Payload:', payload);
+
         try {
-          // ✅ If Google Meet is selected and user is connected to Google
-          if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
-            console.log('Updating Google Meet meeting...');
-
-            const googleEvent = {
-              summary: eventData.title,
-              description: eventData.description,
-              start: {
-                dateTime: new Date(selectedStartDate).toISOString(),
-                timeZone: 'UTC', // match web
-              },
-              end: {
-                dateTime: new Date(selectedEndDate).toISOString(),
-                timeZone: 'UTC',
-              },
-              attendees: [
-                {
-                  email: activeAccount.userName,
-                  displayName: activeAccount.userName.split('@')[0] || 'Organizer',
-                  responseStatus: 'accepted',
-                },
-                ...(eventData.guests?.map((email) => ({
-                  email,
-                  displayName: email.split('@')[0],
-                  responseStatus: 'needsAction',
-                })) || []),
-              ],
-              conferenceData: {
-                createRequest: {
-                  requestId: `meet_${Date.now()}`,
-                },
-              },
-            };
-
-            // Add recurrence if exists
-            if (eventData.recurrenceRule) {
-              googleEvent.recurrence = [eventData.recurrenceRule];
-            }
-
-            // Wrap same as web code
-            const payload = {
-              eventDetails: googleEvent,
-              user_name: activeAccount.userName,
-              eventId: eventData.meetingEventId, // must match backend parameter
-            };
-
-            console.log('Google Event Update Payload:', payload);
-
-            try {
-              // ✅ Direct backend call for updating Google Meet event
-              const response = await api('POST', '/google/update-event', {
-                eventDetails: payload,
-                user_name: payload.user_name,
-                eventId: payload.eventId
-              });
-              const data = response?.data?.data || response?.data;
+          // ✅ Direct backend call for updating Google Meet event
+          const response = await api('POST', '/google/update-event', {
+            eventDetails: payload,
+            user_name: payload.user_name,
+            eventId: payload.eventId
+          });
+          const data = response?.data?.data || response?.data;
 
           if (data?.hangoutLink) {
             console.log('✅ Google Meet updated via backend:', data.hangoutLink);
@@ -1880,332 +1815,169 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           Alert.alert('Error', 'Failed to update Google Meet');
         }
       }
-            if (eventData.locationType === "zoom" && zoomIntegration?.isConnected) {
-        console.log("Updating Zoom meeting...");
-
-        const zoomEvent = {
-          topic: eventData.title,
-          agenda: eventData.description,
-          start_time: new Date(selectedStartDate).toISOString(),
-          duration: Math.ceil(
-            (new Date(selectedEndDate).getTime() - new Date(selectedStartDate).getTime()) / 60000
-          ),
-          timezone: "UTC",
-          settings: {
-            host_video: true,
-            participant_video: false,
-            join_before_host: false,
-            mute_upon_entry: true,
-            waiting_room: false,
-          },
-        };
-
-        try {
-          // PUT /zoom/meetings/:meetingId
-          const response = await api(
-            'PUT',
-            `/zoom/meetings/${eventData.meetingEventId}`,
-            zoomEvent
-          );
-
-          const data = response?.data?.data || response?.data;
-
-          if (data?.join_url) {
-            console.log("✅ Zoom meeting updated:", data.join_url);
-            eventData.location = data.join_url;
-            eventData.meetingEventId = data.id;
-          } else {
-            console.error("❌ Failed to update Zoom meeting:", data);
-            Alert.alert("Error", "Failed to update Zoom Meeting");
-          }
-        } catch (err: any) {
-          console.error("❌ Zoom update error:", err);
-          
-          // Handle 401 Unauthorized - token expired or invalid
-          if (err.response?.status === 401) {
-            Alert.alert(
-              "Zoom Authentication Error",
-              "Your Zoom connection has expired. Please reconnect your Zoom account in Settings.",
-              [
-                { text: "Cancel", style: "cancel" },
-                { 
-                  text: "Go to Settings", 
-                  onPress: () => {
-                    navigation.navigate(Screen.SettingsScreen, {
-                      expandIntegration: true,
-                    });
-                  }
-                }
-              ]
-            );
-          } else {
-            const errorMsg = err.response?.data?.message || err.message || "Failed to update Zoom Meeting";
-            Alert.alert("Error", errorMsg);
-          }
-        }
-      }
 
       console.log('Editing event payload:', eventData);
 
-          const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-          const response = await blockchainService.updateEvent(
-            eventData,
-            activeAccount,
-            token,
-          );
+      const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+      const response = await blockchainService.updateEvent(
+        eventData,
+        activeAccount,
+        token,
+      );
 
-          if (response) {
-            const repeatEvents = (eventData?.list || [])
-              .filter((data: any) => data.key === 'repeatEvent')
-              .map((data: any) => data.value)
-              .filter((value: any) => value !== null);
-            const customRepeat = (eventData?.list || [])
-              .filter((data: any) => data.key === 'customRepeatEvent')
-              .map((data: any) => data.value)
-              .filter((value: any) => value !== null);
-            const meetingEventIdValue =
-              (eventData?.list || []).find((i: any) => i.key === 'meetingEventId')?.value || '';
+      if (response) {
+        const repeatEvents = (eventData?.list || [])
+          .filter((data: any) => data.key === 'repeatEvent')
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+        const customRepeat = (eventData?.list || [])
+          .filter((data: any) => data.key === 'customRepeatEvent')
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+        const meetingEventIdValue =
+          (eventData?.list || []).find((i: any) => i.key === 'meetingEventId')?.value || '';
 
-            const updatePayload = {
-              events: [
-                {
-                  uid: eventData?.uid,
-                  fromTime: eventData?.fromTime,
-                  toTime: eventData?.toTime,
-                  repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
-                  customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
-                  meetingEventId: meetingEventIdValue,
-                },
-              ],
-              active: activeAccount?.userName,
-              type: 'update',
-            };
+        const updatePayload = {
+          events: [
+            {
+              uid: eventData?.uid,
+              fromTime: eventData?.fromTime,
+              toTime: eventData?.toTime,
+              repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
+              customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
+              meetingEventId: meetingEventIdValue,
+            },
+          ],
+          active: activeAccount?.userName,
+          type: 'update',
+        };
 
-            const apiResponse = await api('POST', '/updateevents', updatePayload);
-            console.log('API response data (edit):', apiResponse.data);
+        const apiResponse = await api('POST', '/updateevents', updatePayload);
+        console.log('API response data (edit):', apiResponse.data);
 
-            // Remove optimistic flag after successful save
-            const currentEvents = useEventsStore.getState().userEvents;
-            const cleanedEvents = currentEvents.map(event => {
-              if (event.uid === eventData.uid) {
-                const cleanedList = event.list?.filter(item => item.key !== '_optimistic') || [];
-                return { ...event, list: cleanedList };
-              }
-              return event;
-            });
-            setUserEvents(cleanedEvents);
+        await getUserEvents(activeAccount.userName, api);
 
-            // Refresh events in background (non-blocking) - this will merge with cleaned optimistic events
-            getUserEvents(activeAccount.userName, api).catch(err => {
-              console.error('Background event refresh failed:', err);
-            });
-          
-          // Show success message after background operation completes
-          setTimeout(() => {
-            showAlert('Event Updated', 'Event updated successfully!', 'success');
-          }, 500);
-        } else {
-          // Revert on failure
-          revertOptimisticUpdate(previousEvents);
-          setTimeout(() => {
-            showAlert('Event Update Failed', 'Failed to update event. Please try again.', 'error');
-          }, 100);
-        }
-        } catch (error: any) {
-          console.error('❌ Error in handleEditEvent background operation:', error);
-          // Revert optimistic update on error
-          revertOptimisticUpdate(previousEvents);
-          showAlert('Event Update Failed', error?.message || 'Failed to update event. Please try again.', 'error');
-        }
-      })();
+        navigation.goBack();
+        showAlert('Event Updated', 'Event updated successfully!', 'success');
+      } else {
+        showAlert('Event Update Failed', 'Failed to update event. Please try again.', 'error');
+      }
     } catch (error: any) {
       console.error('❌ Error in handleEditEvent:', error);
-      // Revert optimistic update on error
-      revertOptimisticUpdate(previousEvents);
-      showAlert('Event Update Failed', error?.message || 'Failed to update event. Please try again.', 'error');
+      // Show user-friendly error message from blockchain service
+      const errorMessage = error?.message || 'Failed to update event. Please try again.';
+      showAlert('Event Update Failed', errorMessage, 'error');
     }
   };
 
 
   const handleCreateEvent = async (eventData: any, activeAccount: any) => {
-    // Store current events for potential revert
-    const previousEvents = [...(userEvents || [])];
-    
     try {
-      // NOTE: Optimistic update and navigation already happened in handleSaveEvent
-      // This function only handles background blockchain/API operations
+      // If Google Meet is selected
+      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
+        console.log('Creating Google Meet meeting...');
 
-      // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background
-      (async () => {
+        const googleEvent = {
+          summary: eventData.title,
+          description: eventData.description,
+          start: {
+            dateTime: new Date(selectedStartDate).toISOString(),
+            timeZone: 'UTC', // match web code
+          },
+          end: {
+            dateTime: new Date(selectedEndDate).toISOString(),
+            timeZone: 'UTC',
+          },
+          attendees: [
+            {
+              email: activeAccount.userName, // organizer / current user
+              displayName: activeAccount.userName.split('@')[0] || 'Organizer',
+              responseStatus: 'accepted',
+            },
+            ...(eventData.guests?.map((email) => ({
+              email,
+              displayName: email.split('@')[0],
+              responseStatus: 'needsAction', // default for guests
+            })) || []),
+          ],
+          conferenceData: {
+            createRequest: {
+              requestId: `meet_${Date.now()}`,
+            },
+          },
+        };
+
+        // Add recurrence if exists
+        if (eventData.recurrenceRule) {
+          googleEvent.recurrence = [eventData.recurrenceRule];
+        }
+
+        // Wrap in the same structure as web
+        const payload = {
+          user_name: activeAccount.userName,
+          eventDetails: googleEvent,
+        };
+
+        console.log('Google Event Payload:', googleEvent);
         try {
-          // If Google Meet is selected
-          if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
-            console.log('Creating Google Meet meeting...');
+          // ✅ Call backend API directly
+          const response = await api('POST', '/google/create-event', payload);
 
-            const googleEvent = {
-              summary: eventData.title,
-              description: eventData.description,
-              start: {
-                dateTime: new Date(selectedStartDate).toISOString(),
-                timeZone: 'UTC', // match web code
-              },
-              end: {
-                dateTime: new Date(selectedEndDate).toISOString(),
-                timeZone: 'UTC',
-              },
-              attendees: [
-                {
-                  email: activeAccount.userName, // organizer / current user
-                  displayName: activeAccount.userName.split('@')[0] || 'Organizer',
-                  responseStatus: 'accepted',
-                },
-                ...(eventData.guests?.map((email) => ({
-                  email,
-                  displayName: email.split('@')[0],
-                  responseStatus: 'needsAction', // default for guests
-                })) || []),
-              ],
-              conferenceData: {
-                createRequest: {
-                  requestId: `meet_${Date.now()}`,
-                },
-              },
-            };
+          // ✅ Many Axios wrappers put backend data inside `response.data.data`
+          const data = response?.data?.data || response?.data;
 
-            // Add recurrence if exists
-            if (eventData.recurrenceRule) {
-              googleEvent.recurrence = [eventData.recurrenceRule];
-            }
-
-            // Wrap in the same structure as web
-            const payload = {
-              user_name: activeAccount.userName,
-              eventDetails: googleEvent,
-            };
-
-            console.log('Google Event Payload:', googleEvent);
-            try {
-              // ✅ Call backend API directly
-              const response = await api('POST', '/google/create-event', payload);
-
-              // ✅ Many Axios wrappers put backend data inside `response.data.data`
-              const data = response?.data?.data || response?.data;
-
-              if (data?.hangoutLink) {
-                console.log('✅ Google Meet created via backend:', data.hangoutLink);
-                eventData.location = data.hangoutLink;
-                eventData.meetingEventId = data.id;
-              } else {
-                console.error('❌ Failed to create Google Meet via backend:', data);
-              }
+          if (data?.hangoutLink) {
+            console.log('✅ Google Meet created via backend:', data.hangoutLink);
+            eventData.location = data.hangoutLink;
+            eventData.meetingEventId = data.id;
+          } else {
+            console.error('❌ Failed to create Google Meet via backend:', data);
+            Alert.alert('Error', 'Failed to create Google Meet');
+          }
 
         } catch (err) {
           console.error('❌ Google Meet creation error via backend:', err);
           Alert.alert('Error', 'Failed to create Google Meet');
         }
       }
-  // If Zoom is selected and user is connected
-      if (eventData.locationType === 'zoom' && zoomIntegration?.isConnected) {
-        console.log("Creating Zoom meeting...");
 
-        const zoomEvent = {
-          topic: eventData.title,
-          agenda: eventData.description,
-          start_time: new Date(selectedStartDate).toISOString(), // UTC ISO
-          duration: Math.ceil(
-            (new Date(selectedEndDate).getTime() - new Date(selectedStartDate).getTime()) / 60000
-          ),
-          timezone: "UTC",
-          settings: {
-            host_video: true,
-            participant_video: false,
-            join_before_host: false,
-            mute_upon_entry: true,
-            waiting_room: false,
-          },
-        };
-
-        try {
-          // Call your backend directly
-          const response = await api(
-            'POST',
-            '/zoom/meetings',
-            zoomEvent
-          );
-
-          const data = response?.data?.data || response?.data;
-
-          if (data?.join_url) {
-            console.log("✅ Zoom meeting created:", data.join_url);
-            eventData.location = data.join_url;      // add URL
-            eventData.meetingEventId = data.id;      // store zoom meeting id
-          } else {
-            console.error("❌ Zoom creation failed:", data);
-            Alert.alert("Error", "Failed to create Zoom Meeting");
-          }
-        } catch (err: any) {
-          console.error("❌ Zoom create error:", err);
-          
-          // Handle 401 Unauthorized - token expired or invalid
-          if (err.response?.status === 401) {
-            Alert.alert(
-              "Zoom Authentication Error",
-              "Your Zoom connection has expired. Please reconnect your Zoom account in Settings.",
-              [
-                { text: "Cancel", style: "cancel" },
-                { 
-                  text: "Go to Settings", 
-                  onPress: () => {
-                    navigation.navigate(Screen.SettingsScreen, {
-                      expandIntegration: true,
-                    });
-                  }
-                }
-              ]
-            );
-          } else {
-            const errorMsg = err.response?.data?.message || err.message || "Failed to create Zoom Meeting";
-            Alert.alert("Error", errorMsg);
-          }
-        }
-      }
 
       console.log("Active account: ", activeAccount.userName);
-          console.log("Create event payload: ", eventData);
-          const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-          const response = await blockchainService.createEvent(
-            eventData,
-            activeAccount,
-            token,
-          );
-          if (response) {
-            // Build updatePayload similar to handleEditEvent
-            const repeatEvents = (eventData?.list || [])
-              .filter((data: any) => data.key === "repeatEvent")
-              .map((data: any) => data.value)
-              .filter((value: any) => value !== null);
-            const customRepeat = (eventData?.list || [])
-              .filter((data: any) => data.key === "customRepeatEvent")
-              .map((data: any) => data.value)
-              .filter((value: any) => value !== null);
-            const meetingEventIdValue = (eventData?.list || [])
-              .find((i: any) => i.key === 'meetingEventId')?.value || '';
+      console.log("Create event payload: ", eventData);
+      const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+      const response = await blockchainService.createEvent(
+        eventData,
+        activeAccount,
+        token,
+      );
+      if (response) {
+        // Build updatePayload similar to handleEditEvent
+        const repeatEvents = (eventData?.list || [])
+          .filter((data: any) => data.key === "repeatEvent")
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+        const customRepeat = (eventData?.list || [])
+          .filter((data: any) => data.key === "customRepeatEvent")
+          .map((data: any) => data.value)
+          .filter((value: any) => value !== null);
+        const meetingEventIdValue = (eventData?.list || [])
+          .find((i: any) => i.key === 'meetingEventId')?.value || '';
 
-            const updatePayload = {
-              events: [{
-                uid: eventData?.uid,
-                fromTime: eventData?.fromTime,
-                toTime: eventData?.toTime,
-                repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
-                customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
-                meetingEventId: meetingEventIdValue
-              }],
-              active: activeAccount?.userName,
-              type: 'update',
-            };
-            // Call the same API as edit
-            const apiResponse = await api('POST', '/updateevents', updatePayload);
-            console.log('API response data (create):', apiResponse.data);
+        const updatePayload = {
+          events: [{
+            uid: eventData?.uid,
+            fromTime: eventData?.fromTime,
+            toTime: eventData?.toTime,
+            repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
+            customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
+            meetingEventId: meetingEventIdValue
+          }],
+          active: activeAccount?.userName,
+          type: 'update',
+        };
+        // Call the same API as edit
+        const apiResponse = await api('POST', '/updateevents', updatePayload);
+        console.log('API response data (create):', apiResponse.data);
 
         // Optimistically add event to local state for immediate UI feedback (like tasks)
         if (userEvents && Array.isArray(userEvents)) {
@@ -2239,140 +2011,195 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       }
     } catch (error: any) {
       console.error('Error creating event:', error);
-      // Revert optimistic update on error
-      revertOptimisticUpdate(previousEvents);
       // Show user-friendly error message from blockchain service
       const errorMessage = error?.message || 'Failed to create event. Please try again.';
       showAlert('Event Creation Failed', errorMessage, 'error');
     }
   };
 
-  const handleSaveEvent = () => {
-    // ✅ Set loading state IMMEDIATELY - FIRST THING, before ANY other code
-    // This ensures the button grays out instantly on click
+  const handleSaveEvent = async () => {
+    // ✅ FAST VALIDATION - Return immediately if invalid
+    if (!validateForm()) {
+      return;
+    }
+
+    // Additional validation: Ensure title is not empty (double-check)
+    if (!title || !title.trim() || title.trim().length === 0) {
+      setTitleError('Title is required');
+      Alert.alert('Validation Error', 'Please enter a title for the event');
+      return;
+    }
+
     setIsLoading(true);
-    
-    // ✅ Auto-hide loading after 1.5 seconds (save operation continues in background)
-    const loadingTimeout = setTimeout(() => {
+
+    if (!activeAccount || !token) {
+      Alert.alert('Error', 'Authentication data not found');
       setIsLoading(false);
-    }, 100);
-    
-    // ✅ Use requestAnimationFrame to ensure React processes the state update first
-    // Then do validation and processing in the next frame
-    requestAnimationFrame(() => {
-      // ✅ FAST VALIDATION - Return immediately if invalid
-      if (!validateForm()) {
-        clearTimeout(loadingTimeout);
-        setIsLoading(false);
-        return;
-      }
+      return;
+    }
 
-      // Additional validation: Ensure title is not empty (double-check)
-      if (!title || !title.trim() || title.trim().length === 0) {
-        clearTimeout(loadingTimeout);
-        setIsLoading(false);
-        setTitleError('Title is required');
-        Alert.alert('Validation Error', 'Please enter a title for the event');
-        return;
-      }
+    try {
+      // Convert date and time to timestamp format (YYYYMMDDTHHMMSS)
+      const formatToISO8601Local = (date: Date, time: string, isAllDay: boolean = false
+      ): string => {
+        console.log('DEBUG - Input date:', date);
+        console.log('DEBUG - Input time:', time);
 
-      if (!activeAccount || !token) {
-        clearTimeout(loadingTimeout);
-        setIsLoading(false);
-        Alert.alert('Error', 'Authentication data not found');
-        return;
-      }
+        // Validate inputs
+        if (!date || !time) {
+          console.error('DEBUG - Invalid inputs:', { date, time });
+          return '';
+        }
 
-    // ✅ PREPARE MINIMAL DATA FOR OPTIMISTIC UPDATE (SYNCHRONOUS - NO AWAIT)
-    const formatToISO8601Local = (date: Date, time: string, isAllDay: boolean = false): string => {
-      if (!date) return '';
-      if (isAllDay) {
-        const year = date.getFullYear();
-        const month = String(date.getMonth() + 1).padStart(2, '0');
-        const day = String(date.getDate()).padStart(2, '0');
-        return `${year}${month}${day}T000000`;
-      }
-      if (!time) return '';
-      const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
-      if (!timeMatch) {
-        const timeParts = normalizedTime.split(/\s+/);
-        if (timeParts.length < 2) return '';
-        const timePart = timeParts[0];
-        const period = timeParts[timeParts.length - 1].toUpperCase();
-        if (!timePart || !period || (period !== 'AM' && period !== 'PM')) return '';
-        const [hours, minutes] = timePart.split(':').map(Number);
-        if (isNaN(hours) || isNaN(minutes)) return '';
+        if (isAllDay) {
+          const year = date.getFullYear();
+          const month = String(date.getMonth() + 1).padStart(2, '0');
+          const day = String(date.getDate()).padStart(2, '0');
+          const result = `${year}${month}${day}T000000`;
+          console.log('DEBUG - All-day format result:', result);
+          return result;
+        }
+
+        // For timed events, time is required
+        if (!time) {
+          console.error('DEBUG - Time required for non-all-day event');
+          return '';
+        }
+        // Handle AM/PM format properly - normalize whitespace first (including non-breaking spaces)
+        const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+        console.log('DEBUG - Original time:', JSON.stringify(time));
+        console.log('DEBUG - Normalized time:', JSON.stringify(normalizedTime));
+
+        // Use regex to extract time components (more robust than split)
+        const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+
+        if (!timeMatch) {
+          // Fallback: try splitting by whitespace
+          const timeParts = normalizedTime.split(/\s+/);
+          console.log('DEBUG - Split result (fallback):', timeParts);
+
+          if (timeParts.length < 2) {
+            console.error('DEBUG - Time format should be "HH:MM AM/PM", got:', normalizedTime);
+            return '';
+          }
+
+          const timePart = timeParts[0];
+          const period = timeParts[timeParts.length - 1].toUpperCase();
+          console.log('DEBUG - timePart:', timePart, 'period:', period);
+
+          if (!timePart || !period || (period !== 'AM' && period !== 'PM')) {
+            console.error('DEBUG - Invalid time format:', time);
+            return '';
+          }
+
+          const [hours, minutes] = timePart.split(':').map(Number);
+          console.log('DEBUG - hours:', hours, 'minutes:', minutes);
+
+          if (isNaN(hours) || isNaN(minutes)) {
+            console.error('DEBUG - Invalid hours/minutes:', { hours, minutes });
+            return '';
+          }
+
+          // Use the parsed values
+          let finalHours = hours;
+          if (period === 'PM' && hours !== 12) {
+            finalHours = hours + 12;
+          } else if (period === 'AM' && hours === 12) {
+            finalHours = 0;
+          }
+
+          console.log('DEBUG - finalHours:', finalHours);
+
+          const newDate = new Date(date);
+          newDate.setHours(finalHours, minutes, 0, 0);
+
+          console.log('DEBUG - newDate after setHours:', newDate);
+
+          // Format as YYYYMMDDTHHMMSS
+          const year = newDate.getFullYear();
+          const month = String(newDate.getMonth() + 1).padStart(2, '0');
+          const day = String(newDate.getDate()).padStart(2, '0');
+          const hour = String(newDate.getHours()).padStart(2, '0');
+          const minute = String(newDate.getMinutes()).padStart(2, '0');
+          const second = String(newDate.getSeconds()).padStart(2, '0');
+
+          const result = `${year}${month}${day}T${hour}${minute}${second}`;
+          console.log('DEBUG - Final result (fallback):', result);
+
+          // Validate the result
+          if (result.includes('NaN') || result.length !== 15) {
+            console.error('DEBUG - Invalid result generated:', result);
+            return '';
+          }
+
+          return result;
+        }
+
+        // Extract from regex match
+        const hours = parseInt(timeMatch[1], 10);
+        const minutes = parseInt(timeMatch[2], 10);
+        const period = timeMatch[3].toUpperCase();
+        console.log('DEBUG - Regex match - hours:', hours, 'minutes:', minutes, 'period:', period);
+
         let finalHours = hours;
-        if (period === 'PM' && hours !== 12) finalHours = hours + 12;
-        else if (period === 'AM' && hours === 12) finalHours = 0;
+
+        // Convert to 24-hour format
+        if (period === 'PM' && hours !== 12) {
+          finalHours = hours + 12;
+        } else if (period === 'AM' && hours === 12) {
+          finalHours = 0;
+        }
+
+        console.log('DEBUG - finalHours:', finalHours);
+
         const newDate = new Date(date);
         newDate.setHours(finalHours, minutes, 0, 0);
+
+        console.log('DEBUG - newDate after setHours:', newDate);
+
+        // Format as YYYYMMDDTHHMMSS
         const year = newDate.getFullYear();
         const month = String(newDate.getMonth() + 1).padStart(2, '0');
         const day = String(newDate.getDate()).padStart(2, '0');
         const hour = String(newDate.getHours()).padStart(2, '0');
         const minute = String(newDate.getMinutes()).padStart(2, '0');
-        return `${year}${month}${day}T${hour}${minute}00`;
+        const second = String(newDate.getSeconds()).padStart(2, '0');
+
+        const result = `${year}${month}${day}T${hour}${minute}${second}`;
+        console.log('DEBUG - Final result:', result);
+
+        // Validate the result
+        if (result.includes('NaN') || result.length !== 15) {
+          console.error('DEBUG - Invalid result generated:', result);
+          return '';
+        }
+
+        return result;
+      };
+
+      const getNextDay = (date: Date): Date => {
+        const nextDay = new Date(date);
+        nextDay.setDate(nextDay.getDate() + 1);
+        return nextDay;
+      };
+
+      console.log('CreateEventScreen: Event data ==>', editEventData);
+
+      // Helper function to convert a value to seconds based on unit
+      function convertToSeconds(value: number, unit: string) {
+        switch (unit) {
+          case 'Minutes':
+            return value * 60;
+          case 'Hours':
+            return value * 3600;
+          case 'Days':
+            return value * 86400;
+          case 'Weeks':
+            return value * 604800;
+          default:
+            return value; // fallback, assume already in seconds
+        }
       }
-      const hours = parseInt(timeMatch[1], 10);
-      const minutes = parseInt(timeMatch[2], 10);
-      const period = timeMatch[3].toUpperCase();
-      let finalHours = hours;
-      if (period === 'PM' && hours !== 12) finalHours = hours + 12;
-      else if (period === 'AM' && hours === 12) finalHours = 0;
-      const newDate = new Date(date);
-      newDate.setHours(finalHours, minutes, 0, 0);
-      const year = newDate.getFullYear();
-      const month = String(newDate.getMonth() + 1).padStart(2, '0');
-      const day = String(newDate.getDate()).padStart(2, '0');
-      const hour = String(newDate.getHours()).padStart(2, '0');
-      const minute = String(newDate.getMinutes()).padStart(2, '0');
-      return `${year}${month}${day}T${hour}${minute}00`;
-    };
-
-    const getNextDay = (date: Date): Date => {
-      const nextDay = new Date(date);
-      nextDay.setDate(nextDay.getDate() + 1);
-      return nextDay;
-    };
-
-    // ✅ MINIMAL EVENT DATA FOR IMMEDIATE UI UPDATE
-    const minimalEventData = {
-      uuid: editEventData?.uuid || '',
-      uid: editEventData?.id || editEventData?.uid || generateEventUID(),
-      title: title.trim(),
-      description: description.trim(),
-      fromTime: formatToISO8601Local(
-        selectedStartDate!,
-        selectedStartTime || '12:00 AM',
-        isAllDayEvent
-      ),
-      toTime: formatToISO8601Local(
-        isAllDayEvent ? getNextDay(selectedEndDate!) : selectedEndDate!,
-        selectedEndTime || '12:00 AM',
-        isAllDayEvent
-      ),
-      list: [],
-    };
-
-    // Store for potential revert
-    const previousEvents = [...(userEvents || [])];
-
-    // ✅ STEP 2: PREPARE ALL DATA FOR OPTIMISTIC UPDATE (BEFORE OPTIMISTIC UPDATE)
-    // Pre-compute everything needed for metadata to include in optimistic update
-    const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-    
-    // Helper function to convert a value to seconds based on unit
-    function convertToSeconds(value: number, unit: string) {
-      switch (unit) {
-        case 'Minutes': return value * 60;
-        case 'Hours': return value * 3600;
-        case 'Days': return value * 86400;
-        case 'Weeks': return value * 604800;
-        default: return value;
-      }
-    }
 
       // Creating your event object
       const numericValue = parseInt(notificationMinutes || '0', 10);
@@ -2579,10 +2406,9 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       )}
 
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={{ flex: 1 }}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 90 : 0}
-        enabled={Platform.OS === 'ios'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
       >
         <ScrollView
           ref={scrollViewRef}
@@ -2737,10 +2563,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               // ✅ When switching TO all-day:
               setSelectedStartTime('');
               setSelectedEndTime('');
-              // Clear time validation errors when switching to all-day
-              setStartTimeError('');
-              setEndTimeError('');
-              setDateTimeError('');
 
               if (selectedStartDate) {
                 // Important: Create a new Date object to avoid modifying the start date state directly.
@@ -2756,10 +2578,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               // ✅ When switching FROM all-day, clear times so user must select
               setSelectedStartTime('');
               setSelectedEndTime('');
-              // Clear time validation errors when switching from all-day
-              setStartTimeError('');
-              setEndTimeError('');
-              setDateTimeError('');
             }
           }}
           disabled={isLoading}
@@ -2914,10 +2732,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 }}
                 disabled={isLoading}
               >
-                <Text style={styles.selectorText}>
-                  {selectedVideoConferencing || "Select"}
+                <Text style={[styles.selectorText, selectedVideoConferencing && styles.selectorTextFilled]}>
+                  {getVideoConferencingLabel(selectedVideoConferencing)}
                 </Text>
-                <FeatherIcon name="plus" size={20} color="#6C6C6C" />
+                <FeatherIcon name="chevron-down" size={20} color="#6C6C6C" />
               </TouchableOpacity>
             </View>
 
@@ -2935,6 +2753,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   setSelectedVideoConferencing(
                     selectedVideoConferencing === 'inperson' ? null : 'inperson'
                   );
+                  setShowVideoConferencingOptions(false);
                 }
               }}
               disabled={isLoading}
@@ -2952,21 +2771,17 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 In-person
               </Text>
             </TouchableOpacity>
+            {/* 
             <TouchableOpacity
               style={[
                 styles.videoConferencingButton,
                 selectedVideoConferencing === 'zoom' &&
                 styles.videoConferencingButtonSelected,
               ]}
-              onPress={() => {
-                if (!isLoading) {
-                  handleZoomClick();
-                }
-              }}
-              disabled={isLoading}
+              onPress={() => setSelectedVideoConferencing('zoom')}
             >
               <View style={styles.videoConferencingIconContainer}>
-                <FeatherIcon name="video" size={16} color="#2D8CFF" />
+                <FeatherIcon name="video" size={16} color="#0B6DE0" />
               </View>
               <Text
                 style={[
@@ -2977,7 +2792,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               >
                 Zoom
               </Text>
-            </TouchableOpacity>
+            </TouchableOpacity> */}
 
             <TouchableOpacity
               style={[
@@ -3001,8 +2816,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   selectedVideoConferencing === 'google' &&
                   styles.videoConferencingButtonTextSelected,
                 ]}
-                numberOfLines={1}
-                ellipsizeMode="tail"
               >
                 Google Meet
               </Text>
@@ -3272,46 +3085,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       placeholderTextColor="#A4A7AE"
                       value={customRecurrence.repeatEvery}
                       onChangeText={text => {
-                        // Clear error on input
-                        if (repeatEveryError) {
-                          setRepeatEveryError('');
-                        }
-                        
+                        // Only allow positive integers (1-99)
                         // Remove any non-numeric characters
                         const numericOnly = text.replace(/[^0-9]/g, '');
                         
-                        // Allow empty temporarily for backspace
-                        if (numericOnly === '') {
-                          setCustomRecurrence(prev => ({
-                            ...prev,
-                            repeatEvery: '',
-                          }));
-                          return;
-                        }
-                        
-                        // Prevent zero
-                        if (numericOnly === '0') {
-                          return;
-                        }
-                        
-                        // Handle smart replacement when focused and typing single digit
-                        const currentValue = customRecurrence.repeatEvery;
-                        if (isRepeatEveryFocused.current && currentValue.length === 1 && numericOnly.length === 1) {
-                          // Direct replacement when typing a single digit
-                          setCustomRecurrence(prev => ({
-                            ...prev,
-                            repeatEvery: numericOnly,
-                          }));
-                          return;
-                        }
-                        
-                        // Handle case where text was appended instead of replaced
-                        if (currentValue.length === 1 && numericOnly.length === 2 && numericOnly.startsWith(currentValue)) {
-                          const newDigit = numericOnly.slice(1);
-                          setCustomRecurrence(prev => ({
-                            ...prev,
-                            repeatEvery: newDigit,
-                          }));
+                        // Prevent empty string or zero
+                        if (numericOnly === '' || numericOnly === '0') {
+                          // Don't update if it would be empty or zero
                           return;
                         }
                         
@@ -3323,25 +3103,8 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                           repeatEvery: limitedValue,
                         }));
                       }}
-                      onFocus={() => {
-                        isRepeatEveryFocused.current = true;
-                        setRepeatEveryError('');
-                      }}
-                      onBlur={() => {
-                        isRepeatEveryFocused.current = false;
-                        // Validate on blur
-                        const value = customRecurrence.repeatEvery.trim();
-                        if (!value || value === '' || parseInt(value, 10) < 1 || parseInt(value, 10) > 99) {
-                          setRepeatEveryError('Please enter a number between 1 and 99');
-                          setCustomRecurrence(prev => ({
-                            ...prev,
-                            repeatEvery: '1',
-                          }));
-                        }
-                      }}
                       keyboardType="numeric"
                       maxLength={2}
-                      selectTextOnFocus={true}
                     />
                     <View style={styles.customRepeatUnitContainer}>
                       <TouchableOpacity
@@ -3380,7 +3143,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
 
 
-              {/* Repeat on section */}
+                {/* Repeat on section */}
                 {customRecurrence.repeatUnit === repeatUnits[1] && (
                   <View style={styles.customRecurrenceSection}>
                     <Text style={styles.customRecurrenceSectionTitle}>
@@ -3695,19 +3458,36 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       <Modal
         visible={showIntegrationModal}
         transparent={true}
-        animationType="fade"
+        animationType="none"
         onRequestClose={() => setShowIntegrationModal(false)}
       >
         <View style={styles.integrationModalOverlay}>
-          <View style={styles.integrationModalContainer}>
+          <TouchableOpacity 
+            style={styles.integrationModalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowIntegrationModal(false)}
+          />
+          <Animated.View 
+            style={[
+              styles.integrationModalContainer,
+              {
+                transform: [{ translateY: integrationModalSlideAnim }]
+              }
+            ]}
+          >
             <View style={styles.integrationModalHeader}>
-              <Icon name="link-variant" size={32} color="#18F06E" />
+              <View style={styles.integrationModalIconContainer}>
+                <FeatherIcon name="video" size={32} color={Colors.primaryBlue} />
+              </View>
               <Text style={styles.integrationModalTitle}>Integration Required</Text>
             </View>
 
             <View style={styles.integrationModalContent}>
               <Text style={styles.integrationModalDescription}>
-                To use {integrationType === 'zoom' ? 'Zoom' : 'Google Meet'}, you need to integrate {integrationType === 'zoom' ? 'Zoom' : 'Google'}
+                To use Google Meet, you need to integrate your Google account first.
+              </Text>
+              <Text style={styles.integrationModalSubDescription}>
+                You'll be redirected to Settings to connect your Google account.
               </Text>
             </View>
 
@@ -3715,6 +3495,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               <TouchableOpacity
                 style={styles.integrationModalCancelButton}
                 onPress={() => setShowIntegrationModal(false)}
+                activeOpacity={0.7}
               >
                 <Text style={styles.integrationModalCancelText}>Cancel</Text>
               </TouchableOpacity>
@@ -3727,18 +3508,12 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                     expandIntegration: true,
                   });
                 }}
+                activeOpacity={0.8}
               >
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.integrationModalGradient}
-                >
-                  <Text style={styles.integrationModalContinueText}>Continue</Text>
-                </LinearGradient>
+                <Text style={styles.integrationModalContinueText}>Continue</Text>
               </TouchableOpacity>
             </View>
-          </View>
+          </Animated.View>
         </View>
       </Modal>
 
@@ -4195,7 +3970,6 @@ const styles = StyleSheet.create({
     fontSize: fontSize.textSize14,
     color: colors.blackText,
     fontWeight: '500',
-    flexShrink: 1,
   },
   videoConferencingButtonTextSelected: {
     color: Colors.primaryGreen,
@@ -4644,13 +4418,13 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.xs,
+    paddingHorizontal: spacing.sm,
     fontSize: fontSize.textSize12,
     color: colors.blackText,
     paddingVertical: spacing.sm,
     lineHeight: scaleHeight(13),
     justifyContent: 'center',
-    flexShrink: 1,
+    flexShrink: 0,
   },
   customEndsInputDisabled: {
     backgroundColor: '#F5F5F5',
@@ -5007,74 +4781,98 @@ const styles = StyleSheet.create({
   integrationModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    justifyContent: 'flex-end',
+  },
+  integrationModalBackdrop: {
+    flex: 1,
   },
   integrationModalContainer: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.xl,
-    width: scaleWidth(320),
-    padding: spacing.xl,
-    ...shadows.lg,
+    borderTopLeftRadius: moderateScale(20),
+    borderTopRightRadius: moderateScale(20),
+    paddingTop: scaleHeight(24),
+    paddingBottom: scaleHeight(40),
+    paddingHorizontal: spacing.lg,
+    maxHeight: '70%',
+    minHeight: scaleHeight(300),
   },
   integrationModalHeader: {
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
+  integrationModalIconContainer: {
+    width: scaleWidth(64),
+    height: scaleHeight(64),
+    borderRadius: moderateScale(32),
+    backgroundColor: '#E5F7FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
   integrationModalTitle: {
-    fontSize: fontSize.textSize20,
-    fontWeight: '700',
-    color: colors.blackText,
-    marginTop: spacing.sm,
+    fontSize: fontSize.textSize18,
+    fontWeight: '600',
+    color: Colors.black,
     textAlign: 'center',
+    fontFamily: Fonts.latoBold,
   },
   integrationModalContent: {
     marginBottom: spacing.xl,
   },
   integrationModalDescription: {
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
+    fontSize: fontSize.textSize14,
+    color: Colors.black,
     textAlign: 'center',
-    marginBottom: spacing.md,
-    lineHeight: 22,
+    marginBottom: spacing.sm,
+    lineHeight: 20,
+    fontFamily: Fonts.latoRegular,
   },
   integrationModalSubDescription: {
-    fontSize: fontSize.textSize14,
-    color: colors.grey400,
+    fontSize: fontSize.textSize12,
+    color: themeColors.grey400,
     textAlign: 'center',
-    lineHeight: 20,
+    lineHeight: 18,
+    fontFamily: Fonts.latoRegular,
   },
   integrationModalButtons: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
+    borderTopWidth: 1,
+    borderTopColor: themeColors.grey20,
+    paddingTop: spacing.md,
+    gap: spacing.sm,
+    marginTop: spacing.md,
   },
   integrationModalCancelButton: {
     flex: 1,
-    paddingVertical: spacing.md,
+    paddingVertical: scaleHeight(18),
     alignItems: 'center',
-    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    borderRadius: moderateScale(8),
     borderWidth: 1,
-    borderColor: colors.grey20,
-    marginRight: spacing.sm,
+    borderColor: themeColors.grey20,
+    backgroundColor: Colors.white,
+    minHeight: scaleHeight(56),
   },
   integrationModalCancelText: {
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
-    fontWeight: '600',
+    fontSize: fontSize.textSize14,
+    color: Colors.black,
+    fontWeight: '500',
+    fontFamily: Fonts.latoMedium,
   },
   integrationModalContinueButton: {
     flex: 1,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-  },
-  integrationModalGradient: {
-    paddingVertical: spacing.md,
+    borderRadius: moderateScale(8),
+    backgroundColor: Colors.primaryBlue,
+    paddingVertical: scaleHeight(18),
     alignItems: 'center',
+    justifyContent: 'center',
+    minHeight: scaleHeight(56),
   },
   integrationModalContinueText: {
-    fontSize: fontSize.textSize16,
-    color: colors.white,
+    fontSize: fontSize.textSize14,
+    color: Colors.white,
     fontWeight: '600',
+    fontFamily: Fonts.latoBold,
   },
 });
 

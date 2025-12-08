@@ -1,17 +1,16 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { View, StyleSheet, Text, Alert, TouchableOpacity, ScrollView, Image } from 'react-native';
-import { Calendar } from 'react-native-calendars';
-import { useNavigation } from '@react-navigation/native';
-import React, { useState, useEffect, useMemo } from 'react';
 import {
+  View,
   StyleSheet,
   Text,
-  View,
-  ScrollView,
+  Alert,
   TouchableOpacity,
+  ScrollView,
   Image,
   Modal,
 } from 'react-native';
+import { Calendar } from 'react-native-calendars';
+import { useNavigation } from '@react-navigation/native';
 import CustomDrawer from '../components/CustomDrawer';
 import EventDetailsModal from '../components/EventDetailsModal';
 import FloatingActionButton from '../components/FloatingActionButton';
@@ -317,9 +316,11 @@ const DailyCalendarScreen = () => {
     
     return {
       id: event.uid,
+      eventId: event.uid,
       title: event.title,
       time: timeDisplay,
       date: formatDateDisplay(selectedDate),
+      userName: account?.userName || account?.username || '',
       color: eventColor,
       tags: event.list || [],
       originalRawEventData: event,

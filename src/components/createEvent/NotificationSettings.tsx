@@ -42,12 +42,9 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({
   return (
     <View style={styles.notificationRow}>
       <View style={styles.notificationLeft}>
-        <FeatherIcon name="bell" size={24} color="#6C6C6C" />
+        <FeatherIcon name="bell" size={24} color="#00AEEF" />
         <Text style={styles.selectorText}>Notification</Text>
-        <Image
-          style={styles.smallArrowDropdown}
-          source={require('../../assets/images/CreateEventImages/arrowDropdown.png')}
-        />
+        <FeatherIcon name="chevron-down" size={16} color="#00AEEF" style={styles.dropdownIcon} />
       </View>
       <View style={styles.notificationRight}>
         <View style={styles.numberInput}>
@@ -139,9 +136,8 @@ const styles = StyleSheet.create({
     fontWeight: '400',
     marginHorizontal: spacing.sm,
   },
-  smallArrowDropdown: {
-    height: scaleHeight(5.96),
-    width: scaleWidth(10.9),
+  dropdownIcon: {
+    marginLeft: spacing.xs,
   },
   notificationRight: {
     flexDirection: 'row',

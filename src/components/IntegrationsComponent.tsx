@@ -8,8 +8,8 @@ import {
   ActivityIndicator,
   Linking,
   AppState,
+  Platform,
 } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { GoogleSignin, statusCodes } from '@react-native-google-signin/google-signin';
@@ -19,6 +19,9 @@ import { useApiClient } from '../hooks/useApi';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { colors } from '../utils/LightTheme';
 import { scaleWidth } from '../utils/dimensions';
+import { Colors } from '../constants/Colors';
+import { Fonts } from '../constants/Fonts';
+import { fontSize } from '../utils/LightTheme';
 
 interface IntegrationsComponentProps {
   initialExpanded?: boolean;
@@ -242,128 +245,259 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
     // 1️⃣ Get Zoom OAuth URL from backend
     const response = await api('GET', `/zoom/auth?platform=mobile`);
     
-    // DDD Log: Log the API response
-    console.log('DDD Log:', JSON.stringify(response.data, null, 2));
+    // Zoom Api backend response
+    console.log('========================================');
+    console.log('Zoom Api backend response');
+    console.log('========================================');
+    console.log('Full Response:', JSON.stringify(response, null, 2));
+    console.log('Response Data:', JSON.stringify(response.data, null, 2));
+    console.log('Response Status:', response.status);
+    console.log('Response Headers:', JSON.stringify(response.headers, null, 2));
+    console.log('========================================');
     
-    // ✅ Once we get the response with status: true, show connected message and open link
-    if (response.data?.status === true) {
-      // Update Zoom connection state so button shows "Connected"
-      connectZoom({
-        accessToken: 'connected',
-        refreshToken: '',
-        email: '',
-        fullName: '',
-      });
-      setIsLoadingZoom(false);
-      Alert.alert('Success', 'Zoom connected!');
-      
-      // Open the deep link from response
-      const zoomAuthUrl = response.data?.data;
-      if (zoomAuthUrl) {
-        try {
-          await Linking.openURL(zoomAuthUrl);
-          console.log('✅ Opened Zoom auth link:', zoomAuthUrl);
-        } catch (error: any) {
-          console.error('Failed to open Zoom auth URL:', error);
-        }
-      }
-      return;
-    }
-    
+    // Extract the auth URL from response
     const zoomAuthUrl =
       response.data?.data ||
       response.data?.url ||
-      response.data?.authUrl;
+      response.data?.authUrl ||
+      response.data?.auth_url;
 
-    if (!zoomAuthUrl) {
-      Alert.alert('Error', 'Zoom authorization link missing.');
+    // Validate the URL before proceeding
+    if (!zoomAuthUrl || typeof zoomAuthUrl !== 'string' || zoomAuthUrl.includes('undefined')) {
+      console.error('❌ Invalid Zoom auth URL received:', zoomAuthUrl);
+      Alert.alert('Error', 'Invalid Zoom authorization link received from server.');
       setIsLoadingZoom(false);
       return;
     }
 
-     // 2️⃣ Listen for callback from Zoom (NO wallet authentication)
-     let handled = false;
-     let subscription: any = null;
+    // Validate URL format
+    try {
+      new URL(zoomAuthUrl);
+    } catch (urlError) {
+      console.error('❌ Invalid URL format:', zoomAuthUrl);
+      Alert.alert('Error', 'Invalid URL format received from server.');
+      setIsLoadingZoom(false);
+      return;
+    }
 
-     const handleCallback = async ({ url }: { url: string }) => {
-       // Only process Zoom OAuth callbacks (skip wallet-related URLs)
-       if (!url || handled) return;
-       
-       // Check if this is a Zoom callback URL
-       const isZoomCallback = 
-         url.includes('zoom-callback') || 
-         url.includes('zoom') && url.includes('code=') ||
-         url.includes('dcalendar://zoom') ||
-         url.includes('oauth-callback') && url.includes('zoom');
-       
-       if (!isZoomCallback) {
-         // Not a Zoom callback, ignore it
-         return;
-       }
+    // 2️⃣ Use InAppBrowser to open OAuth and extract code from callback URL
+    try {
+      console.log('🌐 Opening Zoom OAuth in InAppBrowser...');
+      
+      // Helper function to process Zoom callback
+      const processZoomCallback = async (code: string) => {
+        try {
+          console.log('📤 Sending Zoom code to backend...');
 
-       handled = true;
-       subscription?.remove();
+          const callbackResponse = await api('POST', '/zoom/callback', {
+            code,
+            username: userName,
+          });
 
-       try {
-         console.log('🔗 Zoom OAuth callback received:', url);
-         
-         const urlObj = new URL(url);
-         const params = new URLSearchParams(urlObj.search);
-         const code = params.get('code');
-         const error = params.get('error');
+          console.log('✅ Zoom callback response received:', JSON.stringify(callbackResponse.data, null, 2));
 
-         if (error) {
-           Alert.alert('Error', 'Zoom authentication failed.');
-           setIsLoadingZoom(false);
-           return;
-         }
+          if (callbackResponse.data?.status && callbackResponse.data?.data) {
+            const data = callbackResponse.data.data;
 
-         if (!code) {
-           Alert.alert('Error', 'Authorization code not received.');
-           setIsLoadingZoom(false);
-           return;
-         }
+            // Store tokens in state
+            connectZoom({
+              accessToken: data.access_token || data.accessToken,
+              refreshToken: data.refresh_token || data.refreshToken,
+              email: data.email || '',
+              fullName: data.fullName || data.full_name || '',
+            });
 
-         console.log('📤 Sending Zoom code to backend...');
+            Alert.alert('Success', 'Zoom connected successfully!');
+          } else {
+            Alert.alert('Error', callbackResponse.data?.message || 'Failed to connect Zoom.');
+          }
+        } catch (error: any) {
+          console.error('❌ Error processing Zoom callback:', error);
+          const errorMessage = error.response?.data?.message || error.message || 'Failed to connect Zoom.';
+          Alert.alert('Error', errorMessage);
+        } finally {
+          setIsLoadingZoom(false);
+        }
+      };
 
-         // 3️⃣ Send code to backend (simple API call, NO wallet authentication)
-         const callbackResponse = await api('POST', '/zoom/callback', {
-           code,
-           username: userName,
-         });
+      // Check if InAppBrowser is available
+      if (await InAppBrowser.isAvailable()) {
+        // Set up deep link listener BEFORE opening browser
+        let deepLinkSubscription: any = null;
+        let hasProcessedCallback = false;
 
-         console.log('✅ Zoom callback response received');
+        const handleDeepLink = async (event: { url: string }) => {
+          const url = event.url;
+          console.log('🔗 Deep link received:', url);
 
-         if (callbackResponse.data?.status && callbackResponse.data?.data) {
-           const data = callbackResponse.data.data;
+          if (url.includes('zoom-callback') || (url.includes('zoom') && url.includes('code='))) {
+            if (hasProcessedCallback) return;
+            hasProcessedCallback = true;
 
-           // Store tokens in state (simple connection, NO wallet)
-           connectZoom({
-             accessToken: data.access_token,
-             refreshToken: data.refresh_token,
-             email: data.email,
-             fullName: data.fullName,
-           });
+            if (deepLinkSubscription) {
+              deepLinkSubscription.remove();
+            }
 
-           Alert.alert('Success', 'Zoom connected successfully!');
-         } else {
-           Alert.alert('Error', 'Failed to connect Zoom.');
-         }
-       } catch (err: any) {
-         console.error('❌ Zoom callback error:', err);
-         Alert.alert('Error', err.response?.data?.message || 'Zoom connection failed.');
-       } finally {
-         setIsLoadingZoom(false);
-       }
-     };
+            try {
+              InAppBrowser.close();
 
-     // Set up listener for Zoom OAuth callback (NO wallet involved)
-     subscription = Linking.addEventListener('url', handleCallback);
+              // Extract code from URL
+              const urlObj = new URL(url);
+              const params = new URLSearchParams(urlObj.search);
+              const code = params.get('code');
+              const error = params.get('error');
 
-    // 4️⃣ Open Zoom login page
-    await Linking.openURL(zoomAuthUrl);
-  } catch {
-    Alert.alert('Error', 'Zoom connection failed.');
+              if (error) {
+                Alert.alert('Error', `Zoom authentication failed: ${error}`);
+                setIsLoadingZoom(false);
+                return;
+              }
+
+              if (code && code !== 'undefined') {
+                await processZoomCallback(code);
+              }
+            } catch (err) {
+              console.error('❌ Error handling deep link:', err);
+              setIsLoadingZoom(false);
+            }
+          }
+        };
+
+        deepLinkSubscription = Linking.addEventListener('url', handleDeepLink);
+
+        // Use openAuth with deep link redirect
+        // If backend redirects to web URL, we'll need to handle it differently
+        const deepLinkRedirect = 'dcalendar://zoom-callback';
+        const result = await InAppBrowser.openAuth(
+          zoomAuthUrl,
+          deepLinkRedirect,
+          {
+            ephemeralWebSession: false,
+            showTitle: false,
+            enableUrlBarHiding: true,
+            enableDefaultShare: false,
+          }
+        );
+
+        // Remove deep link listener
+        if (deepLinkSubscription) {
+          deepLinkSubscription.remove();
+        }
+
+        console.log('🔗 InAppBrowser result:', JSON.stringify(result, null, 2));
+
+        if (result.type === 'cancel') {
+          console.log('❌ User cancelled Zoom OAuth');
+          Alert.alert('Cancelled', 'Zoom connection was cancelled.');
+          setIsLoadingZoom(false);
+          return;
+        }
+
+        if (result.type === 'dismiss') {
+          console.log('❌ Browser was dismissed');
+          setIsLoadingZoom(false);
+          return;
+        }
+
+        // Process the result
+        if (result.type === 'success' && (result as any).url) {
+          const callbackUrl = (result as any).url;
+          console.log('✅ Zoom callback URL received:', callbackUrl);
+
+          // Extract code from callback URL (could be deep link or web URL)
+          try {
+            const urlObj = new URL(callbackUrl);
+            const params = new URLSearchParams(urlObj.search);
+            const code = params.get('code');
+            const error = params.get('error');
+
+            if (error) {
+              Alert.alert('Error', `Zoom authentication failed: ${error}`);
+              setIsLoadingZoom(false);
+              return;
+            }
+
+            if (code && code !== 'undefined') {
+              await processZoomCallback(code);
+            } else {
+              // No code in URL - this shouldn't happen with proper OAuth flow
+              console.warn('⚠️ No code in callback URL');
+              Alert.alert('Error', 'Authorization code not received. Please try again.');
+              setIsLoadingZoom(false);
+            }
+          } catch (urlError) {
+            console.error('❌ Error parsing callback URL:', urlError);
+            Alert.alert('Error', 'Invalid callback URL received.');
+            setIsLoadingZoom(false);
+          }
+        } else {
+          // No URL in result - user may have closed browser manually
+          // The backend redirects to web URL, so openAuth doesn't capture it
+          // We need to check connection status or show instructions
+          console.log('⚠️ No callback URL in result - backend may have processed it');
+          Alert.alert(
+            'Authorization Complete',
+            'Please check if Zoom connection was successful. If the connection status doesn\'t update, please try connecting again.',
+            [
+              {
+                text: 'OK',
+                onPress: () => {
+                  setIsLoadingZoom(false);
+                },
+              },
+            ]
+          );
+        }
+      } else {
+        // Fallback to regular browser
+        console.log('⚠️ InAppBrowser not available, using regular browser...');
+        await Linking.openURL(zoomAuthUrl);
+        
+        // Set up listener for deep link callback
+        const subscription = Linking.addEventListener('url', async ({ url }) => {
+          if (url.includes('zoom-callback') || (url.includes('zoom') && url.includes('code='))) {
+            subscription.remove();
+            console.log('🔗 Zoom callback received via deep link:', url);
+            
+            try {
+              const urlObj = new URL(url);
+              const params = new URLSearchParams(urlObj.search);
+              const code = params.get('code');
+              
+              if (code && code !== 'undefined') {
+                const callbackResponse = await api('POST', '/zoom/callback', {
+                  code,
+                  username: userName,
+                });
+
+                if (callbackResponse.data?.status && callbackResponse.data?.data) {
+                  const data = callbackResponse.data.data;
+                  connectZoom({
+                    accessToken: data.access_token || data.accessToken,
+                    refreshToken: data.refresh_token || data.refreshToken,
+                    email: data.email || '',
+                    fullName: data.fullName || data.full_name || '',
+                  });
+                  Alert.alert('Success', 'Zoom connected successfully!');
+                }
+              }
+            } catch (err) {
+              console.error('❌ Error handling deep link:', err);
+            } finally {
+              setIsLoadingZoom(false);
+            }
+          }
+        });
+      }
+    } catch (browserError: any) {
+      console.error('❌ Failed to open Zoom auth in browser:', browserError);
+      Alert.alert('Error', `Failed to open authorization page: ${browserError.message}`);
+      setIsLoadingZoom(false);
+    }
+  } catch (error: any) {
+    console.error('❌ Zoom connection error:', error);
+    const errorMessage = error.response?.data?.message || error.message || 'Zoom connection failed.';
+    Alert.alert('Error', errorMessage);
     setIsLoadingZoom(false);
   }
 };
@@ -420,14 +554,9 @@ const handleZoomDisconnect = async () => {
                   <Text style={styles.integrationName}>Google Meet</Text>
                   {googleIntegration.isConnected && (
                     <View style={styles.connectedBadge}>
-                      <LinearGradient
-                        colors={['#18F06E', '#0B6DE0']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.badgeGradient}
-                      >
+                      <View style={styles.badgeGradient}>
                         <Text style={styles.badgeText}>Connected</Text>
-                      </LinearGradient>
+                      </View>
                     </View>
                   )}
                 </View>
@@ -449,22 +578,13 @@ const handleZoomDisconnect = async () => {
                     <Text style={styles.disconnectButtonText}>Disconnect</Text>
                   </View>
                 ) : (
-                  <LinearGradient
-                    colors={
-                      isLoading
-                        ? [colors.grey400, colors.grey400]
-                        : ['#18F06E', '#0B6DE0']
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.gradientFull}
-                  >
+                  <View style={[styles.gradientFull, isLoading && { backgroundColor: colors.grey400 }]}>
                     {isLoading ? (
                       <ActivityIndicator size="small" color={colors.white} />
                     ) : (
                       <Text style={styles.connectButtonTextFull}>Connect</Text>
                     )}
-                  </LinearGradient>
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
@@ -479,14 +599,9 @@ const handleZoomDisconnect = async () => {
                   <Text style={styles.integrationName}>Zoom</Text>
                   {zoomIntegration.isConnected && (
                     <View style={styles.connectedBadge}>
-                      <LinearGradient
-                        colors={['#18F06E', '#0B6DE0']}
-                        start={{ x: 0, y: 0 }}
-                        end={{ x: 1, y: 0 }}
-                        style={styles.badgeGradient}
-                      >
+                      <View style={styles.badgeGradient}>
                         <Text style={styles.badgeText}>Connected</Text>
-                      </LinearGradient>
+                      </View>
                     </View>
                   )}
                 </View>
@@ -508,22 +623,13 @@ const handleZoomDisconnect = async () => {
                     <Text style={styles.disconnectButtonText}>Connected</Text>
                   </View>
                 ) : (
-                  <LinearGradient
-                    colors={
-                      isLoadingZoom
-                        ? [colors.grey400, colors.grey400]
-                        : ['#18F06E', '#0B6DE0']
-                    }
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.gradientFull}
-                  >
+                  <View style={[styles.gradientFull, isLoadingZoom && { backgroundColor: colors.grey400 }]}>
                     {isLoadingZoom ? (
                       <ActivityIndicator size="small" color={colors.white} />
                     ) : (
                       <Text style={styles.connectButtonTextFull}>Connect</Text>
                     )}
-                  </LinearGradient>
+                  </View>
                 )}
               </TouchableOpacity>
             </View>
@@ -549,14 +655,15 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   integrationRowTitle: {
-    fontSize: 16,
-    color: '#333',
-    fontWeight: '400',
+    fontSize: fontSize.textSize14,
+    color: Colors.black,
+    fontFamily: Fonts.latoRegular,
   },
   integrationRowSubtitle: {
-    fontSize: 14,
-    color: '#666',
+    fontSize: fontSize.textSize12,
+    color: colors.grey400,
     marginTop: 2,
+    fontFamily: Fonts.latoRegular,
   },
   dropdownButton: {
     padding: 4,
@@ -607,9 +714,9 @@ const styles = StyleSheet.create({
     flexWrap: 'wrap',
   },
   integrationName: {
-    fontSize: 16,
-    fontWeight: '600',
-    color: '#111827',
+    fontSize: fontSize.textSize16,
+    fontFamily: Fonts.latoSemiBold,
+    color: Colors.black,
     marginRight: 8,
   },
   connectedBadge: {
@@ -619,17 +726,20 @@ const styles = StyleSheet.create({
   badgeGradient: {
     paddingHorizontal: 8,
     paddingVertical: 4,
+    backgroundColor: Colors.primaryBlue,
+    borderRadius: 12,
   },
   badgeText: {
-    fontSize: 11,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: fontSize.textSize11,
+    color: Colors.white,
+    fontFamily: Fonts.latoSemiBold,
   },
   integrationDescription: {
-    fontSize: 13,
-    color: '#6B7280',
+    fontSize: fontSize.textSize13,
+    color: colors.grey400,
     lineHeight: 18,
     marginBottom: 16,
+    fontFamily: Fonts.latoRegular,
   },
   connectButtonFull: {
     borderRadius: 8,
@@ -649,9 +759,9 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   disconnectButtonText: {
-    fontSize: 14,
-    color: '#374151',
-    fontWeight: '600',
+    fontSize: fontSize.textSize14,
+    color: Colors.black,
+    fontFamily: Fonts.latoSemiBold,
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -660,11 +770,13 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    backgroundColor: Colors.primaryBlue,
+    borderRadius: 8,
   },
   connectButtonTextFull: {
-    fontSize: 14,
-    color: '#FFFFFF',
-    fontWeight: '600',
+    fontSize: fontSize.textSize14,
+    color: Colors.white,
+    fontFamily: Fonts.latoSemiBold,
   },
 });
 

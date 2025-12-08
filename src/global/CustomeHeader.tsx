@@ -24,7 +24,6 @@ import {
   shadows,
   spacing,
 } from '../utils/LightTheme';
-import MenuIcon from '../assets/svgs/menu.svg';
 import EventIcon from '../assets/svgs/eventIcon.svg';
 type EventFilter = 'All' | 'EventsOnly' | 'TasksOnly';
 

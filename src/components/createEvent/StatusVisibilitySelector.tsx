@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Image } from 'react-native';
+import { View, Text, StyleSheet } from 'react-native';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { scaleHeight, scaleWidth } from '../../utils/dimensions';
 import {
@@ -25,19 +25,15 @@ const StatusVisibilitySelector: React.FC<StatusVisibilitySelectorProps> = ({
   return (
     <View style={styles.statusRow}>
       <View style={styles.statusLeft}>
-        <FeatherIcon name="eye" size={24} color="#888888" />
+        <FeatherIcon name="eye" size={24} color="#00AEEF" />
         <View style={styles.statusDropdown}>
           <Text style={styles.statusText}>{status}</Text>
-          <Image
-            source={require('../../assets/images/CreateEventImages/slimDownArrow.png')}
-          />
+          <FeatherIcon name="chevron-down" size={14} color="#00AEEF" />
         </View>
       </View>
       <View style={styles.visibilityDropdown}>
         <Text style={styles.visibilityText}>{visibility}</Text>
-        <Image
-          source={require('../../assets/images/CreateEventImages/slimDownArrow.png')}
-        />
+        <FeatherIcon name="chevron-down" size={14} color="#00AEEF" />
       </View>
     </View>
   );

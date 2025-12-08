@@ -32,7 +32,6 @@ import { useApiClient } from '../hooks/useApi';
 import { useToken } from '../stores/useTokenStore';
 import { useEventsStore } from '../stores/useEventsStore';
 import { Colors } from '../constants/Colors';
-import { Fonts } from '../constants/Fonts';
 // Import SVG icons
 import DIcon from '../assets/svgs/DIcon.svg';
 import CrossIcon from '../assets/svgs/crossIcon.svg';

@@ -124,10 +124,88 @@ const EventCard: React.FC<EventCardProps> = ({
   const [editingEvent, setEditingEvent] = useState(null);
   const token = useToken(state => state.token);
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-  const { getUserEvents, setUserEvents, userEvents } = useEventsStore();
+  const { 
+    getUserEvents, 
+    setUserEvents, 
+    userEvents,
+    optimisticallyDeleteEvent,
+    revertOptimisticUpdate
+  } = useEventsStore();
+  const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
+  // Extract guests from event tags
+  const getEventGuests = (): Array<{ email: string; avatar?: string }> => {
+    const eventData = (event as any)?.originalRawEventData || event;
+    const eventTags = eventData?.list || tags || [];
+    if (!Array.isArray(eventTags)) return [];
+    const guests: Array<{ email: string; avatar?: string }> = [];
+    eventTags.forEach((tag: any) => {
+      if (tag && tag.key === 'guest') {
+        if (typeof tag.value === 'string') {
+          guests.push({ email: tag.value });
+        } else if (tag.value && typeof tag.value === 'object') {
+          guests.push({
+            email: tag.value.email || tag.value,
+            avatar: tag.value.avatar || tag.value.picture || tag.value.profilePicture
+          });
+        }
+      }
+    });
+    return guests.filter((g: any) => g && g.email);
+  };
 
-  // In your React Native component (e.g., EventCard or a wrapper screen)
+  // Generate initials from email
+  const getGuestInitials = (email: string): string => {
+    if (!email) return '?';
+    const parts = email.split('@')[0].split(/[._-]/);
+    if (parts.length >= 2) {
+      return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+    return email.charAt(0).toUpperCase();
+  };
+
+  // Generate background color based on email
+  const getGuestBackgroundColor = (email: string): string[] => {
+    const colors = [
+      ['#FF6B6B', '#FF8E8E'],
+      ['#4ECDC4', '#6EDDD6'],
+      ['#45B7D1', '#6BC5D8'],
+      ['#FFA07A', '#FFB89A'],
+      ['#98D8C8', '#B0E4D4'],
+      ['#F7DC6F', '#F9E68F'],
+      ['#BB8FCE', '#C9A3D9'],
+      ['#85C1E2', '#9DCFE8'],
+    ];
+    const hash = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    return colors[hash % colors.length];
+  };
+
+  // Check if event is a task
+  const eventData = (event as any)?.originalRawEventData || event;
+  const eventTags = eventData?.list || tags || [];
+  const isTask = Array.isArray(eventTags) && eventTags.some((tag: any) => tag && tag.key === 'task');
+
+  // Get recurrence info
+  const getRecurrenceInfo = () => {
+    if (!Array.isArray(eventTags)) return null;
+    const recurrenceTag = eventTags.find((tag: any) => tag && (tag.key === 'recurrence' || tag.key === 'repeatEvent'));
+    if (!recurrenceTag || !recurrenceTag.value) return null;
+    return recurrenceTag.value;
+  };
+
+  // Get progress percentage
+  const getProgress = (): number => {
+    if (!Array.isArray(eventTags)) return 0;
+    const progressItem = eventTags.find((tag: any) => tag && (tag.key === 'progress' || tag.key === 'completion'));
+    if (progressItem && typeof progressItem.value === 'number') {
+      return Math.min(100, Math.max(0, progressItem.value));
+    }
+    return 0;
+  };
+
+  const eventGuests = getEventGuests();
+  const recurrenceInfo = getRecurrenceInfo();
+  const progress = getProgress();
 
   const handleDeleteEvent = async (eventId: string) => {
     try {
@@ -250,11 +328,11 @@ const EventCard: React.FC<EventCardProps> = ({
               </View>
 
               {/* Recurrence Badge */}
-              {recurrenceInfo && (
+              {recurrenceInfo && recurrenceInfo !== 'Does not repeat' && (
                 <View style={styles.compactBadge}>
                   <CalendarIcon height={14} width={14} />
                   <Text style={styles.compactBadgeText}>
-                    {recurrenceInfo.repeatOn?.value || 'Recurring'}
+                    {typeof recurrenceInfo === 'string' ? recurrenceInfo : 'Recurring'}
                   </Text>
                 </View>
               )}
