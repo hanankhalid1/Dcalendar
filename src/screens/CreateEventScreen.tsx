@@ -1,4 +1,8 @@
-import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native';
+import {
+  useFocusEffect,
+  useNavigation,
+  useRoute,
+} from '@react-navigation/native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   Alert,
@@ -35,9 +39,9 @@ import { Fonts } from '../constants/Fonts';
 import ClockIcon from '../assets/svgs/clock.svg';
 import CalendarIcon from '../assets/svgs/calendar.svg';
 import ArrowDownIcon from '../assets/svgs/arrow-down.svg';
+import MeetIcon from '../assets/svgs/meet.svg';
 import { useApiClient } from '../hooks/useApi';
 import { useEventsStore } from '../stores/useEventsStore';
-
 
 import CalendarWithTime from '../components/CalendarWithTime';
 
@@ -53,14 +57,22 @@ import {
   timezones,
 } from '../constants/dummyData';
 import { AppNavigationProp, Screen } from '../navigations/appNavigation.type';
-import { generateEventUID, buildEventMetadata, prepareEventForBlockchain, encryptWithNECJS } from '../utils/eventUtils';
+import {
+  generateEventUID,
+  buildEventMetadata,
+  prepareEventForBlockchain,
+  encryptWithNECJS,
+} from '../utils/eventUtils';
 
 import GuestSelector from '../components/createEvent/GuestSelector';
 import { BlockchainService } from '../services/BlockChainService';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useToken } from '../stores/useTokenStore';
-import { convertionISOToTime, convertSecondsToUnit } from '../utils/notifications';
-import dayjs from "dayjs";
+import {
+  convertionISOToTime,
+  convertSecondsToUnit,
+} from '../utils/notifications';
+import dayjs from 'dayjs';
 import Icon from 'react-native-vector-icons/Feather';
 import { useAuthStore } from '../stores/useAuthStore';
 import CustomAlert from '../components/CustomAlert';
@@ -77,20 +89,40 @@ const CreateEventScreen = () => {
   // Initialize blockchain service and get contract instance
   // Form state
   const [title, setTitle] = useState(editEventData?.title ?? '');
-  const [description, setDescription] = useState(editEventData?.description ?? '');
+  const [description, setDescription] = useState(
+    editEventData?.description ?? '',
+  );
   const [location, setLocation] = useState(editEventData?.location ?? '');
-  const [videoConferencing, setVideoConferencing] = useState(editEventData?.videoConferencing ?? '');
+  const [videoConferencing, setVideoConferencing] = useState(
+    editEventData?.videoConferencing ?? '',
+  );
   const [notificationMinutes, setNotificationMinutes] = useState('0');
   const [selectedTimeUnit, setSelectedTimeUnit] = useState('Minutes');
-  const [selectedNotificationType, setSelectedNotificationType] = useState('Notification');
+  const [selectedNotificationType, setSelectedNotificationType] =
+    useState('Notification');
   const [selectedStatus, setSelectedStatus] = useState('Busy');
-  const [selectedVisibility, setSelectedVisibility] = useState('Default Visibility');
+  const [selectedVisibility, setSelectedVisibility] =
+    useState('Default Visibility');
   const [showCalendarModal, setShowCalendarModal] = useState(false);
-  const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(editEventData?.selectedStartDate ? new Date(editEventData.selectedStartDate) : null);
-  const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(editEventData?.selectedEndDate ? new Date(editEventData.selectedEndDate) : null);
-  const [selectedStartTime, setSelectedStartTime] = useState(editEventData?.selectedStartTime || '');
-  const [selectedEndTime, setSelectedEndTime] = useState(editEventData?.selectedEndTime || '');
-  const [showDetailedDateTime, setShowDetailedDateTime] = useState(!!editEventData);
+  const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(
+    editEventData?.selectedStartDate
+      ? new Date(editEventData.selectedStartDate)
+      : null,
+  );
+  const [selectedEndDate, setSelectedEndDate] = useState<Date | null>(
+    editEventData?.selectedEndDate
+      ? new Date(editEventData.selectedEndDate)
+      : null,
+  );
+  const [selectedStartTime, setSelectedStartTime] = useState(
+    editEventData?.selectedStartTime || '',
+  );
+  const [selectedEndTime, setSelectedEndTime] = useState(
+    editEventData?.selectedEndTime || '',
+  );
+  const [showDetailedDateTime, setShowDetailedDateTime] = useState(
+    !!editEventData,
+  );
   const [dateTimeError, setDateTimeError] = useState<string>('');
   const [titleError, setTitleError] = useState<string>('');
   const [locationError, setLocationError] = useState<string>('');
@@ -100,44 +132,60 @@ const CreateEventScreen = () => {
   const [endTimeError, setEndTimeError] = useState<string>('');
   const [calendarMode, setCalendarMode] = useState<'from' | 'to'>('from');
   const [showEventTypeDropdown, setShowEventTypeDropdown] = useState(false);
-  const [selectedEventType, setSelectedEventType] = useState(editEventData?.selectedEventType || 'Event');
+  const [selectedEventType, setSelectedEventType] = useState(
+    editEventData?.selectedEventType || 'Event',
+  );
   const [isLoading, setIsLoading] = useState(false);
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showGuestDropdown, setShowGuestDropdown] = useState(false);
   const [selectedGuests, setSelectedGuests] = useState<string[]>([]);
   const [selectedPermission, setSelectedPermission] = useState<string>('');
-  const [showVideoConferencingOptions, setShowVideoConferencingOptions] = useState(false);
-  const [selectedVideoConferencing, setSelectedVideoConferencing] = useState('');
+  const [showVideoConferencingOptions, setShowVideoConferencingOptions] =
+    useState(false);
+  const [selectedVideoConferencing, setSelectedVideoConferencing] =
+    useState('');
   const [showGuestModal, setShowGuestModal] = useState(false);
   const [guestSearchQuery, setGuestSearchQuery] = useState('');
-  const [activeField, setActiveField] = useState<'title' | 'date' | 'startTime' | 'endTime' | 'repeat' | 'description' | 'videoConferencing' | 'location' | null>(null);
+  const [activeField, setActiveField] = useState<
+    | 'title'
+    | 'date'
+    | 'startTime'
+    | 'endTime'
+    | 'repeat'
+    | 'description'
+    | 'videoConferencing'
+    | 'location'
+    | null
+  >(null);
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
-  const [selectedRecurrence, setSelectedRecurrence] = useState('Does not repeat');
-  const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] = useState(false);
+  const [selectedRecurrence, setSelectedRecurrence] =
+    useState('Does not repeat');
+  const [showCustomRecurrenceModal, setShowCustomRecurrenceModal] =
+    useState(false);
   const [meetingLink, setMeetingLink] = useState('');
   const [meetingEventId, setMeetingEventId] = useState('');
 
   const [customRecurrence, setCustomRecurrence] = useState(() => {
-    const weekday =
-      selectedStartDate
-        ? selectedStartDate.toLocaleDateString('en-US', { weekday: 'long' })
-        : 'Thursday'; // default fallback
+    const weekday = selectedStartDate
+      ? selectedStartDate.toLocaleDateString('en-US', { weekday: 'long' })
+      : 'Thursday'; // default fallback
     return {
-
       repeatEvery: '1',
       repeatUnit: 'Week',
       repeatOn: [weekday],
       endsType: 'Never',
       endsDate: null as Date | null,
       endsAfter: '13',
-    }
+    };
   });
   const [showEndsDatePicker, setShowEndsDatePicker] = useState(false);
   const [showTimezoneModal, setShowTimezoneModal] = useState(false);
   const [selectedTimezone, setSelectedTimezone] = useState(currentTimezone);
   const [timezoneSearchQuery, setTimezoneSearchQuery] = useState('');
-  const [searchQuery, setsearchQuery] = useState("")
-  const [locationSuggestions, setLocationSuggestions] = React.useState<any[]>([]);
+  const [searchQuery, setsearchQuery] = useState('');
+  const [locationSuggestions, setLocationSuggestions] = React.useState<any[]>(
+    [],
+  );
   const [showLocationModal, setShowLocationModal] = React.useState(false);
   const [isLoadingLocations, setIsLoadingLocations] = React.useState(false);
   const locationModalInputRef = useRef<TextInput>(null);
@@ -150,19 +198,23 @@ const CreateEventScreen = () => {
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const endsOptions = ['Never', 'On', 'After'];
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
-  const integrationModalSlideAnim = useRef(new Animated.Value(Dimensions.get('window').height)).current;
-  
+  const integrationModalSlideAnim = useRef(
+    new Animated.Value(Dimensions.get('window').height),
+  ).current;
+
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
-  const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('error');
+  const [alertType, setAlertType] = useState<
+    'success' | 'error' | 'warning' | 'info'
+  >('error');
 
   // Helper function to show custom alert
   const showAlert = (
     title: string,
     message: string,
-    type: 'success' | 'error' | 'warning' | 'info' = 'error'
+    type: 'success' | 'error' | 'warning' | 'info' = 'error',
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
@@ -195,7 +247,7 @@ const CreateEventScreen = () => {
       toTimeOnly,
       isStartMidnight,
       isEndMidnight,
-      result: isStartMidnight && isEndMidnight
+      result: isStartMidnight && isEndMidnight,
     });
 
     return isStartMidnight && isEndMidnight;
@@ -210,7 +262,7 @@ const CreateEventScreen = () => {
       return {};
     }
 
-    console.log("Edit event data", eventData);
+    console.log('Edit event data', eventData);
     const parsedData: any = {};
 
     // Parse each item in the array
@@ -309,7 +361,7 @@ const CreateEventScreen = () => {
           startDate: date,
           startTime: '',
           endDate: date,
-          endTime: ''
+          endTime: '',
         };
       }
 
@@ -329,10 +381,15 @@ const CreateEventScreen = () => {
         startDate: date,
         startTime: startTime,
         endDate: date,
-        endTime: endTime
+        endTime: endTime,
       };
     } catch (error) {
-      console.error('Error parsing date and time:', dateString, timeString, error);
+      console.error(
+        'Error parsing date and time:',
+        dateString,
+        timeString,
+        error,
+      );
       return { startDate: null, startTime: '', endDate: null, endTime: '' };
     }
   };
@@ -355,7 +412,7 @@ const CreateEventScreen = () => {
         timeString = date.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
         });
       }
       // ✅ Handle YYYYMMDDTHHMMSS format (20250924T210000)
@@ -382,7 +439,7 @@ const CreateEventScreen = () => {
           parseInt(day),
           parseInt(hour),
           parseInt(minute),
-          parseInt(second)
+          parseInt(second),
         );
 
         if (isNaN(date.getTime())) {
@@ -406,7 +463,9 @@ const CreateEventScreen = () => {
           displayHour = 12;
         }
 
-        timeString = `${displayHour.toString().padStart(2, '0')}:${minuteNum.toString().padStart(2, '0')} ${period}`;
+        timeString = `${displayHour.toString().padStart(2, '0')}:${minuteNum
+          .toString()
+          .padStart(2, '0')} ${period}`;
       }
       // ✅ Handle date-only format (YYYYMMDD) - treat as all-day
       else if (dateTimeString.match(/^\d{8}$/)) {
@@ -433,14 +492,14 @@ const CreateEventScreen = () => {
         timeString = date.toLocaleTimeString('en-US', {
           hour: '2-digit',
           minute: '2-digit',
-          hour12: true
+          hour12: true,
         });
       }
 
       console.log('parseDateTime result:', {
         input: dateTimeString,
         date: date.toISOString(),
-        time: timeString
+        time: timeString,
       });
 
       return { date, time: timeString };
@@ -449,7 +508,6 @@ const CreateEventScreen = () => {
       return { date: null, time: '' };
     }
   };
-
 
   useEffect(() => {
     console.log('Edit Event Data:', JSON.stringify(editEventData));
@@ -464,7 +522,10 @@ const CreateEventScreen = () => {
 
       // ✅ CHECK IF IT'S AN ALL-DAY EVENT FIRST
       if (editEventData.fromTime && editEventData.toTime) {
-        const isAllDay = isAllDayEventCheck(editEventData.fromTime, editEventData.toTime);
+        const isAllDay = isAllDayEventCheck(
+          editEventData.fromTime,
+          editEventData.toTime,
+        );
 
         console.log('All-day event check:', {
           fromTime: editEventData.fromTime,
@@ -473,8 +534,8 @@ const CreateEventScreen = () => {
           checkDetails: {
             hasT: editEventData.fromTime.includes('T'),
             fromTimeOnly: editEventData.fromTime.split('T')[1],
-            toTimeOnly: editEventData.toTime.split('T')[1]
-          }
+            toTimeOnly: editEventData.toTime.split('T')[1],
+          },
         });
 
         // ✅ SET ALL-DAY STATE IMMEDIATELY
@@ -485,7 +546,7 @@ const CreateEventScreen = () => {
         if (startDateTime.date) {
           setSelectedStartDate(startDateTime.date);
           // ✅ Only set time for non-all-day events
-          setSelectedStartTime(isAllDay ? '' : (startDateTime.time || ''));
+          setSelectedStartTime(isAllDay ? '' : startDateTime.time || '');
         }
 
         // Parse end date/time
@@ -500,7 +561,7 @@ const CreateEventScreen = () => {
 
             console.log('All-day event - Adjusted end date:', {
               storedEndDate: endDateTime.date.toISOString(),
-              displayEndDate: displayEndDate.toISOString()
+              displayEndDate: displayEndDate.toISOString(),
             });
           } else {
             setSelectedEndDate(endDateTime.date);
@@ -508,8 +569,15 @@ const CreateEventScreen = () => {
           }
         }
       } else if (editEventData.date && editEventData.time) {
-        console.log('Parsing date and time:', editEventData.date, editEventData.time);
-        const dateTime = parseDateAndTime(editEventData.date, editEventData.time);
+        console.log(
+          'Parsing date and time:',
+          editEventData.date,
+          editEventData.time,
+        );
+        const dateTime = parseDateAndTime(
+          editEventData.date,
+          editEventData.time,
+        );
         console.log('Parsed date and time result:', dateTime);
 
         if (dateTime.startDate) {
@@ -564,7 +632,10 @@ const CreateEventScreen = () => {
         setSelectedRecurrence(parsedData.repeatEvent);
       }
 
-      if ((editEventData.fromTime && editEventData.toTime) || (editEventData.date && editEventData.time)) {
+      if (
+        (editEventData.fromTime && editEventData.toTime) ||
+        (editEventData.date && editEventData.time)
+      ) {
         setShowDetailedDateTime(true);
       }
 
@@ -590,16 +661,15 @@ const CreateEventScreen = () => {
         const meetingEventId =
           parsedData.meetingEventId ||
           editEventData.meetingEventId ||
-          (editEventData.list || []).find((i: any) => i.key === 'meetingEventId')?.value;
+          (editEventData.list || []).find(
+            (i: any) => i.key === 'meetingEventId',
+          )?.value;
 
         if (meetingEventId) {
           setMeetingEventId(meetingEventId);
           console.log('Meeting Event ID found:', meetingEventId);
         }
       }
-
-
-
     }
   }, [editEventData, mode]);
 
@@ -614,7 +684,7 @@ const CreateEventScreen = () => {
       if (googleIntegration.isConnected && !showVideoConferencingOptions) {
         setShowVideoConferencingOptions(true);
       }
-    }, [googleIntegration.isConnected, showVideoConferencingOptions])
+    }, [googleIntegration.isConnected, showVideoConferencingOptions]),
   );
   const handleGoogleMeetClick = () => {
     if (!googleIntegration.isConnected) {
@@ -627,22 +697,37 @@ const CreateEventScreen = () => {
     }
   };
 
-  // Helper function to get display label for video conferencing
-  const getVideoConferencingLabel = (value: string | null): string => {
-    if (!value || value === 'inperson') return "Select"; // Don't show "in person" in the field
+  // Helper to render selected video conferencing with its icon
+  const getVideoConferencingDisplay = (value: string | null) => {
     switch (value) {
+      case 'inperson':
+        return {
+          label: 'In-person meeting',
+          icon: <FeatherIcon name="map-pin" size={18} color="#6C6C6C" />,
+          filled: true,
+        };
       case 'google':
-        return 'Google Meet';
+        return {
+          label: 'Google Meet',
+          icon: <MeetIcon width={18} height={18} />,
+          filled: true,
+        };
       case 'zoom':
-        return 'Zoom';
+        return {
+          label: 'Zoom Meeting',
+          icon: <FeatherIcon name="video" size={18} color="#0B6DE0" />,
+          filled: true,
+        };
       default:
-        return value;
+        return { label: 'Select', icon: null, filled: false };
     }
   };
 
   useEffect(() => {
     if (selectedStartDate) {
-      const weekday = selectedStartDate.toLocaleDateString('en-US', { weekday: 'long' });
+      const weekday = selectedStartDate.toLocaleDateString('en-US', {
+        weekday: 'long',
+      });
       setCustomRecurrence(prev => ({
         ...prev,
         repeatOn: [weekday],
@@ -744,59 +829,55 @@ const CreateEventScreen = () => {
     }
   }, [showLocationModal]);
 
-const getRecurrenceOptions = (selectedStartDate: Date) => {
-  const d = dayjs(selectedStartDate);
-  const weekday = d.format("dddd");
-  const dayNumber = d.date();
-  const monthName = d.format("MMMM");
+  const getRecurrenceOptions = (selectedStartDate: Date) => {
+    const d = dayjs(selectedStartDate);
+    const weekday = d.format('dddd');
+    const dayNumber = d.date();
+    const monthName = d.format('MMMM');
 
-  // 1. Determine the week position (first, second, third, fourth)
-  const weekNames = ["first", "second", "third", "fourth"];
-  const weekOfMonth = Math.ceil(dayNumber / 7);
+    // 1. Determine the week position (first, second, third, fourth)
+    const weekNames = ['first', 'second', 'third', 'fourth'];
+    const weekOfMonth = Math.ceil(dayNumber / 7);
 
-  // 2. Check if the selected date is the ABSOLUTE last occurrence of this weekday in the month
-  const isSelectedDateTheLastWeekday = d.add(7, "day").month() !== d.month();
+    // 2. Check if the selected date is the ABSOLUTE last occurrence of this weekday in the month
+    const isSelectedDateTheLastWeekday = d.add(7, 'day').month() !== d.month();
 
-  // 3. Determine the Nth Week Text to use for the first monthly option
-  let nthWeekText;
-  if (isSelectedDateTheLastWeekday) {
-    // Use "last" if it is the final occurrence of the day in the month
-    nthWeekText = "last";
-  } else {
-    // Otherwise, use the calculated "Nth" position (first, second, third, or fourth)
-    nthWeekText = weekNames[weekOfMonth - 1] || "first";
-  }
+    // 3. Determine the Nth Week Text to use for the first monthly option
+    let nthWeekText;
+    if (isSelectedDateTheLastWeekday) {
+      // Use "last" if it is the final occurrence of the day in the month
+      nthWeekText = 'last';
+    } else {
+      // Otherwise, use the calculated "Nth" position (first, second, third, or fourth)
+      nthWeekText = weekNames[weekOfMonth - 1] || 'first';
+    }
 
-  let options = [
-    "Does not repeat",
-    "Daily",
-    // 1. Weekly on [Weekday]
-    `Weekly on ${weekday}`,
-  ];
+    let options = [
+      'Does not repeat',
+      'Daily',
+      // 1. Weekly on [Weekday]
+      `Weekly on ${weekday}`,
+    ];
 
-  // 2. Monthly on the [Nth] [Weekday] - Uses "last" when applicable
-  options.push(
-    `Monthly on the ${nthWeekText} ${weekday}`
-  );
+    // 2. Monthly on the [Nth] [Weekday] - Uses "last" when applicable
+    options.push(`Monthly on the ${nthWeekText} ${weekday}`);
 
-  // 3. Monthly on the last [Weekday]
-  // We ONLY add this option if the calculated Nth option (step 2) is NOT "last".
-  // This prevents the redundant inclusion of the "last" option.
-  if (!isSelectedDateTheLastWeekday) {
+    // 3. Monthly on the last [Weekday]
+    // We ONLY add this option if the calculated Nth option (step 2) is NOT "last".
+    // This prevents the redundant inclusion of the "last" option.
+    if (!isSelectedDateTheLastWeekday) {
+      options.push(`Monthly on the last ${weekday}`);
+    }
+
+    // 4. Annually and others
     options.push(
-      `Monthly on the last ${weekday}`
+      `Annually on ${monthName} ${dayNumber}`,
+      'Every Weekday (Monday to Friday)',
+      'Custom...',
     );
-  }
 
-  // 4. Annually and others
-  options.push(
-    `Annually on ${monthName} ${dayNumber}`,
-    "Every Weekday (Monday to Friday)",
-    "Custom...",
-  );
-  
-  return options;
-};
+    return options;
+  };
   const recurrenceOptions = getRecurrenceOptions(selectedStartDate);
 
   // Handle location selection
@@ -823,7 +904,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     }
   };
 
-  const handleUnitSelect = (unit) => {
+  const handleUnitSelect = unit => {
     setCustomRecurrence(prev => ({ ...prev, repeatUnit: unit }));
     setShowUnitDropdown(false);
   };
@@ -837,7 +918,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       timezoneData || { id: timezone, name: timezone, offset: 'GMT+00:00' }
     );
   }, []);
-
 
   const handleEventTypeSelect = (eventType: string) => {
     setSelectedEventType(eventType);
@@ -868,18 +948,18 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   const handleCustomRecurrenceDone = () => {
     // Validate repeatEvery value
     const repeatEveryNum = parseInt(customRecurrence.repeatEvery, 10);
-    
+
     // Check if repeatEvery is valid (must be a positive integer between 1-99)
     if (isNaN(repeatEveryNum) || repeatEveryNum < 1 || repeatEveryNum > 99) {
       // Show error alert
       showAlert(
         'Invalid Repeat Value',
         'Please enter a valid number between 1 and 99 for "Repeat every".',
-        'error'
+        'error',
       );
       return;
     }
-    
+
     // Generate custom recurrence text based on settings
     const { repeatEvery, repeatUnit, repeatOn, endsType } = customRecurrence;
     let customText = `Every ${repeatEvery} ${repeatUnit.toLowerCase()}`;
@@ -950,10 +1030,9 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     });
   };
 
-
   // Filter guests based on search query
   const filteredGuests = guestData.filter(
-    (guest) =>
+    guest =>
       guest.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
       guest.username.toLowerCase().includes(searchQuery.toLowerCase()),
   );
@@ -981,7 +1060,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
 
-      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+      if (
+        selectedYear < currentYear ||
+        (selectedYear === currentYear && selectedMonth < currentMonth)
+      ) {
         setStartDateError('Please select valid time and date');
         return;
       }
@@ -1001,8 +1083,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         // For timed events, check if start date/time is in the past
         if (selectedStartTime && selectedStartTime.trim() !== '') {
           const startDateTime = new Date(selectedStartDate);
-          const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-          const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+          const normalizedStartTime = selectedStartTime
+            .trim()
+            .replace(/\u00A0/g, ' ')
+            .replace(/\s+/g, ' ');
+          const startTimeMatch = normalizedStartTime.match(
+            /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+          );
 
           if (startTimeMatch) {
             let hours = parseInt(startTimeMatch[1], 10);
@@ -1032,7 +1119,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
       if (endDateTime < startDateTime) {
         setDateTimeError('End date must be on or after start date');
-        console.log('DEBUG - Setting all-day error:', 'End date must be on or after start date');
+        console.log(
+          'DEBUG - Setting all-day error:',
+          'End date must be on or after start date',
+        );
         return;
       }
     } else {
@@ -1045,8 +1135,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       const endDateTime = new Date(selectedEndDate);
 
       // Parse start time (handle non-breaking spaces)
-      const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      const normalizedStartTime = selectedStartTime
+        .trim()
+        .replace(/\u00A0/g, ' ')
+        .replace(/\s+/g, ' ');
+      const startTimeMatch = normalizedStartTime.match(
+        /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+      );
 
       if (!startTimeMatch) {
         console.log('DEBUG - Invalid start time format:', normalizedStartTime);
@@ -1065,8 +1160,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       startDateTime.setHours(finalStartHours, startMinutes, 0, 0);
 
       // Parse end time (handle non-breaking spaces)
-      const normalizedEndTime = selectedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      const normalizedEndTime = selectedEndTime
+        .trim()
+        .replace(/\u00A0/g, ' ')
+        .replace(/\s+/g, ' ');
+      const endTimeMatch = normalizedEndTime.match(
+        /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+      );
 
       if (!endTimeMatch) {
         console.log('DEBUG - Invalid end time format:', normalizedEndTime);
@@ -1089,7 +1189,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         endDateTime: endDateTime.toISOString(),
         startTime: selectedStartTime,
         endTime: selectedEndTime,
-        isValid: endDateTime > startDateTime
+        isValid: endDateTime > startDateTime,
       });
 
       // Validate that end date/time is strictly after start date/time
@@ -1115,7 +1215,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         return;
       }
     }
-  }, [selectedStartDate, selectedEndDate, selectedStartTime, selectedEndTime, isAllDayEvent]);
+  }, [
+    selectedStartDate,
+    selectedEndDate,
+    selectedStartTime,
+    selectedEndTime,
+    isAllDayEvent,
+  ]);
 
   const handleDateTimeSelect = (date: Date, time: string) => {
     console.log('>>>>>>>> DATE SELECTED <<<<<<<<', {
@@ -1123,12 +1229,12 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       dateFormatted: date.toLocaleDateString(),
       time: time,
       timeStringified: JSON.stringify(time),
-      mode: calendarMode
+      mode: calendarMode,
     });
     if (calendarMode === 'from') {
       setSelectedStartDate(date);
       setSelectedStartTime(time);
-      setSelectedRecurrence("Does not repeat");
+      setSelectedRecurrence('Does not repeat');
       // Clear errors when date/time is selected
       setStartDateError('');
       setStartTimeError('');
@@ -1142,18 +1248,26 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       // Always update end time to 30 minutes after start time when start time is selected
       if (time && time.trim() !== '') {
         const suggestedEndTime = addMinutesToTime(time, 30);
-        console.log('>>>>>>>> CALCULATING END TIME IN handleDateTimeSelect <<<<<<<<', {
-          startTime: time,
-          calculatedEndTime: suggestedEndTime,
-          previousEndTime: selectedEndTime,
-          startDate: date.toISOString()
-        });
+        console.log(
+          '>>>>>>>> CALCULATING END TIME IN handleDateTimeSelect <<<<<<<<',
+          {
+            startTime: time,
+            calculatedEndTime: suggestedEndTime,
+            previousEndTime: selectedEndTime,
+            startDate: date.toISOString(),
+          },
+        );
         setSelectedEndTime(suggestedEndTime);
-        
+
         // Check if end time rolled over to next day (12:00 AM)
         // Only add 1 day if the END time (after adding 30 min) is 12:00 AM or later
-        const normalizedEndTime = suggestedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-        const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        const normalizedEndTime = suggestedEndTime
+          .trim()
+          .replace(/\u00A0/g, ' ')
+          .replace(/\s+/g, ' ');
+        const endTimeMatch = normalizedEndTime.match(
+          /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+        );
         if (endTimeMatch) {
           let endHours = parseInt(endTimeMatch[1], 10);
           const endPeriod = endTimeMatch[3].toUpperCase();
@@ -1163,14 +1277,20 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             const nextDay = new Date(date);
             nextDay.setDate(nextDay.getDate() + 1);
             setSelectedEndDate(nextDay);
-            console.log('>>>>>>>> END TIME ROLLED OVER - Setting end date to next day:', nextDay.toISOString());
+            console.log(
+              '>>>>>>>> END TIME ROLLED OVER - Setting end date to next day:',
+              nextDay.toISOString(),
+            );
           } else {
             // End time is same day, ensure end date matches start date
             setSelectedEndDate(date);
-            console.log('>>>>>>>> END TIME SAME DAY - Setting end date to start date:', date.toISOString());
+            console.log(
+              '>>>>>>>> END TIME SAME DAY - Setting end date to start date:',
+              date.toISOString(),
+            );
           }
         }
-        
+
         // Always set the calculated end time (this ensures it's always 30 min after start)
         setSelectedEndTime(suggestedEndTime);
         console.log('>>>>>>>> SET END TIME TO:', suggestedEndTime);
@@ -1182,7 +1302,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       // When "To" is selected, set the date and time
       setSelectedEndDate(date);
       setSelectedEndTime(time);
-      
+
       // If start time exists and we're setting end time, validate that end is after start
       // But don't auto-calculate here - let user set their own end time
       // Clear errors when date/time is selected
@@ -1196,25 +1316,34 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     if (calendarMode === 'from' && date && time && time.trim() !== '') {
       // When start date and start time are selected, show the recurrence selector
       setShowDetailedDateTime(true);
-    } else if (calendarMode === 'to' && selectedStartDate && selectedStartTime) {
+    } else if (
+      calendarMode === 'to' &&
+      selectedStartDate &&
+      selectedStartTime
+    ) {
       // When end time is selected (and start date/time already exist), also show it
       setShowDetailedDateTime(true);
     }
 
     // Validate immediately with new values (don't wait for state to update)
     const newStartDate = calendarMode === 'from' ? date : selectedStartDate;
-    let newEndDate = calendarMode === 'to' ? date : (selectedEndDate || date);
+    let newEndDate = calendarMode === 'to' ? date : selectedEndDate || date;
     const newStartTime = calendarMode === 'from' ? time : selectedStartTime;
     let newEndTime = calendarMode === 'to' ? time : selectedEndTime;
 
     // If setting start time, calculate end time
     if (calendarMode === 'from' && time && time.trim() !== '') {
       newEndTime = addMinutesToTime(time, 30);
-      
+
       // Check if end time rolled over to next day (12:00 AM)
       // Only add 1 day if the END time (after adding 30 min) is 12:00 AM or later
-      const normalizedEndTime = newEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      const normalizedEndTime = newEndTime
+        .trim()
+        .replace(/\u00A0/g, ' ')
+        .replace(/\s+/g, ' ');
+      const endTimeMatch = normalizedEndTime.match(
+        /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+      );
       if (endTimeMatch) {
         let endHours = parseInt(endTimeMatch[1], 10);
         const endPeriod = endTimeMatch[3].toUpperCase();
@@ -1233,7 +1362,12 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
     // Validate immediately
     setTimeout(() => {
-      validateDateTimeWithValues(newStartDate, newEndDate, newStartTime || '', newEndTime || '');
+      validateDateTimeWithValues(
+        newStartDate,
+        newEndDate,
+        newStartTime || '',
+        newEndTime || '',
+      );
     }, 0);
   };
 
@@ -1242,7 +1376,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     startDate: Date | null,
     endDate: Date | null,
     startTime: string,
-    endTime: string
+    endTime: string,
   ) => {
     setDateTimeError('');
 
@@ -1261,7 +1395,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
 
-      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+      if (
+        selectedYear < currentYear ||
+        (selectedYear === currentYear && selectedMonth < currentMonth)
+      ) {
         setStartDateError('Please select valid time and date');
         return;
       }
@@ -1281,8 +1418,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         // For timed events, check if start date/time is in the past
         if (startTime && startTime.trim() !== '') {
           const startDateTime = new Date(startDate);
-          const normalizedStartTime = startTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-          const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+          const normalizedStartTime = startTime
+            .trim()
+            .replace(/\u00A0/g, ' ')
+            .replace(/\s+/g, ' ');
+          const startTimeMatch = normalizedStartTime.match(
+            /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+          );
 
           if (startTimeMatch) {
             let hours = parseInt(startTimeMatch[1], 10);
@@ -1322,8 +1464,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       const endDateTime = new Date(endDate);
 
       // Parse start time
-      const normalizedStartTime = startTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      const normalizedStartTime = startTime
+        .trim()
+        .replace(/\u00A0/g, ' ')
+        .replace(/\s+/g, ' ');
+      const startTimeMatch = normalizedStartTime.match(
+        /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+      );
 
       if (!startTimeMatch) {
         return;
@@ -1341,8 +1488,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       startDateTime.setHours(finalStartHours, startMinutes, 0, 0);
 
       // Parse end time
-      const normalizedEndTime = endTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-      const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+      const normalizedEndTime = endTime
+        .trim()
+        .replace(/\u00A0/g, ' ')
+        .replace(/\s+/g, ' ');
+      const endTimeMatch = normalizedEndTime.match(
+        /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+      );
 
       if (!endTimeMatch) {
         return;
@@ -1363,15 +1515,17 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       // If end time is 12:00 AM, it means it's on the next day, so add 1 day to endDateTime for comparison
       const endDateTimeForComparison = new Date(endDateTime);
       if (endPeriod === 'AM' && endHours === 12) {
-        endDateTimeForComparison.setDate(endDateTimeForComparison.getDate() + 1);
+        endDateTimeForComparison.setDate(
+          endDateTimeForComparison.getDate() + 1,
+        );
       }
-      
+
       if (endDateTimeForComparison <= startDateTime) {
         const startDateOnly = new Date(startDate);
         startDateOnly.setHours(0, 0, 0, 0);
         const endDateOnly = new Date(endDate);
         endDateOnly.setHours(0, 0, 0, 0);
-        
+
         // If end time is 12:00 AM, it's actually on the next day
         if (endPeriod === 'AM' && endHours === 12) {
           endDateOnly.setDate(endDateOnly.getDate() + 1);
@@ -1393,15 +1547,20 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     }
   };
 
-
-  const addMinutesToTime = (timeString: string, minutesToAdd: number): string => {
+  const addMinutesToTime = (
+    timeString: string,
+    minutesToAdd: number,
+  ): string => {
     // Validate input
     if (!timeString || timeString.trim() === '') {
       return '12:00 AM';
     }
 
     // Normalize the string: replace any non-breaking spaces or special spaces with regular space
-    const normalized = timeString.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+    const normalized = timeString
+      .trim()
+      .replace(/\u00A0/g, ' ')
+      .replace(/\s+/g, ' ');
 
     // Try to extract time and period using regex to handle various formats
     const timeMatch = normalized.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
@@ -1414,7 +1573,11 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         const period = parts[parts.length - 1].toUpperCase();
         const [hours, minutes] = timePart.split(':').map(Number);
 
-        if (!isNaN(hours) && !isNaN(minutes) && (period === 'AM' || period === 'PM')) {
+        if (
+          !isNaN(hours) &&
+          !isNaN(minutes) &&
+          (period === 'AM' || period === 'PM')
+        ) {
           // Valid format found
           let hours24 = hours;
           if (period === 'PM' && hours < 12) {
@@ -1430,7 +1593,9 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           let displayHours = newHours24 % 12;
           if (displayHours === 0) displayHours = 12;
           const newPeriod = newHours24 >= 12 ? 'PM' : 'AM';
-          return `${displayHours}:${newMinutes.toString().padStart(2, '0')} ${newPeriod}`;
+          return `${displayHours}:${newMinutes
+            .toString()
+            .padStart(2, '0')} ${newPeriod}`;
         }
       }
       return '12:00 AM';
@@ -1464,14 +1629,22 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
     if (displayHours === 0) displayHours = 12;
 
     const newPeriod = newHours24 >= 12 ? 'PM' : 'AM';
-    return `${displayHours}:${newMinutes.toString().padStart(2, '0')} ${newPeriod}`;
+    return `${displayHours}:${newMinutes
+      .toString()
+      .padStart(2, '0')} ${newPeriod}`;
   };
-
 
   // Form validation
   const validateForm = () => {
     let isValid = true;
-    let firstErrorField: 'title' | 'startDate' | 'startTime' | 'endDate' | 'endTime' | 'location' | null = null;
+    let firstErrorField:
+      | 'title'
+      | 'startDate'
+      | 'startTime'
+      | 'endDate'
+      | 'endTime'
+      | 'location'
+      | null = null;
 
     // Clear previous errors
     setTitleError('');
@@ -1510,7 +1683,9 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       // Blocked: < > { } [ ] | \ ` ~ ^ / @ # $ % & * + = ?
       const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
       if (invalidChars.test(location)) {
-        setLocationError('Location contains invalid characters. Please use letters, numbers, spaces, commas, periods, and hyphens.');
+        setLocationError(
+          'Location contains invalid characters. Please use letters, numbers, spaces, commas, periods, and hyphens.',
+        );
         isValid = false;
         if (!firstErrorField) firstErrorField = 'location';
       }
@@ -1532,7 +1707,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       const currentMonth = now.getMonth();
       const currentYear = now.getFullYear();
 
-      if (selectedYear < currentYear || (selectedYear === currentYear && selectedMonth < currentMonth)) {
+      if (
+        selectedYear < currentYear ||
+        (selectedYear === currentYear && selectedMonth < currentMonth)
+      ) {
         setStartDateError('Please select valid time and date');
         isValid = false;
         if (!firstErrorField) firstErrorField = 'startDate';
@@ -1552,8 +1730,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         // For timed events, check if start date/time is in the past
         if (selectedStartTime && selectedStartTime.trim() !== '') {
           const startDateTime = new Date(selectedStartDate);
-          const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-          const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+          const normalizedStartTime = selectedStartTime
+            .trim()
+            .replace(/\u00A0/g, ' ')
+            .replace(/\s+/g, ' ');
+          const startTimeMatch = normalizedStartTime.match(
+            /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+          );
 
           if (startTimeMatch) {
             let hours = parseInt(startTimeMatch[1], 10);
@@ -1589,14 +1772,24 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       }
 
       // Only proceed with time parsing if both times are provided
-      if (selectedStartTime && selectedStartTime.trim() && selectedEndTime && selectedEndTime.trim()) {
+      if (
+        selectedStartTime &&
+        selectedStartTime.trim() &&
+        selectedEndTime &&
+        selectedEndTime.trim()
+      ) {
         // Validate that end date/time is after start date/time
         const startDateTime = new Date(selectedStartDate);
         const endDateTime = new Date(selectedEndDate);
 
         // Parse start time (handle non-breaking spaces)
-        const normalizedStartTime = selectedStartTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-        const startTimeMatch = normalizedStartTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        const normalizedStartTime = selectedStartTime
+          .trim()
+          .replace(/\u00A0/g, ' ')
+          .replace(/\s+/g, ' ');
+        const startTimeMatch = normalizedStartTime.match(
+          /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+        );
 
         if (!startTimeMatch) {
           setStartTimeError('Invalid start time format');
@@ -1616,8 +1809,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         }
 
         // Parse end time (handle non-breaking spaces)
-        const normalizedEndTime = selectedEndTime.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
-        const endTimeMatch = normalizedEndTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        const normalizedEndTime = selectedEndTime
+          .trim()
+          .replace(/\u00A0/g, ' ')
+          .replace(/\s+/g, ' ');
+        const endTimeMatch = normalizedEndTime.match(
+          /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+        );
 
         if (!endTimeMatch) {
           setEndTimeError('Invalid end time format');
@@ -1642,7 +1840,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               endDateTime: endDateTime.toISOString(),
               startTime: selectedStartTime,
               endTime: selectedEndTime,
-              isValid: endDateTime > startDateTime
+              isValid: endDateTime > startDateTime,
             });
 
             if (endDateTime <= startDateTime) {
@@ -1686,11 +1884,11 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 if (scrollViewRef.current) {
                   scrollViewRef.current.scrollTo({
                     y: Math.max(0, y - 40),
-                    animated: true
+                    animated: true,
                   });
                 }
               },
-              (error) => {
+              error => {
                 // If measureLayout fails, try UIManager approach
                 const scrollViewHandle = findNodeHandle(scrollViewRef.current);
                 const fieldHandle = findNodeHandle(ref.current);
@@ -1706,13 +1904,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       if (scrollViewRef.current) {
                         scrollViewRef.current.scrollTo({
                           y: Math.max(0, y - 40),
-                          animated: true
+                          animated: true,
                         });
                       }
-                    }
+                    },
                   );
                 }
-              }
+              },
             );
           } catch (error) {
             console.log('Error scrolling to field:', error);
@@ -1746,7 +1944,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   const handleEditEvent = async (eventData: any, activeAccount: any) => {
     try {
       // ✅ If Google Meet is selected and user is connected to Google
-      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
+      if (
+        eventData.locationType === 'google' &&
+        googleIntegration?.isConnected
+      ) {
         console.log('Updating Google Meet meeting...');
 
         const googleEvent = {
@@ -1766,7 +1967,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               displayName: activeAccount.userName.split('@')[0] || 'Organizer',
               responseStatus: 'accepted',
             },
-            ...(eventData.guests?.map((email) => ({
+            ...(eventData.guests?.map(email => ({
               email,
               displayName: email.split('@')[0],
               responseStatus: 'needsAction',
@@ -1798,12 +1999,15 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           const response = await api('POST', '/google/update-event', {
             eventDetails: payload,
             user_name: payload.user_name,
-            eventId: payload.eventId
+            eventId: payload.eventId,
           });
           const data = response?.data?.data || response?.data;
 
           if (data?.hangoutLink) {
-            console.log('✅ Google Meet updated via backend:', data.hangoutLink);
+            console.log(
+              '✅ Google Meet updated via backend:',
+              data.hangoutLink,
+            );
             eventData.location = data.hangoutLink;
             eventData.meetingEventId = data.id;
           } else {
@@ -1835,7 +2039,8 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           .map((data: any) => data.value)
           .filter((value: any) => value !== null);
         const meetingEventIdValue =
-          (eventData?.list || []).find((i: any) => i.key === 'meetingEventId')?.value || '';
+          (eventData?.list || []).find((i: any) => i.key === 'meetingEventId')
+            ?.value || '';
 
         const updatePayload = {
           events: [
@@ -1860,21 +2065,28 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         navigation.goBack();
         showAlert('Event Updated', 'Event updated successfully!', 'success');
       } else {
-        showAlert('Event Update Failed', 'Failed to update event. Please try again.', 'error');
+        showAlert(
+          'Event Update Failed',
+          'Failed to update event. Please try again.',
+          'error',
+        );
       }
     } catch (error: any) {
       console.error('❌ Error in handleEditEvent:', error);
       // Show user-friendly error message from blockchain service
-      const errorMessage = error?.message || 'Failed to update event. Please try again.';
+      const errorMessage =
+        error?.message || 'Failed to update event. Please try again.';
       showAlert('Event Update Failed', errorMessage, 'error');
     }
   };
 
-
   const handleCreateEvent = async (eventData: any, activeAccount: any) => {
     try {
       // If Google Meet is selected
-      if (eventData.locationType === 'google' && googleIntegration?.isConnected) {
+      if (
+        eventData.locationType === 'google' &&
+        googleIntegration?.isConnected
+      ) {
         console.log('Creating Google Meet meeting...');
 
         const googleEvent = {
@@ -1894,7 +2106,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               displayName: activeAccount.userName.split('@')[0] || 'Organizer',
               responseStatus: 'accepted',
             },
-            ...(eventData.guests?.map((email) => ({
+            ...(eventData.guests?.map(email => ({
               email,
               displayName: email.split('@')[0],
               responseStatus: 'needsAction', // default for guests
@@ -1927,23 +2139,24 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           const data = response?.data?.data || response?.data;
 
           if (data?.hangoutLink) {
-            console.log('✅ Google Meet created via backend:', data.hangoutLink);
+            console.log(
+              '✅ Google Meet created via backend:',
+              data.hangoutLink,
+            );
             eventData.location = data.hangoutLink;
             eventData.meetingEventId = data.id;
           } else {
             console.error('❌ Failed to create Google Meet via backend:', data);
             Alert.alert('Error', 'Failed to create Google Meet');
           }
-
         } catch (err) {
           console.error('❌ Google Meet creation error via backend:', err);
           Alert.alert('Error', 'Failed to create Google Meet');
         }
       }
 
-
-      console.log("Active account: ", activeAccount.userName);
-      console.log("Create event payload: ", eventData);
+      console.log('Active account: ', activeAccount.userName);
+      console.log('Create event payload: ', eventData);
       const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
       const response = await blockchainService.createEvent(
         eventData,
@@ -1953,25 +2166,28 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
       if (response) {
         // Build updatePayload similar to handleEditEvent
         const repeatEvents = (eventData?.list || [])
-          .filter((data: any) => data.key === "repeatEvent")
+          .filter((data: any) => data.key === 'repeatEvent')
           .map((data: any) => data.value)
           .filter((value: any) => value !== null);
         const customRepeat = (eventData?.list || [])
-          .filter((data: any) => data.key === "customRepeatEvent")
+          .filter((data: any) => data.key === 'customRepeatEvent')
           .map((data: any) => data.value)
           .filter((value: any) => value !== null);
-        const meetingEventIdValue = (eventData?.list || [])
-          .find((i: any) => i.key === 'meetingEventId')?.value || '';
+        const meetingEventIdValue =
+          (eventData?.list || []).find((i: any) => i.key === 'meetingEventId')
+            ?.value || '';
 
         const updatePayload = {
-          events: [{
-            uid: eventData?.uid,
-            fromTime: eventData?.fromTime,
-            toTime: eventData?.toTime,
-            repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
-            customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
-            meetingEventId: meetingEventIdValue
-          }],
+          events: [
+            {
+              uid: eventData?.uid,
+              fromTime: eventData?.fromTime,
+              toTime: eventData?.toTime,
+              repeatEvent: repeatEvents.length ? `${repeatEvents}` : '',
+              customRepeatEvent: customRepeat.length ? `${customRepeat}` : '',
+              meetingEventId: meetingEventIdValue,
+            },
+          ],
           active: activeAccount?.userName,
           type: 'update',
         };
@@ -1991,7 +2207,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           };
           setUserEvents([...userEvents, newEvent]);
           console.log('✅ Event added optimistically to local state');
-          console.log('✅ Event list includes guests:', eventData.list?.filter((item: any) => item.key === 'guest') || []);
+          console.log(
+            '✅ Event list includes guests:',
+            eventData.list?.filter((item: any) => item.key === 'guest') || [],
+          );
         }
 
         // Refresh events in background (non-blocking) - this will merge with optimistic event
@@ -2007,12 +2226,17 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           showAlert('Event Created', 'Event created successfully!', 'success');
         }, 300);
       } else {
-        showAlert('Event Creation Failed', 'Failed to create event. Please try again.', 'error');
+        showAlert(
+          'Event Creation Failed',
+          'Failed to create event. Please try again.',
+          'error',
+        );
       }
     } catch (error: any) {
       console.error('Error creating event:', error);
       // Show user-friendly error message from blockchain service
-      const errorMessage = error?.message || 'Failed to create event. Please try again.';
+      const errorMessage =
+        error?.message || 'Failed to create event. Please try again.';
       showAlert('Event Creation Failed', errorMessage, 'error');
     }
   };
@@ -2040,7 +2264,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
 
     try {
       // Convert date and time to timestamp format (YYYYMMDDTHHMMSS)
-      const formatToISO8601Local = (date: Date, time: string, isAllDay: boolean = false
+      const formatToISO8601Local = (
+        date: Date,
+        time: string,
+        isAllDay: boolean = false,
       ): string => {
         console.log('DEBUG - Input date:', date);
         console.log('DEBUG - Input time:', time);
@@ -2066,12 +2293,17 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           return '';
         }
         // Handle AM/PM format properly - normalize whitespace first (including non-breaking spaces)
-        const normalizedTime = time.trim().replace(/\u00A0/g, ' ').replace(/\s+/g, ' ');
+        const normalizedTime = time
+          .trim()
+          .replace(/\u00A0/g, ' ')
+          .replace(/\s+/g, ' ');
         console.log('DEBUG - Original time:', JSON.stringify(time));
         console.log('DEBUG - Normalized time:', JSON.stringify(normalizedTime));
 
         // Use regex to extract time components (more robust than split)
-        const timeMatch = normalizedTime.match(/^(\d{1,2}):(\d{2})\s*(AM|PM)$/i);
+        const timeMatch = normalizedTime.match(
+          /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
+        );
 
         if (!timeMatch) {
           // Fallback: try splitting by whitespace
@@ -2079,7 +2311,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
           console.log('DEBUG - Split result (fallback):', timeParts);
 
           if (timeParts.length < 2) {
-            console.error('DEBUG - Time format should be "HH:MM AM/PM", got:', normalizedTime);
+            console.error(
+              'DEBUG - Time format should be "HH:MM AM/PM", got:',
+              normalizedTime,
+            );
             return '';
           }
 
@@ -2139,7 +2374,14 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         const hours = parseInt(timeMatch[1], 10);
         const minutes = parseInt(timeMatch[2], 10);
         const period = timeMatch[3].toUpperCase();
-        console.log('DEBUG - Regex match - hours:', hours, 'minutes:', minutes, 'period:', period);
+        console.log(
+          'DEBUG - Regex match - hours:',
+          hours,
+          'minutes:',
+          minutes,
+          'period:',
+          period,
+        );
 
         let finalHours = hours;
 
@@ -2221,18 +2463,33 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         }
       })();
       // Build recurrence data from current state
-      const repeatEventValue = selectedRecurrence !== 'Does not repeat' ? selectedRecurrence : '';
+      const repeatEventValue =
+        selectedRecurrence !== 'Does not repeat' ? selectedRecurrence : '';
 
       // Build custom recurrence string if it's a custom recurrence
       let customRepeatEventValue = '';
-      if (selectedRecurrence.startsWith('Every ') && selectedRecurrence !== 'Every Weekday (Monday to Friday)') {
+      if (
+        selectedRecurrence.startsWith('Every ') &&
+        selectedRecurrence !== 'Every Weekday (Monday to Friday)'
+      ) {
         // This is a custom recurrence, format it
-        const { repeatEvery, repeatUnit, repeatOn, endsType, endsAfter, endsDate } = customRecurrence;
+        const {
+          repeatEvery,
+          repeatUnit,
+          repeatOn,
+          endsType,
+          endsAfter,
+          endsDate,
+        } = customRecurrence;
         // Format endsDate as YYYYMMDD if it's a Date object
         const formattedEndsDate = endsDate
-          ? `${endsDate.getFullYear()}${String(endsDate.getMonth() + 1).padStart(2, '0')}${String(endsDate.getDate()).padStart(2, '0')}`
+          ? `${endsDate.getFullYear()}${String(
+              endsDate.getMonth() + 1,
+            ).padStart(2, '0')}${String(endsDate.getDate()).padStart(2, '0')}`
           : '';
-        customRepeatEventValue = `${repeatEvery}|${repeatUnit}|${repeatOn.join(',')}|${endsType}|${endsAfter}|${formattedEndsDate}`;
+        customRepeatEventValue = `${repeatEvery}|${repeatUnit}|${repeatOn.join(
+          ',',
+        )}|${endsType}|${endsAfter}|${formattedEndsDate}`;
       }
 
       // Prepare event data in the new format (before building metadata)
@@ -2243,13 +2500,13 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         description: description.trim(),
         fromTime: formatToISO8601Local(
           selectedStartDate,
-          selectedStartTime || '12:00 AM',  // Use midnight if no time
-          isAllDayEvent
+          selectedStartTime || '12:00 AM', // Use midnight if no time
+          isAllDayEvent,
         ),
         toTime: formatToISO8601Local(
-          isAllDayEvent ? getNextDay(selectedEndDate) : selectedEndDate,  // ✅ Add 1 day for all-day
-          selectedEndTime || '12:00 AM',  // Use midnight if no time
-          isAllDayEvent
+          isAllDayEvent ? getNextDay(selectedEndDate) : selectedEndDate, // ✅ Add 1 day for all-day
+          selectedEndTime || '12:00 AM', // Use midnight if no time
+          isAllDayEvent,
         ),
         organizer:
           activeAccount?.email ||
@@ -2282,30 +2539,44 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         location: eventDataForMetadata.location,
         organizer: eventDataForMetadata.organizer,
       });
-      
-      const metadataList = buildEventMetadata(eventDataForMetadata as any, null);
-      
+
+      const metadataList = buildEventMetadata(
+        eventDataForMetadata as any,
+        null,
+      );
+
       console.log('🔍 Metadata list built:', metadataList);
-      console.log('🔍 Guest items in metadata:', metadataList.filter((item: any) => item.key === 'guest'));
+      console.log(
+        '🔍 Guest items in metadata:',
+        metadataList.filter((item: any) => item.key === 'guest'),
+      );
 
       // If editing, merge with existing list to preserve items like isDeleted, etc.
       let finalList = metadataList;
-      if (mode === 'edit' && editEventData?.list && Array.isArray(editEventData.list)) {
+      if (
+        mode === 'edit' &&
+        editEventData?.list &&
+        Array.isArray(editEventData.list)
+      ) {
         // Preserve special items from existing list (but not guests, location, etc. - those come from new metadata)
-        const preservedItems = editEventData.list.filter((item: any) => 
-          item.key === 'isDeleted' || 
-          item.key === 'deletedTime' || 
-          item.key === 'isPermanentDelete' ||
-          item.key === 'task' ||
-          item.key === 'done'
+        const preservedItems = editEventData.list.filter(
+          (item: any) =>
+            item.key === 'isDeleted' ||
+            item.key === 'deletedTime' ||
+            item.key === 'isPermanentDelete' ||
+            item.key === 'task' ||
+            item.key === 'done',
         );
-        
+
         // Use the new metadata list (which includes updated guests, location, etc.)
         // Combine preserved items with new metadata
         finalList = [...preservedItems, ...metadataList];
       }
 
-      console.log('🔍 Final list with guests:', finalList.filter((item: any) => item.key === 'guest'));
+      console.log(
+        '🔍 Final list with guests:',
+        finalList.filter((item: any) => item.key === 'guest'),
+      );
 
       // Prepare final event data with complete list
       const eventData = {
@@ -2313,18 +2584,15 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         list: finalList,
       };
 
-
-
-
       console.log('>>>>>>>> START DATE/TIME <<<<<<<<', {
         startDate: selectedStartDate?.toISOString(),
         startDateFormatted: selectedStartDate?.toLocaleDateString(),
-        startTime: selectedStartTime
+        startTime: selectedStartTime,
       });
       console.log('>>>>>>>> END DATE/TIME <<<<<<<<', {
         endDate: selectedEndDate?.toISOString(),
         endDateFormatted: selectedEndDate?.toLocaleDateString(),
-        endTime: selectedEndTime
+        endTime: selectedEndTime,
       });
       console.log('>>>>>>>> EDIT EVENT DATA <<<<<<<<', eventData);
       // return;
@@ -2347,6 +2615,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
   const handleClose = () => {
     navigation.goBack();
   };
+
+  const videoConferencingDisplay = getVideoConferencingDisplay(
+    selectedVideoConferencing,
+  );
 
   return (
     <View style={styles.container}>
@@ -2427,13 +2699,16 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             >
               <Text style={styles.labelText}>Add title</Text>
               <TextInput
-                style={[styles.titleInput, activeField === 'title' && styles.fieldActiveInput]}
+                style={[
+                  styles.titleInput,
+                  activeField === 'title' && styles.fieldActiveInput,
+                ]}
                 placeholder="Write here"
                 placeholderTextColor="#A4A7AE"
                 value={title}
                 onFocus={() => setActiveField('title')}
                 onBlur={() => setActiveField(null)}
-                onChangeText={(text) => {
+                onChangeText={text => {
                   setTitle(text);
                   if (titleError) setTitleError('');
                 }}
@@ -2444,169 +2719,159 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               ) : null}
             </View>
 
-            {/* Pick date and time */}
+            {/* Start Date and Time */}
             <View
               ref={dateTimeSectionRef}
-              style={styles.dateTimeSection}
+              style={styles.fieldContainer}
               collapsable={false}
             >
-              <View style={styles.dateTimeDisplay}>
-                <Text style={styles.dateTimeLabel}>Date & Time</Text>
-                <View style={styles.dateTimeRow}>
-                  <View style={styles.timeSlotContainer}>
-                    <TouchableOpacity
-                      style={styles.timeSlot}
-                      onPress={() => {
-                        if (!isLoading) {
-                          setCalendarMode('from');
-                          setShowCalendarModal(true);
-                        }
-                      }}
-                      disabled={isLoading}
-                    >
-                      <Text style={styles.timeSlotLabel}>From</Text>
-                      <Text style={[
-                        styles.timeSlotValue,
-                        (!selectedStartDate || (!isAllDayEvent && !selectedStartTime)) && styles.timeSlotValuePlaceholder
-                      ]}>
-                        {selectedStartDate ? (
-                          isAllDayEvent ? (
-                            // ✅ All-day: Show only date
-                            selectedStartDate.toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })
-                          ) : selectedStartTime ? (
-                            // ✅ Timed: Show date and time
-                            `${selectedStartDate.toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                            })} ${selectedStartTime}`
-                          ) : (
-                            'Select start time'
-                          )
-                        ) : (
-                          'Select start date'
-                        )}
-                      </Text>
-                    </TouchableOpacity>
-                    {(startDateError || startTimeError) && (
-                      <Text style={styles.fieldErrorText}>
-                        {startDateError || startTimeError}
-                      </Text>
-                    )}
-                  </View>
-
-                  <View style={styles.timeSlotContainer}>
-                    <TouchableOpacity
-                      style={styles.timeSlot}
-                      onPress={() => {
-                        if (!isLoading) {
-                          setCalendarMode('to');
-                          setShowCalendarModal(true);
-                        }
-                      }}
-                      disabled={isLoading}
-                    >
-                      <Text style={styles.timeSlotLabel}>To</Text>
-                      <Text style={[
-                        styles.timeSlotValue,
-                        (!selectedEndDate || (!isAllDayEvent && !selectedEndTime)) && styles.timeSlotValuePlaceholder
-                      ]}>
-                        {selectedEndDate ? (
-                          isAllDayEvent ? (
-                            // ✅ All-day: Show only date
-                            selectedEndDate.toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                              year: 'numeric'
-                            })
-                          ) : selectedEndTime ? (
-                            // ✅ Timed: Show date and time
-                            `${selectedEndDate.toLocaleDateString('en-US', {
-                              month: 'short',
-                              day: 'numeric',
-                            })} ${selectedEndTime}`
-                          ) : (
-                            'Select end time'
-                          )
-                        ) : (
-                          'Select end date'
-                        )}
-                      </Text>
-                    </TouchableOpacity>
-                    {(endDateError || endTimeError) && (
-                      <Text style={styles.fieldErrorText}>
-                        {endDateError || endTimeError}
-                      </Text>
-                    )}
-                  </View>
-                </View>
-                {/* Date/Time relationship validation error - shown below both fields */}
-                {dateTimeError && (
-                  <View style={styles.dateTimeErrorContainer}>
-                    <Text style={styles.dateTimeErrorText}>{dateTimeError}</Text>
-                  </View>
-                )}
-              </View>
+              <Text style={styles.labelText}>Start Date and Time</Text>
+              <TouchableOpacity
+                style={styles.datePicker}
+                onPress={() => {
+                  if (!isLoading) {
+                    setCalendarMode('from');
+                    setShowCalendarModal(true);
+                  }
+                }}
+                disabled={isLoading}
+              >
+                <Text
+                  style={[
+                    styles.selectorText,
+                    selectedStartDate && styles.selectorTextFilled,
+                  ]}
+                >
+                  {selectedStartDate
+                    ? isAllDayEvent
+                      ? selectedStartDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                      : selectedStartTime
+                      ? `${selectedStartDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })} ${selectedStartTime}`
+                      : 'Select'
+                    : 'Select'}
+                </Text>
+                <FeatherIcon name="calendar" size={20} color="#A4A7AE" />
+              </TouchableOpacity>
+              {(startDateError || startTimeError) && (
+                <Text style={styles.fieldErrorText}>
+                  {startDateError || startTimeError}
+                </Text>
+              )}
             </View>
 
-        <TouchableOpacity
-          style={styles.allDayToggle}
-          onPress={() => {
-            if (isLoading) return;
-            const newIsAllDay = !isAllDayEvent;
-            setIsAllDayEvent(newIsAllDay);
+            {/* End Date and Time */}
+            <View style={styles.fieldContainer} collapsable={false}>
+              <Text style={styles.labelText}>End Date and Time</Text>
+              <TouchableOpacity
+                style={styles.datePicker}
+                onPress={() => {
+                  if (!isLoading) {
+                    setCalendarMode('to');
+                    setShowCalendarModal(true);
+                  }
+                }}
+                disabled={isLoading}
+              >
+                <Text
+                  style={[
+                    styles.selectorText,
+                    selectedEndDate && styles.selectorTextFilled,
+                  ]}
+                >
+                  {selectedEndDate
+                    ? isAllDayEvent
+                      ? selectedEndDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
+                      : selectedEndTime
+                      ? `${selectedEndDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                        })} ${selectedEndTime}`
+                      : 'Select'
+                    : 'Select'}
+                </Text>
+                <FeatherIcon name="calendar" size={20} color="#A4A7AE" />
+              </TouchableOpacity>
+              {(endDateError || endTimeError) && (
+                <Text style={styles.fieldErrorText}>
+                  {endDateError || endTimeError}
+                </Text>
+              )}
+            </View>
 
-            if (newIsAllDay) {
-              // ✅ When switching TO all-day:
-              setSelectedStartTime('');
-              setSelectedEndTime('');
-
-              if (selectedStartDate) {
-                // Important: Create a new Date object to avoid modifying the start date state directly.
-                setSelectedEndDate(new Date(selectedStartDate.getTime()));
-              } else {
-                // Optional: If no start date is set, set both to today/default
-                const today = new Date();
-                setSelectedStartDate(today);
-                setSelectedEndDate(today);
-              }
-
-            } else {
-              // ✅ When switching FROM all-day, clear times so user must select
-              setSelectedStartTime('');
-              setSelectedEndTime('');
-            }
-          }}
-          disabled={isLoading}
-        >
-          <View style={[
-            styles.checkbox,
-            isAllDayEvent && styles.checkboxSelected
-          ]}>
-            {isAllDayEvent && (
-              <FeatherIcon name="check" size={14} color="white" />
+            {/* Date/Time relationship validation error - shown below both fields */}
+            {dateTimeError && (
+              <View style={styles.dateTimeErrorContainer}>
+                <Text style={styles.dateTimeErrorText}>{dateTimeError}</Text>
+              </View>
             )}
-          </View>
-          <Text style={styles.allDayText}>All-day event</Text>
-        </TouchableOpacity>
 
-        {/* Timezone Tag */}
-        <TouchableOpacity
-          style={styles.timezoneTag}
-          onPress={() => {
-            if (!isLoading) {
-              setShowTimezoneModal(true);
-            }
-          }}
-          disabled={isLoading}
-        >
-          <Text style={styles.timezoneTagText}>
-            {getSelectedTimezoneData().name}
-          </Text>
-        </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.allDayToggle}
+              onPress={() => {
+                if (isLoading) return;
+                const newIsAllDay = !isAllDayEvent;
+                setIsAllDayEvent(newIsAllDay);
+
+                if (newIsAllDay) {
+                  // ✅ When switching TO all-day:
+                  setSelectedStartTime('');
+                  setSelectedEndTime('');
+
+                  if (selectedStartDate) {
+                    // Important: Create a new Date object to avoid modifying the start date state directly.
+                    setSelectedEndDate(new Date(selectedStartDate.getTime()));
+                  } else {
+                    // Optional: If no start date is set, set both to today/default
+                    const today = new Date();
+                    setSelectedStartDate(today);
+                    setSelectedEndDate(today);
+                  }
+                } else {
+                  // ✅ When switching FROM all-day, clear times so user must select
+                  setSelectedStartTime('');
+                  setSelectedEndTime('');
+                }
+              }}
+              disabled={isLoading}
+            >
+              <View
+                style={[
+                  styles.checkbox,
+                  isAllDayEvent && styles.checkboxSelected,
+                ]}
+              >
+                {isAllDayEvent && (
+                  <FeatherIcon name="check" size={14} color="white" />
+                )}
+              </View>
+              <Text style={styles.allDayText}>All-day event</Text>
+            </TouchableOpacity>
+
+            {/* Timezone Tag */}
+            <TouchableOpacity
+              style={styles.timezoneTag}
+              onPress={() => {
+                if (!isLoading) {
+                  setShowTimezoneModal(true);
+                }
+              }}
+              disabled={isLoading}
+            >
+              <Text style={styles.timezoneTagText}>
+                {getSelectedTimezoneData().name}
+              </Text>
+            </TouchableOpacity>
 
             {/* Repeat Field - Match task screen design */}
             {showDetailedDateTime && (
@@ -2627,12 +2892,17 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   }}
                   disabled={isLoading}
                 >
-                  <Text style={[styles.selectorText, selectedRecurrence && selectedRecurrence !== "Does not repeat" && styles.selectorTextFilled]}>{selectedRecurrence}</Text>
-                  <ArrowDownIcon
-                    width={20}
-                    height={20}
-                    fill="#6C6C6C"
-                  />
+                  <Text
+                    style={[
+                      styles.selectorText,
+                      selectedRecurrence &&
+                        selectedRecurrence !== 'Does not repeat' &&
+                        styles.selectorTextFilled,
+                    ]}
+                  >
+                    {selectedRecurrence}
+                  </Text>
+                  <ArrowDownIcon width={20} height={20} fill="#6C6C6C" />
                 </TouchableOpacity>
 
                 {/* Repeat Dropdown - Match task screen design */}
@@ -2654,7 +2924,8 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                           key={`${option}-${index}`}
                           style={[
                             styles.repeatOption,
-                            selectedRecurrence === option && styles.repeatOptionSelected,
+                            selectedRecurrence === option &&
+                              styles.repeatOptionSelected,
                           ]}
                           onPress={() => {
                             if (!isLoading) {
@@ -2667,14 +2938,19 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                           <Text
                             style={[
                               styles.repeatOptionText,
-                              selectedRecurrence === option && styles.repeatOptionTextSelected,
+                              selectedRecurrence === option &&
+                                styles.repeatOptionTextSelected,
                             ]}
                             numberOfLines={1}
                           >
                             {option}
                           </Text>
                           {selectedRecurrence === option && (
-                            <FeatherIcon name="check" size={18} color={colors.primaryBlue} />
+                            <FeatherIcon
+                              name="check"
+                              size={18}
+                              color={colors.primaryBlue}
+                            />
                           )}
                         </TouchableOpacity>
                       ))}
@@ -2684,7 +2960,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               </View>
             )}
 
-            {(showRecurrenceDropdown) && (
+            {showRecurrenceDropdown && (
               <TouchableOpacity
                 style={styles.recurrenceOverlay}
                 activeOpacity={1}
@@ -2723,138 +2999,180 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             <View style={styles.fieldContainer}>
               <Text style={styles.labelText}>Add video conferencing</Text>
               <TouchableOpacity
-                style={[styles.datePicker, activeField === 'videoConferencing' && styles.fieldActive]}
+                style={[
+                  styles.datePicker,
+                  activeField === 'videoConferencing' && styles.fieldActive,
+                ]}
                 onPress={() => {
                   if (!isLoading) {
                     setActiveField('videoConferencing');
-                    setShowVideoConferencingOptions(!showVideoConferencingOptions);
+                    setShowVideoConferencingOptions(
+                      !showVideoConferencingOptions,
+                    );
                   }
                 }}
                 disabled={isLoading}
               >
-                <Text style={[styles.selectorText, selectedVideoConferencing && styles.selectorTextFilled]}>
-                  {getVideoConferencingLabel(selectedVideoConferencing)}
-                </Text>
+                <View style={styles.videoConferencingValueContainer}>
+                  {videoConferencingDisplay.icon && (
+                    <View style={styles.videoConferencingValueIcon}>
+                      {videoConferencingDisplay.icon}
+                    </View>
+                  )}
+                  <Text
+                    style={[
+                      styles.selectorText,
+                      videoConferencingDisplay.filled &&
+                        styles.selectorTextFilled,
+                    ]}
+                  >
+                    {videoConferencingDisplay.label}
+                  </Text>
+                </View>
                 <FeatherIcon name="chevron-down" size={20} color="#6C6C6C" />
               </TouchableOpacity>
+
+              {/* Video Conferencing Dropdown */}
+              {showVideoConferencingOptions && (
+                <View style={styles.videoConferencingDropdown}>
+                  {/* In-person option */}
+                  <TouchableOpacity
+                    style={[
+                      styles.videoConferencingDropdownItem,
+                      selectedVideoConferencing === 'inperson' &&
+                        styles.videoConferencingDropdownItemSelected,
+                    ]}
+                    onPress={() => {
+                      if (!isLoading) {
+                        setSelectedVideoConferencing(
+                          selectedVideoConferencing === 'inperson'
+                            ? null
+                            : 'inperson',
+                        );
+                        setShowVideoConferencingOptions(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <View style={styles.videoConferencingDropdownItemContent}>
+                      <FeatherIcon name="map-pin" size={18} color="#6C6C6C" />
+                      <Text style={styles.videoConferencingDropdownItemText}>
+                        In-person meeting
+                      </Text>
+                    </View>
+                    {selectedVideoConferencing === 'inperson' && (
+                      <FeatherIcon
+                        name="check"
+                        size={18}
+                        color={colors.primaryBlue}
+                      />
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Google Meet option */}
+                  <TouchableOpacity
+                    style={[
+                      styles.videoConferencingDropdownItem,
+                      selectedVideoConferencing === 'google' &&
+                        styles.videoConferencingDropdownItemSelected,
+                    ]}
+                    onPress={() => {
+                      if (!isLoading) {
+                        handleGoogleMeetClick();
+                        setSelectedVideoConferencing('google');
+                        setShowVideoConferencingOptions(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <View style={styles.videoConferencingDropdownItemContent}>
+                      <MeetIcon width={18} height={18} />
+                      <Text style={styles.videoConferencingDropdownItemText}>
+                        Google Meet
+                      </Text>
+                    </View>
+                    {selectedVideoConferencing === 'google' && (
+                      <FeatherIcon
+                        name="check"
+                        size={18}
+                        color={colors.primaryBlue}
+                      />
+                    )}
+                  </TouchableOpacity>
+
+                  {/* Zoom option */}
+                  <TouchableOpacity
+                    style={[
+                      styles.videoConferencingDropdownItem,
+                      selectedVideoConferencing === 'zoom' &&
+                        styles.videoConferencingDropdownItemSelected,
+                    ]}
+                    onPress={() => {
+                      if (!isLoading) {
+                        setSelectedVideoConferencing(
+                          selectedVideoConferencing === 'zoom' ? null : 'zoom',
+                        );
+                        setShowVideoConferencingOptions(false);
+                      }
+                    }}
+                    disabled={isLoading}
+                  >
+                    <View style={styles.videoConferencingDropdownItemContent}>
+                      <FeatherIcon name="video" size={18} color="#0B6DE0" />
+                      <Text style={styles.videoConferencingDropdownItemText}>
+                        Zoom Meeting
+                      </Text>
+                    </View>
+                    {selectedVideoConferencing === 'zoom' && (
+                      <FeatherIcon
+                        name="check"
+                        size={18}
+                        color={colors.primaryBlue}
+                      />
+                    )}
+                  </TouchableOpacity>
+                </View>
+              )}
             </View>
 
-            {/* Video Conferencing Options */}
-        {showVideoConferencingOptions && (
-          <View style={styles.videoConferencingOptions}>
-            <TouchableOpacity
-              style={[
-                styles.videoConferencingButton,
-                selectedVideoConferencing === 'inperson' &&
-                styles.videoConferencingButtonSelected,
-              ]}
-              onPress={() => {
-                if (!isLoading) {
-                  setSelectedVideoConferencing(
-                    selectedVideoConferencing === 'inperson' ? null : 'inperson'
-                  );
-                  setShowVideoConferencingOptions(false);
-                }
-              }}
-              disabled={isLoading}
+            {/* Add location - Match task screen design */}
+            <View
+              ref={locationSectionRef}
+              style={styles.fieldContainer}
+              collapsable={false}
             >
-              <View style={styles.videoConferencingIconContainer}>
-                <FeatherIcon name="map-pin" size={16} color="#A4A7AE" />
-              </View>
-              <Text
+              <Text style={styles.labelText}>Add Location</Text>
+              <TouchableOpacity
                 style={[
-                  styles.videoConferencingButtonText,
-                  selectedVideoConferencing === 'inperson' &&
-                  styles.videoConferencingButtonTextSelected,
+                  styles.datePicker,
+                  activeField === 'location' && styles.fieldActive,
                 ]}
+                onPress={() => {
+                  if (!isLoading) {
+                    setActiveField('location');
+                    handleOpenLocationModal();
+                  }
+                }}
+                disabled={isLoading}
               >
-                In-person
-              </Text>
-            </TouchableOpacity>
-            {/* 
-            <TouchableOpacity
-              style={[
-                styles.videoConferencingButton,
-                selectedVideoConferencing === 'zoom' &&
-                styles.videoConferencingButtonSelected,
-              ]}
-              onPress={() => setSelectedVideoConferencing('zoom')}
-            >
-              <View style={styles.videoConferencingIconContainer}>
-                <FeatherIcon name="video" size={16} color="#0B6DE0" />
-              </View>
-              <Text
-                style={[
-                  styles.videoConferencingButtonText,
-                  selectedVideoConferencing === 'zoom' &&
-                  styles.videoConferencingButtonTextSelected,
-                ]}
-              >
-                Zoom
-              </Text>
-            </TouchableOpacity> */}
+                <FeatherIcon name="map-pin" size={20} color="#A4A7AE" />
+                <Text
+                  style={[
+                    styles.selectorText,
+                    location && styles.selectorTextFilled,
+                  ]}
+                >
+                  {location || 'Add Location'}
+                </Text>
+                <FeatherIcon name="plus" size={20} color="#6C6C6C" />
+              </TouchableOpacity>
+              {locationError ? (
+                <Text style={styles.fieldErrorText}>{locationError}</Text>
+              ) : null}
+            </View>
 
-            <TouchableOpacity
-              style={[
-                styles.videoConferencingButton,
-                selectedVideoConferencing === 'google' &&
-                styles.videoConferencingButtonSelected,
-              ]}
-              onPress={() => {
-                if (!isLoading) {
-                  handleGoogleMeetClick();
-                }
-              }}
-              disabled={isLoading}
-            >
-              <View style={styles.videoConferencingIconContainer}>
-                <FeatherIcon name="video" size={16} color="#34A853" />
-              </View>
-              <Text
-                style={[
-                  styles.videoConferencingButtonText,
-                  selectedVideoConferencing === 'google' &&
-                  styles.videoConferencingButtonTextSelected,
-                ]}
-              >
-                Google Meet
-              </Text>
-            </TouchableOpacity>
-          </View>
-        )}
-
-        {/* Add location - Match task screen design */}
-        <View
-          ref={locationSectionRef}
-          style={styles.fieldContainer}
-          collapsable={false}
-        >
-          <Text style={styles.labelText}>Add Location</Text>
-          <TouchableOpacity
-            style={[styles.datePicker, activeField === 'location' && styles.fieldActive]}
-            onPress={() => {
-              if (!isLoading) {
-                setActiveField('location');
-                handleOpenLocationModal();
-              }
-            }}
-            disabled={isLoading}
-          >
-            <FeatherIcon name="map-pin" size={20} color="#A4A7AE" />
-            <Text style={[styles.selectorText, location && styles.selectorTextFilled]}>
-              {location || "Add Location"}
-            </Text>
-            <FeatherIcon name="plus" size={20} color="#6C6C6C" />
-          </TouchableOpacity>
-          {locationError ? (
-            <Text style={styles.fieldErrorText}>{locationError}</Text>
-          ) : null}
-        </View>
-
-
-
-        {/* Add Notification time */}
-        {/* <View style={styles.notificationRow}>
+            {/* Add Notification time */}
+            {/* <View style={styles.notificationRow}>
           <FeatherIcon name="bell" size={20} color="#6C6C6C" />
           <Text style={styles.selectorText}>Add Notification time</Text>
 
@@ -2880,45 +3198,48 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         </View> */}
 
             {/* Advanced Options - Only show when expanded */}
-        {showAdvanced && (
-          <AdvancedOptions
-            notificationMinutes={parseInt(notificationMinutes) || 0}
-            onNotificationMinutesChange={minutes =>
-              setNotificationMinutes(minutes.toString())
-            }
-            selectedTimeUnit={selectedTimeUnit}
-            onTimeUnitChange={setSelectedTimeUnit}
-            selectedNotificationType={selectedNotificationType}
-            onNotificationTypeChange={setSelectedNotificationType}
-            onAddNotification={() => {
-              // Handle add notification
-              console.log('Add notification pressed');
-            }}
-            organizerName="Farhanur Rahman"
-            onOrganizerPress={() => {
-              // Handle organizer selection
-              console.log('Organizer pressed');
-            }}
-            selectedStatus={selectedStatus}
-            onStatusChange={setSelectedStatus}
-            selectedVisibility={selectedVisibility}
-            onVisibilityChange={setSelectedVisibility}
-            onStatusPress={() => {
-              // Handle status selection
-              console.log('Status pressed');
-            }}
-            onVisibilityPress={() => {
-              // Handle visibility selection
-              console.log('Visibility pressed');
-            }}
-          />
-        )}
+            {showAdvanced && (
+              <AdvancedOptions
+                notificationMinutes={parseInt(notificationMinutes) || 0}
+                onNotificationMinutesChange={minutes =>
+                  setNotificationMinutes(minutes.toString())
+                }
+                selectedTimeUnit={selectedTimeUnit}
+                onTimeUnitChange={setSelectedTimeUnit}
+                selectedNotificationType={selectedNotificationType}
+                onNotificationTypeChange={setSelectedNotificationType}
+                onAddNotification={() => {
+                  // Handle add notification
+                  console.log('Add notification pressed');
+                }}
+                organizerName="Farhanur Rahman"
+                onOrganizerPress={() => {
+                  // Handle organizer selection
+                  console.log('Organizer pressed');
+                }}
+                selectedStatus={selectedStatus}
+                onStatusChange={setSelectedStatus}
+                selectedVisibility={selectedVisibility}
+                onVisibilityChange={setSelectedVisibility}
+                onStatusPress={() => {
+                  // Handle status selection
+                  console.log('Status pressed');
+                }}
+                onVisibilityPress={() => {
+                  // Handle visibility selection
+                  console.log('Visibility pressed');
+                }}
+              />
+            )}
 
             {/* Description Field */}
             <View style={styles.fieldContainer}>
               <Text style={styles.labelText}>Description</Text>
               <TextInput
-                style={[styles.descriptionInput, activeField === 'description' && styles.fieldActiveInput]}
+                style={[
+                  styles.descriptionInput,
+                  activeField === 'description' && styles.fieldActiveInput,
+                ]}
                 placeholder="Enter here.."
                 value={description}
                 onChangeText={setDescription}
@@ -2933,7 +3254,10 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             {/* Bottom Action Bar - Advanced Options and Create Button Inline */}
             <View style={styles.bottomActionBar}>
               <TouchableOpacity
-                style={styles.advanceOptionsButton}
+                style={[
+                  styles.advanceOptionsButton,
+                  showAdvanced && styles.advanceOptionsButtonActive,
+                ]}
                 onPress={() => {
                   if (!isLoading) {
                     setShowAdvanced(!showAdvanced);
@@ -2941,11 +3265,22 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 }}
                 disabled={isLoading}
               >
-                <Text style={styles.advanceOptionsText} numberOfLines={1}>Advanced options</Text>
+                <Text
+                  style={[
+                    styles.advanceOptionsText,
+                    showAdvanced && styles.advanceOptionsTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  Advanced options
+                </Text>
               </TouchableOpacity>
-              
+
               <TouchableOpacity
-                style={[styles.saveButton, isLoading && styles.saveButtonDisabled]}
+                style={[
+                  styles.saveButton,
+                  isLoading && styles.saveButtonDisabled,
+                ]}
                 disabled={isLoading}
                 onPress={handleSaveEvent}
               >
@@ -2958,15 +3293,20 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         </ScrollView>
       </KeyboardAvoidingView>
 
-
       {/* Calendar with Time Modal */}
       <CalendarWithTime
         isVisible={showCalendarModal}
         onClose={() => setShowCalendarModal(false)}
         onDateTimeSelect={handleDateTimeSelect}
         mode={calendarMode}
-        selectedDate={calendarMode === 'from' ? selectedStartDate || undefined : selectedEndDate || undefined}
-        selectedTime={calendarMode === 'from' ? selectedStartTime : selectedEndTime}
+        selectedDate={
+          calendarMode === 'from'
+            ? selectedStartDate || undefined
+            : selectedEndDate || undefined
+        }
+        selectedTime={
+          calendarMode === 'from' ? selectedStartTime : selectedEndTime
+        }
       />
 
       {/* Timezone Selection Modal */}
@@ -3016,7 +3356,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                     style={[
                       styles.timezoneItemText,
                       selectedTimezone === item.id &&
-                      styles.timezoneItemTextSelected,
+                        styles.timezoneItemTextSelected,
                     ]}
                   >
                     ({item.offset}) {item.name}
@@ -3088,16 +3428,19 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                         // Only allow positive integers (1-99)
                         // Remove any non-numeric characters
                         const numericOnly = text.replace(/[^0-9]/g, '');
-                        
+
                         // Prevent empty string or zero
                         if (numericOnly === '' || numericOnly === '0') {
                           // Don't update if it would be empty or zero
                           return;
                         }
-                        
+
                         // Limit to 2 digits (1-99)
-                        const limitedValue = numericOnly.length > 2 ? numericOnly.slice(0, 2) : numericOnly;
-                        
+                        const limitedValue =
+                          numericOnly.length > 2
+                            ? numericOnly.slice(0, 2)
+                            : numericOnly;
+
                         setCustomRecurrence(prev => ({
                           ...prev,
                           repeatEvery: limitedValue,
@@ -3111,8 +3454,17 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                         style={styles.customRepeatUnitDropdown}
                         onPress={() => setShowUnitDropdown(prev => !prev)}
                       >
-                        <Text style={[styles.customRepeatUnitText, !repeatUnits.includes(customRecurrence.repeatUnit) ? styles.customRepeatUnitTextPlaceholder : null]}>
-                          {repeatUnits.includes(customRecurrence.repeatUnit) ? customRecurrence.repeatUnit : 'Select'}
+                        <Text
+                          style={[
+                            styles.customRepeatUnitText,
+                            !repeatUnits.includes(customRecurrence.repeatUnit)
+                              ? styles.customRepeatUnitTextPlaceholder
+                              : null,
+                          ]}
+                        >
+                          {repeatUnits.includes(customRecurrence.repeatUnit)
+                            ? customRecurrence.repeatUnit
+                            : 'Select'}
                         </Text>
                         <FeatherIcon
                           name="chevron-down"
@@ -3128,11 +3480,16 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                               key={unit}
                               style={styles.customUnitDropdownItem}
                               onPress={() => {
-                                setCustomRecurrence(prev => ({ ...prev, repeatUnit: unit }));
+                                setCustomRecurrence(prev => ({
+                                  ...prev,
+                                  repeatUnit: unit,
+                                }));
                                 setShowUnitDropdown(false);
                               }}
                             >
-                              <Text style={styles.customUnitDropdownItemText}>{unit}</Text>
+                              <Text style={styles.customUnitDropdownItemText}>
+                                {unit}
+                              </Text>
                             </TouchableOpacity>
                           ))}
                         </View>
@@ -3140,8 +3497,6 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                     </View>
                   </View>
                 </View>
-
-
 
                 {/* Repeat on section */}
                 {customRecurrence.repeatUnit === repeatUnits[1] && (
@@ -3156,12 +3511,28 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                           style={styles.customDayOption}
                           onPress={() => handleDayToggle(day)}
                         >
-                          <View style={[styles.customDayCheckbox, customRecurrence.repeatOn.includes(day) && styles.customDayCheckboxSelected]}>
+                          <View
+                            style={[
+                              styles.customDayCheckbox,
+                              customRecurrence.repeatOn.includes(day) &&
+                                styles.customDayCheckboxSelected,
+                            ]}
+                          >
                             {customRecurrence.repeatOn.includes(day) && (
-                              <FeatherIcon name="check" size={14} color="#000000" />
+                              <FeatherIcon
+                                name="check"
+                                size={14}
+                                color="#000000"
+                              />
                             )}
                           </View>
-                          <Text style={[styles.customDayOptionText, customRecurrence.repeatOn.includes(day) && styles.customDayOptionTextSelected]}>
+                          <Text
+                            style={[
+                              styles.customDayOptionText,
+                              customRecurrence.repeatOn.includes(day) &&
+                                styles.customDayOptionTextSelected,
+                            ]}
+                          >
                             {day}
                           </Text>
                         </TouchableOpacity>
@@ -3183,12 +3554,24 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       }))
                     }
                   >
-                    <View style={[styles.customCheckbox, customRecurrence.endsType === endsOptions[0] && styles.customCheckboxSelected]}>
+                    <View
+                      style={[
+                        styles.customCheckbox,
+                        customRecurrence.endsType === endsOptions[0] &&
+                          styles.customCheckboxSelected,
+                      ]}
+                    >
                       {customRecurrence.endsType === endsOptions[0] && (
                         <FeatherIcon name="check" size={14} color="#000000" />
                       )}
                     </View>
-                    <Text style={[styles.customEndsOptionText, customRecurrence.endsType === endsOptions[0] && styles.customEndsOptionTextSelected]}>
+                    <Text
+                      style={[
+                        styles.customEndsOptionText,
+                        customRecurrence.endsType === endsOptions[0] &&
+                          styles.customEndsOptionTextSelected,
+                      ]}
+                    >
                       {endsOptions[0]}
                     </Text>
                   </TouchableOpacity>
@@ -3202,19 +3585,31 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       }))
                     }
                   >
-                    <View style={[styles.customCheckbox, customRecurrence.endsType === endsOptions[1] && styles.customCheckboxSelected]}>
+                    <View
+                      style={[
+                        styles.customCheckbox,
+                        customRecurrence.endsType === endsOptions[1] &&
+                          styles.customCheckboxSelected,
+                      ]}
+                    >
                       {customRecurrence.endsType === endsOptions[1] && (
                         <FeatherIcon name="check" size={14} color="#000000" />
                       )}
                     </View>
-                    <Text style={[styles.customEndsOptionText, customRecurrence.endsType === endsOptions[1] && styles.customEndsOptionTextSelected]}>
+                    <Text
+                      style={[
+                        styles.customEndsOptionText,
+                        customRecurrence.endsType === endsOptions[1] &&
+                          styles.customEndsOptionTextSelected,
+                      ]}
+                    >
                       {endsOptions[1]}
                     </Text>
                     <TouchableOpacity
                       style={[
                         styles.customEndsInput,
                         customRecurrence.endsType !== endsOptions[1] &&
-                        styles.customEndsInputDisabled,
+                          styles.customEndsInputDisabled,
                       ]}
                       onPress={() => {
                         if (customRecurrence.endsType === endsOptions[1]) {
@@ -3226,14 +3621,20 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       <Text
                         style={[
                           styles.customEndsInputText,
-                          !customRecurrence.endsDate && styles.customEndsInputPlaceholder,
+                          !customRecurrence.endsDate &&
+                            styles.customEndsInputPlaceholder,
                         ]}
                       >
                         {customRecurrence.endsDate
                           ? (() => {
                               const date = customRecurrence.endsDate;
-                              const month = String(date.getMonth() + 1).padStart(2, '0');
-                              const day = String(date.getDate()).padStart(2, '0');
+                              const month = String(
+                                date.getMonth() + 1,
+                              ).padStart(2, '0');
+                              const day = String(date.getDate()).padStart(
+                                2,
+                                '0',
+                              );
                               const year = date.getFullYear();
                               return `${month}/${day}/${year}`;
                             })()
@@ -3251,19 +3652,31 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                       }))
                     }
                   >
-                    <View style={[styles.customCheckbox, customRecurrence.endsType === endsOptions[2] && styles.customCheckboxSelected]}>
+                    <View
+                      style={[
+                        styles.customCheckbox,
+                        customRecurrence.endsType === endsOptions[2] &&
+                          styles.customCheckboxSelected,
+                      ]}
+                    >
                       {customRecurrence.endsType === endsOptions[2] && (
                         <FeatherIcon name="check" size={14} color="#000000" />
                       )}
                     </View>
-                    <Text style={[styles.customEndsOptionText, customRecurrence.endsType === endsOptions[2] && styles.customEndsOptionTextSelected]}>
+                    <Text
+                      style={[
+                        styles.customEndsOptionText,
+                        customRecurrence.endsType === endsOptions[2] &&
+                          styles.customEndsOptionTextSelected,
+                      ]}
+                    >
                       {endsOptions[2]}
                     </Text>
                     <TextInput
                       style={[
                         styles.customEndsInput,
                         customRecurrence.endsType !== endsOptions[2] &&
-                        styles.customEndsInputDisabled,
+                          styles.customEndsInputDisabled,
                       ]}
                       value={customRecurrence.endsAfter}
                       onChangeText={text =>
@@ -3281,9 +3694,8 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   </TouchableOpacity>
                 </View>
               </View>
-
             </ScrollView>
-            
+
             {/* Date Picker Modal for Ends Date */}
             <Modal
               visible={showEndsDatePicker}
@@ -3294,7 +3706,9 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               <View style={styles.datePickerModalOverlay}>
                 <View style={styles.datePickerModalContainer}>
                   <View style={styles.datePickerModalHeader}>
-                    <Text style={styles.datePickerModalTitle}>Select End Date</Text>
+                    <Text style={styles.datePickerModalTitle}>
+                      Select End Date
+                    </Text>
                     <TouchableOpacity
                       onPress={() => setShowEndsDatePicker(false)}
                       style={styles.datePickerModalCloseButton}
@@ -3303,16 +3717,21 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                     </TouchableOpacity>
                   </View>
                   <Calendar
-                    onDayPress={(day) => {
+                    onDayPress={day => {
                       const selectedDate = new Date(day.dateString);
-                      setCustomRecurrence(prev => ({ ...prev, endsDate: selectedDate }));
+                      setCustomRecurrence(prev => ({
+                        ...prev,
+                        endsDate: selectedDate,
+                      }));
                       setShowEndsDatePicker(false);
                     }}
                     minDate={new Date().toISOString().split('T')[0]}
                     markedDates={
                       customRecurrence.endsDate
                         ? {
-                            [customRecurrence.endsDate.toISOString().split('T')[0]]: {
+                            [customRecurrence.endsDate
+                              .toISOString()
+                              .split('T')[0]]: {
                               selected: true,
                               selectedColor: '#0B6DE0',
                             },
@@ -3333,7 +3752,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 </View>
               </View>
             </Modal>
-            
+
             {/* Action Buttons */}
             <View style={styles.customModalActions}>
               <TouchableOpacity
@@ -3351,9 +3770,7 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
               </TouchableOpacity>
             </View>
           </View>
-
         </View>
-
       </Modal>
 
       {/* Location Suggestions Modal */}
@@ -3381,10 +3798,12 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                   const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
                   if (invalidChars.test(text)) {
                     // Show error message and don't update the location
-                    setLocationError('Special characters (@, #, $, %, &, *, +, =, ?, <, >, {, }, [, ], |, \\, `, ~, ^, /) are not allowed. Please use letters, numbers, spaces, commas, periods, and hyphens.');
+                    setLocationError(
+                      'Special characters (@, #, $, %, &, *, +, =, ?, <, >, {, }, [, ], |, \\, `, ~, ^, /) are not allowed. Please use letters, numbers, spaces, commas, periods, and hyphens.',
+                    );
                     return;
                   }
-                  
+
                   // If valid, update location and clear error
                   setLocation(text);
                   if (locationError) setLocationError('');
@@ -3421,7 +3840,9 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
             ) : locationSuggestions.length === 0 ? (
               <View style={styles.emptyContainer}>
                 <Text style={styles.emptyText}>
-                  {location.length >= 2 ? 'No locations found' : 'Start typing to search locations...'}
+                  {location.length >= 2
+                    ? 'No locations found'
+                    : 'Start typing to search locations...'}
                 </Text>
               </View>
             ) : (
@@ -3462,29 +3883,36 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
         onRequestClose={() => setShowIntegrationModal(false)}
       >
         <View style={styles.integrationModalOverlay}>
-          <TouchableOpacity 
+          <TouchableOpacity
             style={styles.integrationModalBackdrop}
             activeOpacity={1}
             onPress={() => setShowIntegrationModal(false)}
           />
-          <Animated.View 
+          <Animated.View
             style={[
               styles.integrationModalContainer,
               {
-                transform: [{ translateY: integrationModalSlideAnim }]
-              }
+                transform: [{ translateY: integrationModalSlideAnim }],
+              },
             ]}
           >
             <View style={styles.integrationModalHeader}>
               <View style={styles.integrationModalIconContainer}>
-                <FeatherIcon name="video" size={32} color={Colors.primaryBlue} />
+                <FeatherIcon
+                  name="video"
+                  size={32}
+                  color={Colors.primaryBlue}
+                />
               </View>
-              <Text style={styles.integrationModalTitle}>Integration Required</Text>
+              <Text style={styles.integrationModalTitle}>
+                Integration Required
+              </Text>
             </View>
 
             <View style={styles.integrationModalContent}>
               <Text style={styles.integrationModalDescription}>
-                To use Google Meet, you need to integrate your Google account first.
+                To use Google Meet, you need to integrate your Google account
+                first.
               </Text>
               <Text style={styles.integrationModalSubDescription}>
                 You'll be redirected to Settings to connect your Google account.
@@ -3510,7 +3938,9 @@ const getRecurrenceOptions = (selectedStartDate: Date) => {
                 }}
                 activeOpacity={0.8}
               >
-                <Text style={styles.integrationModalContinueText}>Continue</Text>
+                <Text style={styles.integrationModalContinueText}>
+                  Continue
+                </Text>
               </TouchableOpacity>
             </View>
           </Animated.View>
@@ -3877,7 +4307,7 @@ const styles = StyleSheet.create({
   descriptionInput: {
     backgroundColor: colors.white,
     borderRadius: 8,
-    textAlignVertical: "top", // Aligns text to the top for Android
+    textAlignVertical: 'top', // Aligns text to the top for Android
     borderWidth: 1,
     borderColor: '#DCE0E5',
     fontSize: 12,
@@ -3908,11 +4338,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  advanceOptionsButtonActive: {
+    borderColor: '#DCE0E5',
+  },
   advanceOptionsText: {
     fontSize: fontSize.textSize14,
-    color: colors.blackText,
+    color: '#A4A7AE',
     fontWeight: '600',
     fontFamily: Fonts.latoSemiBold,
+  },
+  advanceOptionsTextActive: {
+    color: '#00AEEF',
   },
   saveButton: {
     flex: 1,
@@ -3939,6 +4375,48 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
     marginBottom: spacing.md,
     paddingHorizontal: spacing.sm,
+  },
+  videoConferencingValueContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  videoConferencingValueIcon: {
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: spacing.xs,
+  },
+  videoConferencingDropdown: {
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderTopWidth: 0,
+    borderBottomLeftRadius: 8,
+    borderBottomRightRadius: 8,
+    backgroundColor: colors.white,
+    marginTop: -1,
+  },
+  videoConferencingDropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  videoConferencingDropdownItemSelected: {
+    backgroundColor: '#F8F9FA',
+  },
+  videoConferencingDropdownItemContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  videoConferencingDropdownItemText: {
+    fontSize: 14,
+    fontFamily: Fonts.latoRegular,
+    color: '#252B37',
+    marginLeft: spacing.sm,
   },
   videoConferencingButton: {
     flex: 1,
@@ -4873,6 +5351,29 @@ const styles = StyleSheet.create({
     color: Colors.white,
     fontWeight: '600',
     fontFamily: Fonts.latoBold,
+  },
+  datePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: 8,
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white,
+    minHeight: scaleHeight(44),
+  },
+  selectorText: {
+    fontSize: 12,
+    fontFamily: Fonts.latoRegular,
+    lineHeight: 18,
+    letterSpacing: 0,
+    color: '#A4A7AE',
+    flex: 1,
+  },
+  selectorTextFilled: {
+    color: '#252B37',
   },
 });
 

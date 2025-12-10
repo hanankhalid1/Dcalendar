@@ -6,26 +6,17 @@ import {
   TextInput,
   TouchableOpacity,
   StyleSheet,
-  Alert,
 } from 'react-native';
 import { useForm, Controller } from 'react-hook-form';
-import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import GradientText from '../home/GradientText';
 import { Fonts } from '../../constants/Fonts';
 import { Colors } from '../../constants/Colors';
 import { scale } from 'react-native-size-matters';
-import CustomButton from '../../global/CustomButton';
-// import { CrossIcon } from '../../assets/svgs';
-// import { BlockchainService } from '@/services/BlockChainService';
-
+import { moderateScale } from '../../utils/dimensions';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { PRIVATE_KEY } from '../../constants/Config';
 import { useToken } from '../../stores/useTokenStore';
 import CustomLoader from '../../global/CustomLoader';
 import { BlockchainService } from '../../services/BlockChainService';
 import { useToast } from '../../hooks/useToast';
-import { Contract } from 'necjs';
-import { CONTACT_CONTRACT_ABI } from '../../abis';
 import Config from '../../config';
 interface AddAccountFormData {
   username: string;
@@ -69,6 +60,10 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
     const storage = await AsyncStorage.getItem('token');
     // const storage=token;
+    if (!storage) {
+      toast.error('Error', 'Token not found');
+      return;
+    }
     const parseData = JSON.parse(storage);
     console.log('parseData///', parseData);
     setloading(true);
@@ -124,7 +119,7 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const renderError = (error?: { message?: string }) => {
     if (!error?.message) return null;
     return (
-      <Text style={[styles.errorText, { fontFamily: Fonts.regular }]}>
+      <Text style={[styles.errorText, { fontFamily: Fonts.latoRegular }]}>
         {error.message}
       </Text>
     );
@@ -142,33 +137,20 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
         <View style={styles.modalContainer}>
           {/* Header */}
           <View style={styles.header}>
-            <View style={styles.titleContainer}>
-              <Text style={[styles.addText, { fontFamily: Fonts.semiBold }]}>
-                Add new{' '}
-              </Text>
-              <GradientText
-                style={[styles.accountText, { fontFamily: Fonts.semiBold }]}
-                colors={[Colors.primaryGreen, Colors.primaryblue]}
-              >
-                account
-              </GradientText>
-            </View>
-
-            <TouchableOpacity onPress={handleClose} style={styles.closeButton}>
-              {/* <CrossIcon /> */}
-              <Icon name="close" size={24} color="#666" />
-            </TouchableOpacity>
+            <Text style={[styles.title, { fontFamily: Fonts.latoBold }]}>
+              Add new account
+            </Text>
           </View>
 
           {/* Description */}
-          <Text style={[styles.description, { fontFamily: Fonts.regular }]}>
+          <Text style={[styles.description, { fontFamily: Fonts.latoRegular }]}>
             Choose your unique username. This name will work as your dmail
-            account as well as your web3.
+            account as well as web3.
           </Text>
 
           {/* Username Input */}
           <View style={styles.inputContainer}>
-            <Text style={[styles.label, { fontFamily: Fonts.medium }]}>
+            <Text style={[styles.label, { fontFamily: Fonts.latoMedium }]}>
               Username
             </Text>
 
@@ -199,21 +181,20 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
                   ]}
                 >
                   <TextInput
-                    style={[styles.input, { fontFamily: Fonts.regular }]}
+                    style={[styles.input, { fontFamily: Fonts.latoRegular }]}
                     value={value}
                     onChangeText={onChange}
                     onBlur={onBlur}
-                    placeholder="Username"
-                    placeholderTextColor="#A0A0A0"
+                    placeholder="johndoe"
+                    placeholderTextColor="#A4A7AE"
                     autoCapitalize="none"
                     autoCorrect={false}
                   />
-                  <GradientText
-                    style={[styles.domainText, { fontFamily: Fonts.medium }]}
-                    colors={[Colors.primaryGreen, Colors.primaryblue]}
+                  <Text
+                    style={[styles.domainText, { fontFamily: Fonts.latoRegular }]}
                   >
                     {domain}
-                  </GradientText>
+                  </Text>
                 </View>
               )}
             />
@@ -223,33 +204,42 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
             {watchedUsername && (
               <View style={styles.previewContainer}>
                 <Text
-                  style={[styles.previewLabel, { fontFamily: Fonts.regular }]}
+                  style={[styles.previewLabel, { fontFamily: Fonts.latoRegular }]}
                 >
                   Your email will be:{' '}
                 </Text>
-                <GradientText
-                  style={[styles.previewEmail, { fontFamily: Fonts.medium }]}
-                  colors={[Colors.primaryGreen, Colors.primaryblue]}
+                <Text
+                  style={[styles.previewEmail, { fontFamily: Fonts.latoRegular }]}
                 >
                   {watchedUsername}
                   {domain}
-                </GradientText>
+                </Text>
               </View>
             )}
           </View>
 
-          {/* Confirm Button */}
+          {/* Action Buttons */}
           <View style={styles.buttonContainer}>
-            <CustomButton
-              title="Confirm"
-              style={{
-                justifyContent: 'center',
-                opacity: isValid ? 1 : 0.6,
-                marginTop: 8,
-              }}
+            <TouchableOpacity
+              style={styles.cancelButton}
+              onPress={handleClose}
+            >
+              <Text style={[styles.cancelButtonText, { fontFamily: Fonts.latoMedium }]}>
+                Cancel
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.confirmButton,
+                !isValid && styles.confirmButtonDisabled,
+              ]}
               onPress={handleSubmit(onSubmit)}
               disabled={!isValid}
-            />
+            >
+              <Text style={[styles.confirmButtonText, { fontFamily: Fonts.latoMedium }]}>
+                Confirm
+              </Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -272,49 +262,37 @@ const styles = StyleSheet.create({
     maxWidth: 400,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
     marginBottom: 16,
   },
-  titleContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  addText: {
-    fontSize: scale(20),
+  title: {
+    fontSize: moderateScale(16),
     color: '#000',
-  },
-  accountText: {
-    fontSize: scale(20),
-  },
-  closeButton: {
-    padding: 4,
+    fontWeight: '700',
   },
   description: {
-    fontSize: scale(12),
-    color: '#666',
-    marginBottom: 10,
-    lineHeight: 20,
+    fontSize: moderateScale(12),
+    color: '#A4A7AE',
+    marginBottom: 24,
+    lineHeight: 18,
   },
   inputContainer: {
     marginBottom: 24,
   },
   label: {
-    fontSize: scale(13),
-    color: '#3C3C43',
+    fontSize: moderateScale(12),
+    color: '#414651',
     marginBottom: 8,
-    opacity: 0.6,
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
-    borderRadius: 12,
+    backgroundColor: Colors.white,
+    borderRadius: 8,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#E5E5E7',
+    borderColor: Colors.primaryBlue,
+    gap: 0,
   },
   inputWrapperError: {
     borderColor: '#FF3B30',
@@ -322,13 +300,19 @@ const styles = StyleSheet.create({
   },
   input: {
     flex: 1,
-    fontSize: scale(16),
+    fontSize: moderateScale(12),
     color: '#000',
     paddingVertical: 4,
+    paddingRight: 0,
+    marginRight: 0,
   },
   domainText: {
-    fontSize: scale(16),
-    marginLeft: 4,
+    fontSize: moderateScale(12),
+    marginLeft: 0,
+    color: Colors.primaryBlue,
+    lineHeight: moderateScale(16),
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   errorText: {
     color: '#FF3B30',
@@ -341,16 +325,51 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginTop: 12,
     paddingHorizontal: 4,
+    flexWrap: 'wrap',
   },
   previewLabel: {
-    fontSize: scale(13),
-    color: '#666',
+    fontSize: moderateScale(12),
+    color: '#535862',
   },
   previewEmail: {
-    fontSize: scale(13),
+    fontSize: moderateScale(12),
+    color: Colors.primaryBlue,
   },
   buttonContainer: {
+    flexDirection: 'row',
+    gap: 12,
     marginTop: 8,
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: Colors.white,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: '#E5E5E7',
+  },
+  cancelButtonText: {
+    fontSize: moderateScale(16),
+    color: '#666',
+  },
+  confirmButton: {
+    flex: 1,
+    backgroundColor: Colors.primaryBlue,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  confirmButtonDisabled: {
+    opacity: 0.6,
+  },
+  confirmButtonText: {
+    fontSize: moderateScale(16),
+    color: Colors.white,
   },
 });
 

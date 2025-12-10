@@ -4,7 +4,7 @@ import { Calendar } from 'react-native-calendars';
 import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../navigations/appNavigation.type';
 import FloatingActionButton from '../components/FloatingActionButton';
-import CustomeHeader from '../global/CustomeHeader';
+import WeekHeader from '../components/WeekHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
@@ -113,6 +113,18 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     const month = String(date.getMonth() + 1).padStart(2, '0');
     const day = String(date.getDate()).padStart(2, '0');
     return `${year}-${month}-${day}`;
+  };
+
+  // Format date for header display (e.g., "30 October 2025")
+  const formatDateForHeader = (date: Date): string => {
+    const monthNames = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ];
+    const day = date.getDate();
+    const month = monthNames[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
   };
 
   const selectedDateString = useMemo(() => {
@@ -230,8 +242,15 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       event.list?.find((item: any) => item.key === 'repeatEvent')?.value;
 
     if (!repeatType || repeatType === 'Does not repeat') {
-      // Standard non-recurring event check
-      if (startDate >= viewStartDate && startDate <= viewEndDate) {
+      // Standard non-recurring event check - include ALL events within view range (past, present, future)
+      const eventStartOnly = new Date(startDate);
+      eventStartOnly.setHours(0, 0, 0, 0);
+      const viewStartOnly = new Date(viewStartDate);
+      viewStartOnly.setHours(0, 0, 0, 0);
+      const viewEndOnly = new Date(viewEndDate);
+      viewEndOnly.setHours(23, 59, 59, 999);
+      
+      if (eventStartOnly >= viewStartOnly && eventStartOnly <= viewEndOnly) {
         return [{ date: startDate, event }];
       }
       return instances;
@@ -270,14 +289,19 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     let currentDate = new Date(startDate);
     currentDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
 
-    // Adjust currentDate to the *start* of the view range if the event started before
-    if (currentDate < viewStartDate) {
-      currentDate = new Date(viewStartDate);
-      currentDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
-      currentDate.setHours(0, 0, 0, 0);
-    } else {
-      currentDate.setHours(0, 0, 0, 0);
+    // For recurring events, we need to generate instances both in the past and future
+    // Start from viewStartDate to ensure we capture past instances within the view range
+    let startGenerationDate = new Date(viewStartDate);
+    startGenerationDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
+    
+    // But don't start before the original event date
+    if (startGenerationDate < startDate) {
+      startGenerationDate = new Date(startDate);
+      startGenerationDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
     }
+    
+    startGenerationDate.setHours(0, 0, 0, 0);
+    currentDate.setHours(0, 0, 0, 0);
 
     const maxDate = new Date(viewEndDate);
     maxDate.setHours(23, 59, 59, 999);
@@ -294,6 +318,11 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     if (customEndDate && customEndDate < limitDate) {
       limitDate = customEndDate;
     }
+    
+    // For past instances, we need to go back from the original start date
+    // Calculate how many instances back we need to go to cover the view range
+    let minDate = viewStartDate < startDate ? viewStartDate : startDate;
+    minDate.setHours(0, 0, 0, 0);
 
     // Original event day, date, and month for reference
     const originalStartDay = startDate.getDay();
@@ -328,8 +357,37 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     }
 
     // Calculate the *next* date based on recurrence rule
+    // Start from the earliest date that could have instances in the view range
+    // If event started before viewStartDate, we need to calculate backwards to find the first instance in range
     let nextDate = new Date(startDate);
     nextDate.setHours(0, 0, 0, 0);
+    
+    // If the event started before viewStartDate, we need to find the first instance
+    // that falls on or after viewStartDate by working backwards from startDate
+    if (nextDate < viewStartDate) {
+      // For simple recurrences, calculate how many intervals back we need to go
+      // This is a simplified approach - for complex recurrences, we generate forward from an earlier start
+      const daysDiff = Math.floor((viewStartDate.getTime() - nextDate.getTime()) / (1000 * 60 * 60 * 24));
+      
+      if (repeatTypeLower.includes('day') || customUnit === 'day') {
+        const intervalsBack = Math.floor(daysDiff / (customInterval || 1));
+        nextDate.setDate(nextDate.getDate() + (intervalsBack * (customInterval || 1)));
+      } else if (repeatTypeLower.includes('week') || customUnit === 'week') {
+        const intervalsBack = Math.floor(daysDiff / (7 * (customInterval || 1)));
+        nextDate.setDate(nextDate.getDate() + (intervalsBack * 7 * (customInterval || 1)));
+      } else {
+        // For month/year, start from viewStartDate to ensure we capture instances
+        nextDate = new Date(viewStartDate);
+        nextDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
+        nextDate.setHours(0, 0, 0, 0);
+      }
+      
+      // Ensure we don't go before the original start date
+      if (nextDate < startDate) {
+        nextDate = new Date(startDate);
+        nextDate.setHours(0, 0, 0, 0);
+      }
+    }
 
     let iteration = 0;
     let occurrenceCount = 1; // Track occurrences for "after N times"
@@ -685,14 +743,67 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       });
     });
 
+    // Mark today's date with blue background
+    const today = new Date();
+    today.setHours(12, 0, 0, 0);
+    const todayString = formatDate(today);
+    
+    // Mark selected date
     if (marked[selectedDateString]) {
       marked[selectedDateString].selected = true;
-      marked[selectedDateString].selectedColor = '#2196F3';
+      marked[selectedDateString].selectedColor = '#00AEEF';
     } else {
       marked[selectedDateString] = {
         selected: true,
-        selectedColor: '#2196F3',
+        selectedColor: '#00AEEF',
       };
+    }
+
+    // Mark today's date with blue background if it's not the selected date
+    if (todayString !== selectedDateString) {
+      if (marked[todayString]) {
+        // If today already has events, add today styling without overriding periods
+        marked[todayString].customStyles = {
+          container: {
+            backgroundColor: '#00AEEF',
+            borderRadius: 18,
+            overflow: 'hidden',
+          },
+          text: {
+            color: '#ffffff',
+            fontWeight: '600',
+          },
+        };
+      } else {
+        // Mark today with blue background
+        marked[todayString] = {
+          customStyles: {
+            container: {
+              backgroundColor: '#00AEEF',
+              borderRadius: 18,
+            },
+            text: {
+              color: '#ffffff',
+              fontWeight: '600',
+            },
+          },
+        };
+      }
+    } else {
+      // If today is selected, ensure it has the blue background
+      if (marked[todayString]) {
+        marked[todayString].customStyles = {
+          container: {
+            backgroundColor: '#00AEEF',
+            borderRadius: 18,
+            overflow: 'hidden',
+          },
+          text: {
+            color: '#ffffff',
+            fontWeight: '600',
+          },
+        };
+      }
     }
 
     return { markedDates: marked, eventsByDate: byDate };
@@ -955,11 +1066,14 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         onDelete={handleDeleteEvent}
       />
 
-      <CustomeHeader
+      <WeekHeader
         onMenuPress={handleMenuPress}
-        currentMonth={currentMonth}
+        currentMonth={formatDateForHeader(selectedDate)}
         onMonthPress={handleMonthPress}
         onMonthSelect={handleMonthSelect}
+        onDateSelect={handleDateSelect}
+        currentDate={selectedDate}
+        selectedDate={selectedDate}
       />
 
       <ScrollView
@@ -979,9 +1093,9 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
               backgroundColor: '#ffffff',
               calendarBackground: '#ffffff',
               textSectionTitleColor: '#b6c1cd',
-              selectedDayBackgroundColor: '#000',
+              selectedDayBackgroundColor: '#00AEEF',
               selectedDayTextColor: '#ffffff',
-              todayTextColor: colors.figmaLightBlue || '#2196F3',
+              todayTextColor: '#00AEEF',
               dayTextColor: '#202020',
               textDisabledColor: '#A8A8AA',
               dotColor: '#337E89',
@@ -1275,7 +1389,7 @@ const styles = StyleSheet.create({
   },
   eventTitle: {
     fontSize: 14,
-    fontFamily: Fonts.bold,
+    fontFamily: Fonts.latoRegular,
     color: '#000',
     marginBottom: 0,
   },

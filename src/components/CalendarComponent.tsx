@@ -3,6 +3,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../stores/useSetting';
+import { Fonts } from '../constants/Fonts';
+import { moderateScale } from '../utils/dimensions';
 
 interface CalendarComponentProps {
   onDateSelect?: (date: Date) => void;
@@ -419,27 +421,10 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
             }
           >
             {dayData.isSelected && dayData.isCurrentMonth ? (
-              dayData.isToday ? (
-                // Today's date - different style
-                <LinearGradient
-                  colors={['#FF6B6B', '#FF8E53']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.todayDay}
-                >
-                  <Text style={styles.todayDayText}>{dayData.day}</Text>
-                </LinearGradient>
-              ) : (
-                // Selected date (not today)
-                <LinearGradient
-                  colors={['#18F06E', '#0B6DE0']}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 0 }}
-                  style={styles.selectedDay}
-                >
-                  <Text style={styles.selectedDayText}>{dayData.day}</Text>
-                </LinearGradient>
-              )
+              // Selected date (including today) - using solid blue color
+              <View style={styles.selectedDay}>
+                <Text style={styles.selectedDayText}>{dayData.day}</Text>
+              </View>
             ) : (
               <Text
                 style={[
@@ -492,9 +477,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   monthYear: {
-    fontSize: 18,
-    fontWeight: '700',
-    color: '#2d4150',
+    fontSize: moderateScale(18),
+    fontFamily: Fonts.latoBold,
+    color: '#181D27',
   },
   weekdayRow: {
     flexDirection: 'row',
@@ -502,8 +487,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   weekdayText: {
-    fontSize: 14,
-    fontWeight: '500',
+    fontSize: moderateScale(14),
+    fontFamily: Fonts.latoMedium,
     color: '#6c757d',
     width: '13%',
     textAlign: 'center',
@@ -524,9 +509,9 @@ const styles = StyleSheet.create({
     minWidth: 40,
   },
   dayText: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: '#2d4150',
+    fontSize: moderateScale(16),
+    fontFamily: Fonts.latoRegular,
+    color: '#181D27',
   },
   inactiveDayText: {
     color: '#adb5bd',
@@ -535,24 +520,26 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 8,
+    backgroundColor: '#00AEEF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   selectedDayText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: moderateScale(16),
+    fontFamily: Fonts.latoMedium,
     color: '#ffffff',
   },
   todayDay: {
     width: 32,
     height: 32,
     borderRadius: 8,
+    backgroundColor: '#00AEEF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   todayDayText: {
-    fontSize: 16,
-    fontWeight: '600',
+    fontSize: moderateScale(16),
+    fontFamily: Fonts.latoMedium,
     color: '#ffffff',
   },
 });

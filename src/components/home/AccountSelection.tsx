@@ -11,10 +11,10 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
-import GradientText from './../home/GradientText';
 import { Fonts } from '../../constants/Fonts';
 import { Colors } from '../../constants/Colors';
 import { scale } from 'react-native-size-matters';
+import { moderateScale } from '../../utils/dimensions';
 import { BlockchainService } from '../../services/BlockChainService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApiClient } from '../../hooks/useApi';
@@ -204,8 +204,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
 
   const handleAccountPress = (account: Account) => {
     setTempSelectedId(account.userName);
-    fetchAccountTokenAndSave(account?.userName);
-
+    // Don't connect immediately - wait for button click
   };
 
   const renderAccountItem = ({
@@ -218,13 +217,19 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
     const isSelected = tempSelectedId === item.userName;
     const backgroundColor =
       item.backgroundColor || getAvatarBackgroundColor(index);
+    const isLastItem = index === accounts.length - 1;
 
     return (
       <TouchableOpacity
-        style={[styles.accountItem, isSelected && styles.selectedAccountItem]}
+        style={[
+          styles.accountItem,
+          isSelected && styles.selectedAccountItem,
+          isLastItem && styles.lastAccountItem,
+        ]}
         onPress={() => handleAccountPress(item)}
         activeOpacity={0.7}
       >
+        {isSelected && <View style={styles.selectedIndicator} />}
         <View style={styles.accountContent}>
           <View style={styles.avatarContainer}>
             {item.avatar ? (
@@ -241,7 +246,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
           </View>
 
           <View style={styles.accountInfo}>
-            <Text style={[styles.accountName, { fontFamily: Fonts.latoBold }]}>
+            <Text style={[styles.accountName, { fontFamily: Fonts.latoRegular }]}>
               {item.name}
             </Text>
             <Text style={[styles.accountEmail, { fontFamily: Fonts.latoRegular }]}>
@@ -270,39 +275,67 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={[styles.chooseText, { fontFamily: Fonts.latoBold }]}>
+        <Text style={[styles.chooseText, { fontFamily: Fonts.latoExtraBold }]}>
           Choose an account
         </Text>
       </View>
 
       {/* Subtitle */}
       <Text style={[styles.subtitle, { fontFamily: Fonts.latoRegular }]}>
-        to continue to <Text style={{ color: '#00AEEF' }}>DCalendar</Text>
+        Select or add new account to continue Dcalendar
       </Text>
 
-      {/* Account List */}
-      <FlatList
-        data={accounts}
-        renderItem={renderAccountItem}
-        style={styles.accountList}
-        showsVerticalScrollIndicator={false}
-      />
+      {/* Accounts List Card */}
+      <View style={styles.accountsCard}>
+        {/* Accounts Header */}
+        <View style={styles.accountsHeader}>
+          <Text style={[styles.accountsLabel, { fontFamily: Fonts.latoMedium }]}>
+            Accounts
+          </Text>
+        </View>
+        {/* Accounts List */}
+        <FlatList
+          data={accounts}
+          renderItem={renderAccountItem}
+          style={styles.accountList}
+          showsVerticalScrollIndicator={false}
+        />
+      </View>
 
-      {/* Add New Account Button */}
-      <TouchableOpacity style={styles.addAccountButton}
-        onPress={() => {
-          onAddNewAccount();
-          onClose();
-        }}
-        activeOpacity={0.7}>
-        <Icon name="plus-circle-outline" size={24} color="#00AEEF" />
-        <GradientText
-          style={[styles.addAccountText, { fontFamily: Fonts.medium }]}
-          colors={['#00AEEF', '#0088CC']}
+      {/* Action Buttons */}
+      <View style={styles.buttonContainer}>
+        <TouchableOpacity
+          style={styles.connectButton}
+          onPress={() => {
+            if (tempSelectedId) {
+              const selectedAccount = accounts.find(acc => acc.userName === tempSelectedId);
+              if (selectedAccount) {
+                fetchAccountTokenAndSave(selectedAccount.userName);
+              }
+            }
+          }}
+          activeOpacity={0.7}
+          disabled={!tempSelectedId}
         >
-          Add new account
-        </GradientText>
-      </TouchableOpacity>
+          <Text style={[styles.connectButtonText, { fontFamily: Fonts.latoMedium }]}>
+            {tempSelectedId ? 'Continue with selected account' : 'Connect'}
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          style={styles.addAccountButton}
+          onPress={() => {
+            onAddNewAccount();
+            onClose();
+          }}
+          activeOpacity={0.7}
+        >
+          <Icon name="plus" size={20} color={Colors.white} />
+          <Text style={[styles.addAccountText, { fontFamily: Fonts.latoMedium }]}>
+            Add new account
+          </Text>
+        </TouchableOpacity>
+      </View>
 
       {loading && (
         <View style={styles.loadingOverlay}>
@@ -334,8 +367,15 @@ const styles = StyleSheet.create({
 
 
   selectedAccountItem: {
-    borderColor: Colors.primaryblue,
     backgroundColor: '#F0F8FF',
+  },
+  selectedIndicator: {
+    position: 'absolute',
+    left: 0,
+    top: 0,
+    bottom: 0,
+    width: 4,
+    backgroundColor: Colors.primaryBlue,
   },
   accountContent: {
     flexDirection: 'row',
@@ -346,32 +386,35 @@ const styles = StyleSheet.create({
     marginRight: 16,
   },
   avatar: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
   },
   avatarPlaceholder: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: 'center',
     alignItems: 'center',
   },
   avatarText: {
     color: Colors.white,
-    fontSize: scale(16),
+    fontSize: moderateScale(14),
+    fontFamily: Fonts.latoBold,
   },
   accountInfo: {
     // flex: 1,
   },
   accountName: {
-    fontSize: scale(16),
+    fontSize: moderateScale(14),
     color: '#000',
-    // marginBottom: 4,
+    marginBottom: 4,
+    fontFamily: Fonts.latoRegular,
   },
   accountEmail: {
-    fontSize: scale(14),
-    color: '#666',
+    fontSize: moderateScale(14),
+    color: '#181D27',
+    fontFamily: Fonts.latoRegular,
   },
   radioContainer: {
     marginLeft: 16,
@@ -396,8 +439,9 @@ const styles = StyleSheet.create({
   },
 
   addAccountText: {
-    fontSize: scale(16),
-    marginLeft: 8,
+    fontSize: moderateScale(16),
+    color: Colors.white,
+    fontFamily: Fonts.latoMedium,
   },
   loadingOverlay: {
     position: 'absolute',
@@ -449,45 +493,88 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   chooseText: {
-    fontSize: scale(24),
-    color: '#000',
+    fontSize: moderateScale(30),
+    color: '#181D27',
     textAlign: 'center',
-    fontFamily: Fonts.latoBold,
+    fontFamily: Fonts.latoExtraBold,
   },
   subtitle: {
-    fontSize: scale(14),
+    fontSize: moderateScale(14),
     color: '#666',
-    marginBottom: 30,
+    marginBottom: 24,
     textAlign: 'center',
     fontFamily: Fonts.latoRegular,
   },
+  accountsCard: {
+    backgroundColor: Colors.white,
+    borderRadius: 12,
+    overflow: 'hidden',
+    marginBottom: 20,
+  },
+  accountsHeader: {
+    backgroundColor: '#FAFAFA',
+    paddingTop: moderateScale(14),
+    paddingRight: moderateScale(12),
+    paddingBottom: moderateScale(14),
+    paddingLeft: moderateScale(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E7',
+    borderTopLeftRadius: 12,
+    borderTopRightRadius: 12,
+  },
+  accountsLabel: {
+    fontSize: moderateScale(14),
+    color: '#535862',
+  },
   accountList: {
-    flexGrow: 0, // Don't let it take all space
+    flexGrow: 0,
   },
   accountItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    marginBottom: 12,
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
+    paddingVertical: 16,
+    paddingHorizontal: 16,
+    marginBottom: 0,
+    backgroundColor: Colors.white,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E5E7',
+    position: 'relative',
+  },
+  lastAccountItem: {
+    borderBottomWidth: 0,
+  },
+  buttonContainer: {
+    flexDirection: 'column',
+    gap: 12,
+    marginBottom: 20,
+  },
+  connectButton: {
+    width: '100%',
+    backgroundColor: Colors.white,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    // Remove radio button styles
+    borderColor: '#E5E5E7',
+    opacity: 1,
+  },
+  connectButtonText: {
+    fontSize: moderateScale(16),
+    color: '#000',
+    fontFamily: Fonts.latoMedium,
   },
   addAccountButton: {
+    width: '100%',
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 20,
-    marginTop: 12,
-    marginBottom: 20,
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: '#E0E0E0',
-    borderStyle: 'dashed', // Dashed border
+    backgroundColor: Colors.primaryBlue,
+    borderRadius: 8,
+    paddingVertical: 14,
+    paddingHorizontal: 24,
+    gap: 8,
   },
   useAnotherText: {
     fontSize: scale(16),

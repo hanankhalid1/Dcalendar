@@ -39,6 +39,7 @@ import HomeIcon from '../assets/svgs/sidebarHomeIcon.svg';
 import CalendarIcon from '../assets/svgs/calendar.svg';
 import TrashIcon from '../assets/svgs/trash.svg';
 import SettingIcon from '../assets/svgs/setting.svg';
+import AddIcon from '../assets/svgs/add.svg';
 
 interface CustomDrawerProps {
   isOpen: boolean;
@@ -81,20 +82,26 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   const route = useRoute();
   
   // State to track current route name
-  const [currentRouteName, setCurrentRouteName] = useState<string | undefined>(route?.name);
+  const [currentRouteName, setCurrentRouteName] = useState<string | undefined>(
+    route?.name === 'HomeScreen' ? 'MonthlyCalenderScreen' : route?.name
+  );
   
   // Update route name when navigation state changes
   useEffect(() => {
     const unsubscribe = navigation.addListener('state', () => {
       const state = navigation.getState();
       const currentRoute = state?.routes[state?.index || 0];
-      setCurrentRouteName(currentRoute?.name);
+      const routeName = currentRoute?.name;
+      // Map HomeScreen to MonthlyCalenderScreen for highlighting
+      setCurrentRouteName(routeName === 'HomeScreen' ? 'MonthlyCalenderScreen' : routeName);
     });
     
     // Also set initial route name
     const state = navigation.getState();
     const currentRoute = state?.routes[state?.index || 0];
-    setCurrentRouteName(currentRoute?.name || route?.name);
+    const routeName = currentRoute?.name || route?.name;
+    // Map HomeScreen to MonthlyCalenderScreen for highlighting
+    setCurrentRouteName(routeName === 'HomeScreen' ? 'MonthlyCalenderScreen' : routeName);
     
     return unsubscribe;
   }, [navigation, route?.name]);
@@ -433,6 +440,37 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             </View>
           </View>
 
+          {/* Create Button */}
+          <View style={styles.createButtonSection}>
+            <TouchableOpacity
+              ref={createBtnRef}
+              style={styles.createButton}
+              onPress={() => {
+                createBtnRef.current?.measureInWindow((x, y, width, height) => {
+                  setCreateBtnWindowLayout({ x, y, width, height });
+                  setShowCreateMenu(!showCreateMenu);
+                });
+              }}
+              onLayout={() => {
+                createBtnRef.current?.measureInWindow((x, y, width, height) => {
+                  setCreateBtnWindowLayout({ x, y, width, height });
+                });
+              }}
+            >
+              <LinearGradient
+                colors={[Colors.primaryBlue, Colors.primaryBlue]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={styles.createButtonGradient}
+              >
+                <AddIcon width={20} height={20} fill={Colors.white} />
+                <Text style={[styles.createButtonText, { fontFamily: Fonts.latoMedium }]}>Create</Text>
+                <View style={styles.createButtonSpacer} />
+                <Icon name="chevron-down" size={20} color={Colors.white} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
+
         <ScrollView
           style={styles.scrollView}
           showsVerticalScrollIndicator={false}
@@ -441,59 +479,6 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
           {/* Navigation Items Section */}
           <View style={styles.section}>
-            {/* Home */}
-            <View style={styles.navItemContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.navItem,
-                  currentRouteName === 'HomeScreen' && styles.navItemActive
-                ]}
-                onPress={() => {
-                  doNavigate('HomeScreen');
-                  onClose();
-                }}
-              >
-                <HomeIcon 
-                  width={22} 
-                  height={22} 
-                  fill={currentRouteName === 'HomeScreen' ? colors.primaryBlue : '#414651'} 
-                />
-                <Text style={[
-                  styles.navText,
-                  currentRouteName === 'HomeScreen' && styles.navTextActive
-                ]}>
-                  Home
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Schedule */}
-            <View style={styles.navItemContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.navItem,
-                  currentRouteName === 'ScheduleScreen' && styles.navItemActive
-                ]}
-                onPress={() => {
-                  console.log('Schedule button pressed');
-                  doNavigate(Screen.ScheduleScreen);
-                  onClose();
-                }}
-              >
-                <CalendarIcon 
-                  width={22} 
-                  height={22} 
-                  fill={currentRouteName === 'ScheduleScreen' ? colors.primaryBlue : '#414651'} 
-                />
-                <Text style={[
-                  styles.navText,
-                  currentRouteName === 'ScheduleScreen' && styles.navTextActive
-                ]}>
-                  Schedule
-                </Text>
-              </TouchableOpacity>
-            </View>
-
             {/* Daily Calendar */}
             <View style={styles.navItemContainer}>
               <TouchableOpacity
@@ -568,6 +553,33 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                   currentRouteName === 'MonthlyCalenderScreen' && styles.navTextActive
                 ]}>
                   Monthly calendar
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* Schedule */}
+            <View style={styles.navItemContainer}>
+              <TouchableOpacity
+                style={[
+                  styles.navItem,
+                  currentRouteName === 'ScheduleScreen' && styles.navItemActive
+                ]}
+                onPress={() => {
+                  console.log('Schedule button pressed');
+                  doNavigate(Screen.ScheduleScreen);
+                  onClose();
+                }}
+              >
+                <CalendarIcon 
+                  width={22} 
+                  height={22} 
+                  fill={currentRouteName === 'ScheduleScreen' ? colors.primaryBlue : '#414651'} 
+                />
+                <Text style={[
+                  styles.navText,
+                  currentRouteName === 'ScheduleScreen' && styles.navTextActive
+                ]}>
+                  Schedule
                 </Text>
               </TouchableOpacity>
             </View>
@@ -755,11 +767,10 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             style={[
               styles.createMenuContainer,
               {
-                top: (createBtnWindowLayout?.y || 0) + (createBtnWindowLayout?.height || 0) + scaleHeight(24),
-                left:
-                  ((createBtnWindowLayout?.x || 0) + ((createBtnWindowLayout?.width || 0) / 2)) -
-                  (menuComputedWidth / 2),
+                top: (createBtnWindowLayout?.y || 0) + (createBtnWindowLayout?.height || 0) + scaleHeight(8),
+                left: spacing.md,
                 right: undefined,
+                width: scaleWidth(273) - (spacing.md * 2),
               },
             ]}
             pointerEvents="auto"
@@ -848,10 +859,18 @@ const styles = StyleSheet.create({
   topSection: {
     paddingHorizontal: spacing.md,
     paddingTop: scaleHeight(20),
-    paddingBottom: spacing.lg,
+    paddingBottom: spacing.md,
     position: 'relative',
     backgroundColor: '#F5F5F5', // Gray background like drawer
     // Removed borderBottomWidth and borderBottomColor
+  },
+  createButtonSection: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.md,
+  },
+  createButton: {
+    borderRadius: 8,
+    overflow: 'hidden',
   },
   headerRow: {
     flexDirection: 'row',
@@ -879,17 +898,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   createButtonText: {
-    // Aligned with navItems - no center alignment
+    fontSize: moderateScale(16),
+    color: Colors.white,
+    fontFamily: Fonts.latoMedium,
+    fontWeight: '500',
   },
   createButtonGradient: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 14,
-    paddingBottom: 14,
+    justifyContent: 'space-between',
+    paddingVertical: 14,
     paddingHorizontal: 24,
-    borderRadius: 32,
-    alignSelf: 'flex-start',
+    borderRadius: 8,
+    gap: 8,
+  },
+  createButtonSpacer: {
+    flex: 1,
   },
   createButtonLabel: {
     fontSize: 17,
@@ -899,12 +923,9 @@ const styles = StyleSheet.create({
   },
   createMenuContainer: {
     position: 'absolute',
-    right: spacing.md,
-    top: scaleHeight(56),
     backgroundColor: colors.white,
     borderRadius: moderateScale(12),
     ...shadows.lg,
-    width: scaleWidth(190),
     overflow: 'hidden',
     zIndex: 100,
     elevation: 12,
@@ -928,8 +949,9 @@ const styles = StyleSheet.create({
   },
   createMenuTextOnly: {
     color: '#111827',
-    fontSize: fontSize.textSize15,
-    fontWeight: '600',
+    fontSize: moderateScale(14),
+    fontFamily: Fonts.latoMedium,
+    fontWeight: '500',
     marginLeft: spacing.lg,
   },
   section: {

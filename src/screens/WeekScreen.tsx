@@ -1,6 +1,21 @@
-import React, { useEffect, useMemo, useState, useRef, useCallback } from 'react';
+import React, {
+  useEffect,
+  useMemo,
+  useState,
+  useRef,
+  useCallback,
+} from 'react';
 import { InteractionManager } from 'react-native';
-import { View, StyleSheet, Text, Alert, TouchableOpacity, ScrollView, Image, FlatList } from 'react-native';
+import {
+  View,
+  StyleSheet,
+  Text,
+  Alert,
+  TouchableOpacity,
+  ScrollView,
+  Image,
+  FlatList,
+} from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { Dimensions } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
@@ -15,7 +30,7 @@ import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
 import { useSettingsStore } from '../stores/useSetting';
 import EventDetailsModal from '../components/EventDetailsModal';
-import { colors, spacing } from '../utils/LightTheme';
+import { colors, spacing, shadows } from '../utils/LightTheme';
 import { BlockchainService } from '../services/BlockChainService';
 import { useToken } from '../stores/useTokenStore';
 import { NECJSPRIVATE_KEY } from '../constants/Config';
@@ -27,31 +42,32 @@ import TaskIcon from '../assets/svgs/taskIcon.svg';
 import LinearGradient from 'react-native-linear-gradient';
 import { Fonts } from '../constants/Fonts';
 import { convertToSelectedTimezone } from '../utils/timezone';
+import Icon from 'react-native-vector-icons/AntDesign';
 
 const WeekScreen = () => {
   const navigation = useNavigation();
   const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
   const { account } = useActiveAccount();
-  const { 
-    userEvents, 
-    userEventsLoading, 
-    getUserEvents, 
+  const {
+    userEvents,
+    userEventsLoading,
+    getUserEvents,
     optimisticallyDeleteEvent,
-    revertOptimisticUpdate
+    revertOptimisticUpdate,
   } = useEventsStore();
   const { selectedDate, setSelectedDate } = useCalendarStore();
   const { selectedTimeZone, selectedDay } = useSettingsStore();
-  
+
   // Helper function to convert day name to numeric value for react-native-calendars
   const getFirstDayNumber = (dayName: string): number => {
     const dayMap: { [key: string]: number } = {
-      'Sunday': 0,
-      'Monday': 1,
-      'Tuesday': 2,
-      'Wednesday': 3,
-      'Thursday': 4,
-      'Friday': 5,
-      'Saturday': 6,
+      Sunday: 0,
+      Monday: 1,
+      Tuesday: 2,
+      Wednesday: 3,
+      Thursday: 4,
+      Friday: 5,
+      Saturday: 6,
     };
     return dayMap[dayName] || 0;
   };
@@ -65,7 +81,7 @@ const WeekScreen = () => {
   const { api } = useApiClient();
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(false);
-  
+
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -74,7 +90,7 @@ const WeekScreen = () => {
   const showAlert = (
     title: string,
     message: string,
-    type: 'success' | 'error' | 'warning' | 'info' = 'warning'
+    type: 'success' | 'error' | 'warning' | 'info' = 'warning',
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
@@ -137,7 +153,7 @@ const WeekScreen = () => {
     year: number,
     month: number,
     dayOfWeek: number,
-    occurrence: number
+    occurrence: number,
   ): Date | null => {
     if (occurrence === -1) {
       // Last occurrence
@@ -168,12 +184,18 @@ const WeekScreen = () => {
   const generateRecurringInstances = (
     event: any,
     viewStartDate: Date,
-    viewEndDate: Date
+    viewEndDate: Date,
   ): Array<{ date: Date; event: any }> => {
     const instances: Array<{ date: Date; event: any }> = [];
 
-    const startTimeData = convertToSelectedTimezone(event.fromTime, selectedTimeZone);
-    const endTimeData = convertToSelectedTimezone(event.toTime, selectedTimeZone);
+    const startTimeData = convertToSelectedTimezone(
+      event.fromTime,
+      selectedTimeZone,
+    );
+    const endTimeData = convertToSelectedTimezone(
+      event.toTime,
+      selectedTimeZone,
+    );
 
     if (!startTimeData || !endTimeData) return [];
 
@@ -187,14 +209,24 @@ const WeekScreen = () => {
       event.list?.find((item: any) => item.key === 'repeatEvent')?.value;
 
     if (!repeatType || repeatType === 'Does not repeat') {
-      if (startDate >= viewStartDate && startDate <= viewEndDate) {
+      // Standard non-recurring event check - include ALL events within view range (past, present, future)
+      const eventStartOnly = new Date(startDate);
+      eventStartOnly.setHours(0, 0, 0, 0);
+      const viewStartOnly = new Date(viewStartDate);
+      viewStartOnly.setHours(0, 0, 0, 0);
+      const viewEndOnly = new Date(viewEndDate);
+      viewEndOnly.setHours(23, 59, 59, 999);
+
+      if (eventStartOnly >= viewStartOnly && eventStartOnly <= viewEndOnly) {
         return [{ date: startDate, event }];
       }
       return instances;
     }
 
     const repeatTypeLower = repeatType.toLowerCase();
-    const customMatch = repeatType.match(/^Every (\d+) (day|week|month|year)s?(?:\s+on\s+([^(]+))?(?:\s+\((?:(\d+) times|until ([^)]+))\))?$/i);
+    const customMatch = repeatType.match(
+      /^Every (\d+) (day|week|month|year)s?(?:\s+on\s+([^(]+))?(?:\s+\((?:(\d+) times|until ([^)]+))\))?$/i,
+    );
 
     let customInterval = 1;
     let customUnit = '';
@@ -219,11 +251,21 @@ const WeekScreen = () => {
     }
 
     let currentDate = new Date(startDate);
-    currentDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
+    currentDate.setHours(
+      startDate.getHours(),
+      startDate.getMinutes(),
+      startDate.getSeconds(),
+      startDate.getMilliseconds(),
+    );
 
     if (currentDate < viewStartDate) {
       currentDate = new Date(viewStartDate);
-      currentDate.setHours(startDate.getHours(), startDate.getMinutes(), startDate.getSeconds(), startDate.getMilliseconds());
+      currentDate.setHours(
+        startDate.getHours(),
+        startDate.getMinutes(),
+        startDate.getSeconds(),
+        startDate.getMilliseconds(),
+      );
       currentDate.setHours(0, 0, 0, 0);
     } else {
       currentDate.setHours(0, 0, 0, 0);
@@ -237,13 +279,18 @@ const WeekScreen = () => {
     if (customEndDate && customEndDate < limitDate) {
       limitDate = customEndDate;
     }
-    
+
     // Limit iterations to prevent long processing
     const maxIterations = 50; // Reduced from 366*2 for week view
 
     const dayNameToNumber: { [key: string]: number } = {
-      sunday: 0, monday: 1, tuesday: 2, wednesday: 3,
-      thursday: 4, friday: 5, saturday: 6
+      sunday: 0,
+      monday: 1,
+      tuesday: 2,
+      wednesday: 3,
+      thursday: 4,
+      friday: 5,
+      saturday: 6,
     };
 
     const addInstance = (date: Date) => {
@@ -286,9 +333,11 @@ const WeekScreen = () => {
           hasMoved = true;
         } else if (customUnit === 'week') {
           if (customDays.length > 0) {
-            const targetDayNumbers = customDays.map(day => dayNameToNumber[day]).filter(n => n !== undefined);
+            const targetDayNumbers = customDays
+              .map(day => dayNameToNumber[day])
+              .filter(n => n !== undefined);
             if (targetDayNumbers.length === 0) {
-              nextDate.setDate(nextDate.getDate() + (7 * customInterval));
+              nextDate.setDate(nextDate.getDate() + 7 * customInterval);
               hasMoved = true;
             } else {
               let foundNext = false;
@@ -302,7 +351,10 @@ const WeekScreen = () => {
                 daysChecked++;
                 const currentDay = nextDate.getDay();
                 if (targetDayNumbers.includes(currentDay)) {
-                  const daysDiff = Math.floor((nextDate.getTime() - startTime.getTime()) / (24 * 60 * 60 * 1000));
+                  const daysDiff = Math.floor(
+                    (nextDate.getTime() - startTime.getTime()) /
+                      (24 * 60 * 60 * 1000),
+                  );
                   const weekNumber = Math.floor(daysDiff / 7);
                   if (weekNumber % customInterval === 0) {
                     foundNext = true;
@@ -312,7 +364,7 @@ const WeekScreen = () => {
               hasMoved = foundNext;
             }
           } else {
-            nextDate.setDate(nextDate.getDate() + (7 * customInterval));
+            nextDate.setDate(nextDate.getDate() + 7 * customInterval);
             hasMoved = true;
           }
         } else if (customUnit === 'month') {
@@ -326,7 +378,10 @@ const WeekScreen = () => {
           nextDate.setFullYear(nextDate.getFullYear() + customInterval);
           hasMoved = true;
         }
-      } else if (repeatTypeLower === 'daily' || repeatTypeLower === 'every day') {
+      } else if (
+        repeatTypeLower === 'daily' ||
+        repeatTypeLower === 'every day'
+      ) {
         nextDate.setDate(nextDate.getDate() + 1);
         hasMoved = true;
       } else if (
@@ -336,20 +391,32 @@ const WeekScreen = () => {
       ) {
         nextDate.setDate(nextDate.getDate() + 7);
         hasMoved = true;
-      } else if (repeatTypeLower === 'bi-weekly' || repeatTypeLower === 'every 2 weeks') {
+      } else if (
+        repeatTypeLower === 'bi-weekly' ||
+        repeatTypeLower === 'every 2 weeks'
+      ) {
         nextDate.setDate(nextDate.getDate() + 14);
         hasMoved = true;
-      } else if (repeatTypeLower === 'monthly' || repeatTypeLower === 'every month') {
+      } else if (
+        repeatTypeLower === 'monthly' ||
+        repeatTypeLower === 'every month'
+      ) {
         const currentDay = nextDate.getDate();
         nextDate.setMonth(nextDate.getMonth() + 1);
         if (nextDate.getDate() < currentDay) {
           nextDate.setDate(0);
         }
         hasMoved = true;
-      } else if (repeatTypeLower === 'yearly' || repeatTypeLower === 'every year') {
+      } else if (
+        repeatTypeLower === 'yearly' ||
+        repeatTypeLower === 'every year'
+      ) {
         nextDate.setFullYear(nextDate.getFullYear() + 1);
         hasMoved = true;
-      } else if (repeatTypeLower.includes('weekday') || repeatTypeLower.includes('monday to friday')) {
+      } else if (
+        repeatTypeLower.includes('weekday') ||
+        repeatTypeLower.includes('monday to friday')
+      ) {
         do {
           nextDate.setDate(nextDate.getDate() + 1);
         } while (nextDate.getDay() === 0 || nextDate.getDay() === 6);
@@ -363,7 +430,10 @@ const WeekScreen = () => {
         let nextYear = nextDate.getFullYear();
         let nextMonth = MONTH_MAP[monthName];
         let nextDay = dayNumber;
-        if (nextDate.getMonth() > nextMonth || (nextDate.getMonth() === nextMonth && nextDate.getDate() >= nextDay)) {
+        if (
+          nextDate.getMonth() > nextMonth ||
+          (nextDate.getMonth() === nextMonth && nextDate.getDate() >= nextDay)
+        ) {
           nextYear++;
         }
         nextDate.setFullYear(nextYear);
@@ -372,13 +442,19 @@ const WeekScreen = () => {
         hasMoved = true;
       }
 
-      const monthlyWeekdayMatch = repeatType.match(/^Monthly on the (\w+) (\w+)$/i);
+      const monthlyWeekdayMatch = repeatType.match(
+        /^Monthly on the (\w+) (\w+)$/i,
+      );
       if (monthlyWeekdayMatch) {
         const occurrenceText = monthlyWeekdayMatch[1].toLowerCase();
         const weekdayName = monthlyWeekdayMatch[2].toLowerCase();
         const occurrence = WEEK_TEXT_MAP[occurrenceText];
         const dayOfWeek = DAY_MAP[weekdayName];
-        let nextMonthDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 1);
+        let nextMonthDate = new Date(
+          nextDate.getFullYear(),
+          nextDate.getMonth() + 1,
+          1,
+        );
         let year = nextMonthDate.getFullYear();
         let month = nextMonthDate.getMonth();
         let newDate = getNthWeekdayOfMonth(year, month, dayOfWeek, occurrence);
@@ -387,7 +463,11 @@ const WeekScreen = () => {
           year = nextMonthDate.getFullYear();
           month = nextMonthDate.getMonth();
           newDate = getNthWeekdayOfMonth(year, month, dayOfWeek, occurrence);
-          if (nextMonthDate.getTime() > limitDate.getTime() + (31 * 24 * 60 * 60 * 1000) || iteration > maxIterations) {
+          if (
+            nextMonthDate.getTime() >
+              limitDate.getTime() + 31 * 24 * 60 * 60 * 1000 ||
+            iteration > maxIterations
+          ) {
             break;
           }
         }
@@ -401,7 +481,11 @@ const WeekScreen = () => {
       if (monthlyLastMatch && !monthlyWeekdayMatch) {
         const weekdayName = monthlyLastMatch[1].toLowerCase();
         const dayOfWeek = DAY_MAP[weekdayName];
-        let nextMonthDate = new Date(nextDate.getFullYear(), nextDate.getMonth() + 1, 1);
+        let nextMonthDate = new Date(
+          nextDate.getFullYear(),
+          nextDate.getMonth() + 1,
+          1,
+        );
         let year = nextMonthDate.getFullYear();
         let month = nextMonthDate.getMonth();
         let newDate = getNthWeekdayOfMonth(year, month, dayOfWeek, -1);
@@ -410,7 +494,11 @@ const WeekScreen = () => {
           year = nextMonthDate.getFullYear();
           month = nextMonthDate.getMonth();
           newDate = getNthWeekdayOfMonth(year, month, dayOfWeek, -1);
-          if (nextMonthDate.getTime() > limitDate.getTime() + (31 * 24 * 60 * 60 * 1000) || iteration > maxIterations) {
+          if (
+            nextMonthDate.getTime() >
+              limitDate.getTime() + 31 * 24 * 60 * 60 * 1000 ||
+            iteration > maxIterations
+          ) {
             break;
           }
         }
@@ -440,116 +528,200 @@ const WeekScreen = () => {
   };
 
   // Cache for event processing - keyed by week start date
-  const eventsCacheRef = useRef<Map<string, { markedDatesBase: any; eventsByDate: any }>>(new Map());
+  const eventsCacheRef = useRef<
+    Map<string, { markedDatesBase: any; eventsByDate: any }>
+  >(new Map());
   const [isProcessingEvents, setIsProcessingEvents] = useState(false);
-  
+
   // Process events ONLY for the current visible week - much faster!
-  const processEventsForWeek = useCallback((weekStart: Date) => {
-    const cacheKey = `${formatDate(weekStart)}-${selectedTimeZone}-${selectedDay}`;
-    
-    // Check cache first
-    if (eventsCacheRef.current.has(cacheKey)) {
-      return eventsCacheRef.current.get(cacheKey)!;
-    }
+  const processEventsForWeek = useCallback(
+    (weekStart: Date) => {
+      const cacheKey = `${formatDate(
+        weekStart,
+      )}-${selectedTimeZone}-${selectedDay}`;
 
-    const marked: any = {};
-    const byDate: { [key: string]: any[] } = {};
+      // Check cache first
+      if (eventsCacheRef.current.has(cacheKey)) {
+        return eventsCacheRef.current.get(cacheKey)!;
+      }
 
-    // Only process events for THIS week (no buffer for speed)
-    const weekEnd = new Date(weekStart);
-    weekEnd.setDate(weekEnd.getDate() + 6);
-    weekEnd.setHours(23, 59, 59, 999);
+      const marked: any = {};
+      const byDate: { [key: string]: any[] } = {};
 
-    const viewStartDate = new Date(weekStart);
-    viewStartDate.setHours(0, 0, 0, 0);
-    const viewEndDate = new Date(weekEnd);
-    viewEndDate.setHours(23, 59, 59, 999);
+      // Only process events for THIS week (no buffer for speed)
+      const weekEnd = new Date(weekStart);
+      weekEnd.setDate(weekEnd.getDate() + 6);
+      weekEnd.setHours(23, 59, 59, 999);
 
-    // AGGRESSIVE FILTERING: Only process events that could be in this week
-    // This is the key optimization - skip events that are clearly not relevant
-    const relevantEvents = (userEvents || []).filter(ev => {
-      if (!ev.fromTime) return false;
-      
-      // Quick timezone conversion (lightweight check)
-      try {
-        const startTimeData = convertToSelectedTimezone(ev.fromTime, selectedTimeZone);
-        if (!startTimeData?.date) return false;
-        
-        const eventStart = startTimeData.date;
-        const eventEnd = convertToSelectedTimezone(ev.toTime, selectedTimeZone)?.date || eventStart;
-        
-        // Fast range check: event must overlap with week range
-        const eventEndTime = eventEnd.getTime();
-        const viewStartTime = viewStartDate.getTime();
-        const viewEndTime = viewEndDate.getTime();
-        
-        // Event overlaps if: eventStart <= viewEnd AND eventEnd >= viewStart
-        if (eventStart.getTime() > viewEndTime || eventEndTime < viewStartTime) {
-          // Check if it's a recurring event that might recur into this week
-          const repeatType = ev.repeatEvent || ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
-          if (!repeatType || repeatType === 'Does not repeat') {
-            return false; // Non-recurring event outside range - skip it
+      const viewStartDate = new Date(weekStart);
+      viewStartDate.setHours(0, 0, 0, 0);
+      const viewEndDate = new Date(weekEnd);
+      viewEndDate.setHours(23, 59, 59, 999);
+
+      // AGGRESSIVE FILTERING: Only process events that could be in this week
+      // This is the key optimization - skip events that are clearly not relevant
+      const relevantEvents = (userEvents || []).filter(ev => {
+        if (!ev.fromTime) return false;
+
+        // Quick timezone conversion (lightweight check)
+        try {
+          const startTimeData = convertToSelectedTimezone(
+            ev.fromTime,
+            selectedTimeZone,
+          );
+          if (!startTimeData?.date) return false;
+
+          const eventStart = startTimeData.date;
+          const eventEnd =
+            convertToSelectedTimezone(ev.toTime, selectedTimeZone)?.date ||
+            eventStart;
+
+          // Fast range check: event must overlap with week range
+          // Include ALL events that fall within or overlap the week range, regardless of past/future
+          const eventEndTime = eventEnd.getTime();
+          const viewStartTime = viewStartDate.getTime();
+          const viewEndTime = viewEndDate.getTime();
+
+          // Event overlaps if: eventStart <= viewEnd AND eventEnd >= viewStart
+          // This includes past events that are within the week range
+          if (
+            eventStart.getTime() > viewEndTime ||
+            eventEndTime < viewStartTime
+          ) {
+            // Check if it's a recurring event that might recur into this week
+            const repeatType =
+              ev.repeatEvent ||
+              ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+            if (!repeatType || repeatType === 'Does not repeat') {
+              return false; // Non-recurring event outside range - skip it
+            }
+
+            // For recurring events, process if they could recur into this week (extend range)
+            const daysDiff = Math.abs(
+              (eventStart.getTime() - viewStartTime) / (1000 * 60 * 60 * 24),
+            );
+            // Increase range for recurring events to catch past recurring events
+            return daysDiff < 365; // Process recurring events within 1 year
           }
-          
-          // For recurring events, only process if within reasonable range (30 days)
-          const daysDiff = Math.abs((eventStart.getTime() - viewStartTime) / (1000 * 60 * 60 * 24));
-          return daysDiff < 30; // Only process recurring events within 30 days
+
+          return true; // Event overlaps with week range (includes past events within range)
+        } catch (e) {
+          return false; // Skip invalid events
         }
-        
-        return true; // Event overlaps with week range
-      } catch (e) {
-        return false; // Skip invalid events
-      }
-    });
+      });
 
-    relevantEvents.forEach(ev => {
-      const startTimeData = convertToSelectedTimezone(ev.fromTime, selectedTimeZone);
-      const endTimeData = convertToSelectedTimezone(ev.toTime, selectedTimeZone);
+      relevantEvents.forEach(ev => {
+        const startTimeData = convertToSelectedTimezone(
+          ev.fromTime,
+          selectedTimeZone,
+        );
+        const endTimeData = convertToSelectedTimezone(
+          ev.toTime,
+          selectedTimeZone,
+        );
 
-      if (!startTimeData || !endTimeData) return;
+        if (!startTimeData || !endTimeData) return;
 
-      const startDate = startTimeData.date;
-      const endDate = endTimeData.date;
+        const startDate = startTimeData.date;
+        const endDate = endTimeData.date;
 
-      if (!startDate || !endDate || isNaN(startDate.getTime()) || isNaN(endDate.getTime())) {
-        return;
-      }
+        if (
+          !startDate ||
+          !endDate ||
+          isNaN(startDate.getTime()) ||
+          isNaN(endDate.getTime())
+        ) {
+          return;
+        }
 
-      const isTask = ev.list?.some((item: any) => item.key === 'task' && item.value === 'true');
-      const repeatType = ev.repeatEvent || ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
-      const isRecurring = repeatType && repeatType !== 'Does not repeat';
+        const isTask = ev.list?.some(
+          (item: any) => item.key === 'task' && item.value === 'true',
+        );
+        const repeatType =
+          ev.repeatEvent ||
+          ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+        const isRecurring = repeatType && repeatType !== 'Does not repeat';
 
-      const eventColor = isTask ? '#8DC63F' : '#00AEEF';
+        const eventColor = isTask ? '#8DC63F' : '#00AEEF';
 
-      const instances = generateRecurringInstances(ev, viewStartDate, viewEndDate);
+        const instances = generateRecurringInstances(
+          ev,
+          viewStartDate,
+          viewEndDate,
+        );
 
-      instances.forEach(({ date: instanceDate, event }) => {
-        const startHour = startDate.getHours();
-        const startMinute = startDate.getMinutes();
-        const startSecond = startDate.getSeconds();
+        instances.forEach(({ date: instanceDate, event }) => {
+          const startHour = startDate.getHours();
+          const startMinute = startDate.getMinutes();
+          const startSecond = startDate.getSeconds();
 
-        const endHour = endDate.getHours();
-        const endMinute = endDate.getMinutes();
-        const endSecond = endDate.getSeconds();
+          const endHour = endDate.getHours();
+          const endMinute = endDate.getMinutes();
+          const endSecond = endDate.getSeconds();
 
-        const instanceStartDate = new Date(instanceDate);
-        instanceStartDate.setHours(startHour, startMinute, startSecond);
+          const instanceStartDate = new Date(instanceDate);
+          instanceStartDate.setHours(startHour, startMinute, startSecond);
 
-        const duration = endDate.getTime() - startDate.getTime();
-        const instanceEndDate = new Date(instanceStartDate.getTime() + duration);
+          const duration = endDate.getTime() - startDate.getTime();
+          const instanceEndDate = new Date(
+            instanceStartDate.getTime() + duration,
+          );
 
-        const isMultiDay = instanceStartDate.toDateString() !== instanceEndDate.toDateString();
+          const isMultiDay =
+            instanceStartDate.toDateString() !== instanceEndDate.toDateString();
 
-        if (isMultiDay) {
-          const currentDate = new Date(instanceStartDate);
-          currentDate.setHours(0, 0, 0, 0);
-          const endDateOnly = new Date(instanceEndDate);
-          endDateOnly.setHours(0, 0, 0, 0);
+          if (isMultiDay) {
+            const currentDate = new Date(instanceStartDate);
+            currentDate.setHours(0, 0, 0, 0);
+            const endDateOnly = new Date(instanceEndDate);
+            endDateOnly.setHours(0, 0, 0, 0);
 
-          while (currentDate <= endDateOnly) {
-            const dateString = formatDate(currentDate);
-            const isStart = currentDate.toDateString() === instanceStartDate.toDateString();
-            const isEnd = currentDate.toDateString() === instanceEndDate.toDateString();
+            while (currentDate <= endDateOnly) {
+              const dateString = formatDate(currentDate);
+              const isStart =
+                currentDate.toDateString() === instanceStartDate.toDateString();
+              const isEnd =
+                currentDate.toDateString() === instanceEndDate.toDateString();
+
+              if (!marked[dateString]) {
+                marked[dateString] = { periods: [] };
+              }
+              if (!marked[dateString].periods) {
+                marked[dateString].periods = [];
+              }
+
+              marked[dateString].periods.push({
+                startingDay: isStart,
+                endingDay: isEnd,
+                color: eventColor,
+                textColor: '#000000',
+              });
+
+              if (!byDate[dateString]) {
+                byDate[dateString] = [];
+              }
+
+              const alreadyExists = byDate[dateString].some(
+                e => e.uid === ev.uid && e.instanceDate === dateString,
+              );
+
+              if (!alreadyExists) {
+                byDate[dateString].push({
+                  ...ev,
+                  instanceDate: dateString,
+                  instanceStartTime: instanceStartDate,
+                  instanceEndTime: instanceEndDate,
+                  isTask,
+                  isRecurring,
+                  isMultiDay,
+                  color: eventColor,
+                });
+              }
+
+              currentDate.setDate(currentDate.getDate() + 1);
+            }
+          } else {
+            const dateString = formatDate(instanceStartDate);
 
             if (!marked[dateString]) {
               marked[dateString] = { periods: [] };
@@ -559,19 +731,16 @@ const WeekScreen = () => {
             }
 
             marked[dateString].periods.push({
-              startingDay: isStart,
-              endingDay: isEnd,
               color: eventColor,
-              textColor: '#000000',
+              selectedColor: eventColor,
             });
 
             if (!byDate[dateString]) {
               byDate[dateString] = [];
             }
 
-            const alreadyExists = byDate[dateString].some(e =>
-              e.uid === ev.uid &&
-              e.instanceDate === dateString
+            const alreadyExists = byDate[dateString].some(
+              e => e.uid === ev.uid && e.instanceDate === dateString,
             );
 
             if (!alreadyExists) {
@@ -582,64 +751,27 @@ const WeekScreen = () => {
                 instanceEndTime: instanceEndDate,
                 isTask,
                 isRecurring,
-                isMultiDay,
+                isMultiDay: false,
                 color: eventColor,
               });
             }
-
-            currentDate.setDate(currentDate.getDate() + 1);
           }
-        } else {
-          const dateString = formatDate(instanceStartDate);
-
-          if (!marked[dateString]) {
-            marked[dateString] = { periods: [] };
-          }
-          if (!marked[dateString].periods) {
-            marked[dateString].periods = [];
-          }
-
-          marked[dateString].periods.push({
-            color: eventColor,
-            selectedColor: eventColor,
-          });
-
-          if (!byDate[dateString]) {
-            byDate[dateString] = [];
-          }
-
-          const alreadyExists = byDate[dateString].some(e =>
-            e.uid === ev.uid &&
-            e.instanceDate === dateString
-          );
-
-          if (!alreadyExists) {
-            byDate[dateString].push({
-              ...ev,
-              instanceDate: dateString,
-              instanceStartTime: instanceStartDate,
-              instanceEndTime: instanceEndDate,
-              isTask,
-              isRecurring,
-              isMultiDay: false,
-              color: eventColor,
-            });
-          }
-        }
+        });
       });
-    });
 
-    const result = { markedDatesBase: marked, eventsByDate: byDate };
-    
-    // Cache the result (limit cache size)
-    if (eventsCacheRef.current.size > 20) {
-      const firstKey = eventsCacheRef.current.keys().next().value;
-      eventsCacheRef.current.delete(firstKey);
-    }
-    eventsCacheRef.current.set(cacheKey, result);
-    
-    return result;
-  }, [userEvents, selectedTimeZone, selectedDay]);
+      const result = { markedDatesBase: marked, eventsByDate: byDate };
+
+      // Cache the result (limit cache size)
+      if (eventsCacheRef.current.size > 20) {
+        const firstKey = eventsCacheRef.current.keys().next().value;
+        eventsCacheRef.current.delete(firstKey);
+      }
+      eventsCacheRef.current.set(cacheKey, result);
+
+      return result;
+    },
+    [userEvents, selectedTimeZone, selectedDay],
+  );
 
   // Calculate current week start
   const currentWeekStart = useMemo(() => {
@@ -655,7 +787,9 @@ const WeekScreen = () => {
 
   // Process events for current week - use InteractionManager to defer heavy work
   const [markedDatesBase, setMarkedDatesBase] = useState<any>({});
-  const [eventsByDate, setEventsByDate] = useState<{ [key: string]: any[] }>({});
+  const [eventsByDate, setEventsByDate] = useState<{ [key: string]: any[] }>(
+    {},
+  );
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
@@ -665,7 +799,9 @@ const WeekScreen = () => {
     }
 
     // Update UI immediately with cached data if available
-    const cacheKey = `${formatDate(currentWeekStart)}-${selectedTimeZone}-${selectedDay}`;
+    const cacheKey = `${formatDate(
+      currentWeekStart,
+    )}-${selectedTimeZone}-${selectedDay}`;
     const cached = eventsCacheRef.current.get(cacheKey);
     if (cached) {
       setMarkedDatesBase(cached.markedDatesBase);
@@ -704,20 +840,20 @@ const WeekScreen = () => {
   // Only update selected date marker - this is fast and doesn't require recalculating all events
   const markedDates = useMemo(() => {
     const marked = { ...markedDatesBase };
-    
+
     if (marked[selectedDateString]) {
       marked[selectedDateString] = {
         ...marked[selectedDateString],
         selected: true,
-        selectedColor: '#2196F3',
+        selectedColor: '#00AEEF',
       };
     } else {
       marked[selectedDateString] = {
         selected: true,
-        selectedColor: '#2196F3',
+        selectedColor: '#00AEEF',
       };
     }
-    
+
     return marked;
   }, [markedDatesBase, selectedDateString]);
 
@@ -783,22 +919,23 @@ const WeekScreen = () => {
   const handleEditEvent = (event: any) => {
     handleCloseEventModal();
     const eventToPass = event.originalRawEventData || event;
-    const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
+    const list =
+      eventToPass.list || eventToPass.tags || event.list || event.tags || [];
     const isTask = list.some((item: any) => item.key === 'task');
-    
+
     if (isEventInPast(eventToPass)) {
       showAlert(
         isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
         '',
-        'warning'
+        'warning',
       );
       return;
     }
-    
+
     const targetScreen = isTask
       ? Screen.CreateTaskScreen
       : Screen.CreateEventScreen;
-    
+
     (navigation as any).navigate(targetScreen, {
       mode: 'edit',
       eventData: eventToPass,
@@ -813,28 +950,35 @@ const WeekScreen = () => {
       }
 
       handleCloseEventModal();
-      
+
       const currentEvents = [...(userEvents || [])];
       optimisticallyDeleteEvent(event.uid);
 
       (async () => {
         try {
-          await blockchainService.deleteEventSoft(event.uid, account, token, api);
+          await blockchainService.deleteEventSoft(
+            event.uid,
+            account,
+            token,
+            api,
+          );
           setTimeout(() => {
-            getUserEvents(account.userName, api, undefined, { skipLoading: true }).catch(err => {
+            getUserEvents(account.userName, api, undefined, {
+              skipLoading: true,
+            }).catch(err => {
               console.error('Background event refresh failed:', err);
               revertOptimisticUpdate(currentEvents);
             });
           }, 2000);
         } catch (err) {
-          console.error("Delete Event Failed:", err);
+          console.error('Delete Event Failed:', err);
           revertOptimisticUpdate(currentEvents);
-          Alert.alert("Error", "Failed to move the event to the trash");
+          Alert.alert('Error', 'Failed to move the event to the trash');
         }
       })();
     } catch (err) {
-      console.error("Delete Event Failed:", err);
-      Alert.alert("Error", "Failed to move the event to the trash");
+      console.error('Delete Event Failed:', err);
+      Alert.alert('Error', 'Failed to move the event to the trash');
     }
   };
 
@@ -857,7 +1001,9 @@ const WeekScreen = () => {
     return repeatType;
   };
 
-  const getEventGuests = (event: any): Array<{ email: string; avatar?: string }> => {
+  const getEventGuests = (
+    event: any,
+  ): Array<{ email: string; avatar?: string }> => {
     if (!event) return [];
     const guests: Array<{ email: string; avatar?: string }> = [];
 
@@ -866,20 +1012,28 @@ const WeekScreen = () => {
         if (typeof g === 'string') {
           guests.push({ email: g });
         } else if (g && typeof g === 'object' && g.email) {
-          guests.push({ email: g.email, avatar: g.avatar || g.picture || g.profilePicture });
+          guests.push({
+            email: g.email,
+            avatar: g.avatar || g.picture || g.profilePicture,
+          });
         }
       });
     }
 
     if (event.list && Array.isArray(event.list)) {
-      const guestItems = event.list.filter((item: any) => item && item.key === 'guest');
+      const guestItems = event.list.filter(
+        (item: any) => item && item.key === 'guest',
+      );
       guestItems.forEach((item: any) => {
         if (typeof item.value === 'string') {
           guests.push({ email: item.value });
         } else if (item.value && typeof item.value === 'object') {
           guests.push({
             email: item.value.email || item.value,
-            avatar: item.value.avatar || item.value.picture || item.value.profilePicture
+            avatar:
+              item.value.avatar ||
+              item.value.picture ||
+              item.value.profilePicture,
           });
         }
       });
@@ -944,26 +1098,26 @@ const WeekScreen = () => {
     const startWeek = getWeekStart(selectedDate);
     // Normalize to midnight for consistent comparison
     startWeek.setHours(0, 0, 0, 0);
-    
+
     // Add 12 weeks before
     for (let i = 12; i > 0; i--) {
       const week = new Date(startWeek);
-      week.setDate(week.getDate() - (i * 7));
+      week.setDate(week.getDate() - i * 7);
       week.setHours(0, 0, 0, 0);
       weeks.push(week);
     }
-    
+
     // Add current week
     weeks.push(new Date(startWeek));
-    
+
     // Add 12 weeks after
     for (let i = 1; i <= 12; i++) {
       const week = new Date(startWeek);
-      week.setDate(week.getDate() + (i * 7));
+      week.setDate(week.getDate() + i * 7);
       week.setHours(0, 0, 0, 0);
       weeks.push(week);
     }
-    
+
     return weeks;
   }, [selectedDate, selectedDay]);
 
@@ -972,13 +1126,13 @@ const WeekScreen = () => {
     const normalizedWeekStart = new Date(weekStartDate);
     normalizedWeekStart.setHours(0, 0, 0, 0);
     const weekStartStr = formatDate(normalizedWeekStart);
-    
+
     const index = weekDates.findIndex(week => {
       const normalizedWeek = new Date(week);
       normalizedWeek.setHours(0, 0, 0, 0);
       return formatDate(normalizedWeek) === weekStartStr;
     });
-    
+
     return index >= 0 ? index : 12; // Default to middle if not found
   }, [weekDates, weekStartDate]);
 
@@ -987,7 +1141,7 @@ const WeekScreen = () => {
     const normalizedWeekStart = new Date(weekStartDate);
     normalizedWeekStart.setHours(0, 0, 0, 0);
     const weekStartStr = formatDate(normalizedWeekStart);
-    
+
     const idx = weekDates.findIndex(week => {
       const normalizedWeek = new Date(week);
       normalizedWeek.setHours(0, 0, 0, 0);
@@ -1017,35 +1171,63 @@ const WeekScreen = () => {
     // Normalize weekStart to midnight for consistent calculation
     const normalizedWeekStart = new Date(weekStart);
     normalizedWeekStart.setHours(0, 0, 0, 0);
-    
+
     const cacheKey = `${normalizedWeekStart.getFullYear()}-${normalizedWeekStart.getMonth()}-${normalizedWeekStart.getDate()}`;
-    
+
     // Check cache first
     if (monthProgressCache.current.has(cacheKey)) {
       return monthProgressCache.current.get(cacheKey);
     }
 
-    const monthStart = new Date(normalizedWeekStart.getFullYear(), normalizedWeekStart.getMonth(), 1);
+    const monthStart = new Date(
+      normalizedWeekStart.getFullYear(),
+      normalizedWeekStart.getMonth(),
+      1,
+    );
     monthStart.setHours(0, 0, 0, 0);
-    const monthEnd = new Date(normalizedWeekStart.getFullYear(), normalizedWeekStart.getMonth() + 1, 0);
+    const monthEnd = new Date(
+      normalizedWeekStart.getFullYear(),
+      normalizedWeekStart.getMonth() + 1,
+      0,
+    );
     monthEnd.setHours(0, 0, 0, 0);
-    
+
     const monthStartWeek = getWeekStart(monthStart);
     monthStartWeek.setHours(0, 0, 0, 0);
     const monthEndWeek = getWeekStart(monthEnd);
     monthEndWeek.setHours(0, 0, 0, 0);
-    
+
     // Calculate which week of the month this is
-    const weeksDiff = Math.round((normalizedWeekStart.getTime() - monthStartWeek.getTime()) / (7 * 24 * 60 * 60 * 1000));
-    const totalWeeksDiff = Math.round((monthEndWeek.getTime() - monthStartWeek.getTime()) / (7 * 24 * 60 * 60 * 1000));
+    const weeksDiff = Math.round(
+      (normalizedWeekStart.getTime() - monthStartWeek.getTime()) /
+        (7 * 24 * 60 * 60 * 1000),
+    );
+    const totalWeeksDiff = Math.round(
+      (monthEndWeek.getTime() - monthStartWeek.getTime()) /
+        (7 * 24 * 60 * 60 * 1000),
+    );
     const totalWeeks = Math.max(1, totalWeeksDiff + 1);
     const currentWeek = Math.max(1, Math.min(weeksDiff + 1, totalWeeks));
-    
+
     // Cache month name calculation
-    const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 
-                       'July', 'August', 'September', 'October', 'November', 'December'];
-    const monthName = `${monthNames[weekStart.getMonth()]} ${weekStart.getFullYear()}`;
-    
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    const monthName = `${
+      monthNames[weekStart.getMonth()]
+    } ${weekStart.getFullYear()}`;
+
     const result = {
       currentWeek,
       totalWeeks,
@@ -1059,12 +1241,14 @@ const WeekScreen = () => {
       monthProgressCache.current.delete(firstKey);
     }
     monthProgressCache.current.set(cacheKey, result);
-    
+
     return result;
   };
 
   // Use state for monthProgress to update immediately during scrolling
-  const [monthProgress, setMonthProgress] = useState(() => getMonthProgress(weekStartDate));
+  const [monthProgress, setMonthProgress] = useState(() =>
+    getMonthProgress(weekStartDate),
+  );
 
   // Update monthProgress when currentWeekIndex changes (during scrolling)
   useEffect(() => {
@@ -1077,93 +1261,202 @@ const WeekScreen = () => {
     }
   }, [currentWeekIndex, weekDates, weekStartDate]);
 
-
   // Memoized week component for better performance
-  const WeekRow = React.memo(({ weekStart, markedDates, eventsByDate, selectedDateString, firstDayNumber, onDayPress }: any) => {
-    const days = [];
-    const weekStartStr = formatDate(weekStart);
-    
-    // Get day names based on firstDay
-    const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
-    const reorderedDayNames = [
-      ...dayNames.slice(firstDayNumber),
-      ...dayNames.slice(0, firstDayNumber)
-    ];
+  const WeekRow = React.memo(
+    ({
+      weekStart,
+      markedDates,
+      eventsByDate,
+      selectedDateString,
+      firstDayNumber,
+      onDayPress,
+    }: any) => {
+      const days = [];
+      const weekStartStr = formatDate(weekStart);
 
-    for (let i = 0; i < 7; i++) {
-      const dayDate = new Date(weekStart);
-      dayDate.setDate(weekStart.getDate() + i);
-      const dayStr = formatDate(dayDate);
-      const isSelected = dayStr === selectedDateString;
-      const isToday = dayStr === formatDate(new Date());
-      const dayMarked = markedDates[dayStr];
-      const dayEvents = eventsByDate[dayStr] || [];
+      // Get day names based on firstDay
+      const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      const reorderedDayNames = [
+        ...dayNames.slice(firstDayNumber),
+        ...dayNames.slice(0, firstDayNumber),
+      ];
 
-      days.push(
-        <TouchableOpacity
-          key={dayStr}
-          style={[
-            styles.weekDayContainer,
-            isSelected && styles.weekDaySelected,
-          ]}
-          onPress={() => onDayPress({ dateString: dayStr, timestamp: dayDate.getTime() })}
-        >
-          <Text style={[styles.weekDayName, isSelected && styles.weekDayNameSelected]}>
-            {reorderedDayNames[i]}
-          </Text>
-          <View style={[
-            styles.weekDayNumber,
-            isSelected && styles.weekDayNumberSelected,
-            isToday && !isSelected && styles.weekDayToday,
-          ]}>
-            <Text style={[
-              styles.weekDayNumberText,
-              isSelected && styles.weekDayNumberTextSelected,
-              isToday && !isSelected && styles.weekDayNumberTextToday,
-            ]}>
-              {dayDate.getDate()}
+      for (let i = 0; i < 7; i++) {
+        const dayDate = new Date(weekStart);
+        dayDate.setDate(weekStart.getDate() + i);
+        const dayStr = formatDate(dayDate);
+        const isSelected = dayStr === selectedDateString;
+        const isToday = dayStr === formatDate(new Date());
+        const dayMarked = markedDates[dayStr];
+        const dayEvents = eventsByDate[dayStr] || [];
+
+        days.push(
+          <TouchableOpacity
+            key={dayStr}
+            style={[
+              styles.weekDayContainer,
+              isSelected && styles.weekDaySelected,
+            ]}
+            onPress={() =>
+              onDayPress({ dateString: dayStr, timestamp: dayDate.getTime() })
+            }
+          >
+            <Text style={styles.weekDayName}>
+              {reorderedDayNames[i].charAt(0)}
             </Text>
-          </View>
-          {/* Render lines instead of dots, similar to monthly view */}
-          <View style={styles.weekDayLinesContainer}>
-            {dayMarked && dayMarked.periods && dayMarked.periods.length > 0 ? (
-              dayMarked.periods.slice(0, 3).map((period: any, idx: number) => (
-                <View
-                  key={idx}
-                  style={[
-                    styles.weekDayLine,
-                    { backgroundColor: period.color || '#337E89' }
-                  ]}
-                />
-              ))
-            ) : dayEvents.length > 0 ? (
-              <View style={[styles.weekDayLine, { backgroundColor: '#337E89' }]} />
-            ) : null}
-          </View>
-        </TouchableOpacity>
-      );
-    }
+            <View
+              style={[
+                styles.weekDayNumber,
+                isSelected && styles.weekDaySelectedUnderline,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.weekDayNumberText,
+                  isToday && !isSelected && styles.weekDayNumberTextToday,
+                  isSelected && styles.weekDayNumberTextSelected,
+                ]}
+              >
+                {dayDate.getDate()}
+              </Text>
+            </View>
+            {/* Event/Task lines - stacked vertically under date */}
+            <View style={styles.weekDayLinesContainer}>
+              {dayEvents.length > 0
+                ? dayEvents.map((event: any, idx: number) => {
+                    const lineColor = event.isTask ? '#8DC63F' : '#00AEEF';
+                    return (
+                      <View
+                        key={`${event.uid}-${idx}`}
+                        style={[
+                          styles.weekDayLine,
+                          { backgroundColor: lineColor },
+                        ]}
+                      />
+                    );
+                  })
+                : dayMarked && dayMarked.periods && dayMarked.periods.length > 0
+                ? dayMarked.periods.map((period: any, idx: number) => {
+                    // Check if any event for this date with this color is a task
+                    const matchingEvent = dayEvents.find(
+                      (e: any) => e.color === period.color,
+                    );
+                    const isTask = matchingEvent ? matchingEvent.isTask : false;
+                    const lineColor = isTask
+                      ? '#8DC63F'
+                      : period.color || '#00AEEF';
+                    return (
+                      <View
+                        key={idx}
+                        style={[
+                          styles.weekDayLine,
+                          { backgroundColor: lineColor },
+                        ]}
+                      />
+                    );
+                  })
+                : null}
+            </View>
+          </TouchableOpacity>,
+        );
+      }
 
-    return (
-      <View style={styles.weekRow}>
-        {days}
-      </View>
-    );
-  });
+      return <View style={styles.weekRow}>{days}</View>;
+    },
+  );
 
   // Render a single week (7 days) - memoized for performance
-  const renderWeek = useCallback((weekStart: Date) => {
-    return (
-      <WeekRow
-        weekStart={weekStart}
-        markedDates={markedDates}
-        eventsByDate={eventsByDate}
-        selectedDateString={selectedDateString}
-        firstDayNumber={firstDayNumber}
-        onDayPress={handleDayPress}
-      />
-    );
-  }, [markedDates, eventsByDate, selectedDateString, firstDayNumber, handleDayPress]);
+  const renderWeek = useCallback(
+    (weekStart: Date) => {
+      return (
+        <WeekRow
+          weekStart={weekStart}
+          markedDates={markedDates}
+          eventsByDate={eventsByDate}
+          selectedDateString={selectedDateString}
+          firstDayNumber={firstDayNumber}
+          onDayPress={handleDayPress}
+        />
+      );
+    },
+    [
+      markedDates,
+      eventsByDate,
+      selectedDateString,
+      firstDayNumber,
+      handleDayPress,
+    ],
+  );
+
+  // Handle horizontal scroll to next/previous weeks
+  const handleWeekScroll = useCallback(
+    (event: any) => {
+      const contentOffsetX = event.nativeEvent.contentOffset.x;
+      const screenWidth = Dimensions.get('window').width;
+      const index = Math.round(contentOffsetX / screenWidth);
+
+      if (
+        index !== currentWeekIndex &&
+        index >= 0 &&
+        index < weekDates.length
+      ) {
+        setCurrentWeekIndex(index);
+        // Update selected date to the Monday of the selected week
+        const newWeekStart = new Date(weekDates[index]);
+        setSelectedDate(newWeekStart);
+        // Update the month in header if it changed
+        setCurrentMonthByIndex(newWeekStart.getMonth());
+      }
+    },
+    [currentWeekIndex, weekDates, setSelectedDate, setCurrentMonthByIndex],
+  );
+
+  // Navigate to previous week
+  const handlePreviousWeek = useCallback(() => {
+    if (currentWeekIndex > 0) {
+      const newIndex = currentWeekIndex - 1;
+      setCurrentWeekIndex(newIndex);
+      const newWeekStart = new Date(weekDates[newIndex]);
+      setSelectedDate(newWeekStart);
+      setCurrentMonthByIndex(newWeekStart.getMonth());
+      weekScrollRef.current?.scrollToIndex({
+        index: newIndex,
+        animated: true,
+      });
+    }
+  }, [currentWeekIndex, weekDates, setSelectedDate, setCurrentMonthByIndex]);
+
+  // Navigate to next week
+  const handleNextWeek = useCallback(() => {
+    if (currentWeekIndex < weekDates.length - 1) {
+      const newIndex = currentWeekIndex + 1;
+      setCurrentWeekIndex(newIndex);
+      const newWeekStart = new Date(weekDates[newIndex]);
+      setSelectedDate(newWeekStart);
+      setCurrentMonthByIndex(newWeekStart.getMonth());
+      weekScrollRef.current?.scrollToIndex({
+        index: newIndex,
+        animated: true,
+      });
+    }
+  }, [currentWeekIndex, weekDates, setSelectedDate, setCurrentMonthByIndex]);
+
+  // Render individual week item for FlatList
+  const renderWeekItem = useCallback(
+    ({ item: weekStart }: { item: Date }) => {
+      return (
+        <View
+          style={{
+            width: Dimensions.get('window').width,
+            paddingHorizontal: spacing.md,
+          }}
+        >
+          <View style={styles.calendarWrapper}>{renderWeek(weekStart)}</View>
+        </View>
+      );
+    },
+    [renderWeek],
+  );
 
   return (
     <View style={styles.container}>
@@ -1185,105 +1478,73 @@ const WeekScreen = () => {
         selectedDate={selectedDate}
       />
 
-      {/* Week Indicator */}
-      <View style={styles.weekIndicatorContainer}>
-        <Text style={styles.weekIndicatorText}>
-          Week {monthProgress.currentWeek} / {monthProgress.totalWeeks}
-        </Text>
-      </View>
-
       <ScrollView
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={true}
       >
-        <View style={styles.calendarWrapper}>
+        {/* Week Header with Navigation */}
+        <View style={styles.weekHeaderSection}>
+          <View style={styles.weekTitleContainer}>
+            <Text style={styles.weekTitleText}>
+              {monthProgress.monthName} - Week {monthProgress.currentWeek} of{' '}
+              {monthProgress.totalWeeks}
+            </Text>
+          </View>
+
+          {/* Navigation Icon Buttons */}
+          <View style={styles.weekNavigationButtons}>
+            <TouchableOpacity
+              style={styles.iconNavButton}
+              onPress={handlePreviousWeek}
+              disabled={currentWeekIndex === 0}
+              activeOpacity={0.6}
+            >
+              <Icon
+                name="left"
+                size={18}
+                color={currentWeekIndex === 0 ? '#D0D0D0' : '#808080'}
+              />
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              style={styles.iconNavButton}
+              onPress={handleNextWeek}
+              disabled={currentWeekIndex === weekDates.length - 1}
+              activeOpacity={0.6}
+            >
+              <Icon
+                name="right"
+                size={18}
+                color={
+                  currentWeekIndex === weekDates.length - 1
+                    ? '#D0D0D0'
+                    : '#808080'
+                }
+              />
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Horizontal week slider - Full Width */}
+        <View style={styles.weekSliderContainer}>
           <FlatList
             ref={weekScrollRef}
             data={weekDates}
-            keyExtractor={(item, index) => `week-${formatDate(item)}-${index}`}
-            renderItem={({ item, index }) => {
-              return (
-                <View style={{ width: calendarWidth }}>
-                  {renderWeek(item)}
-                </View>
-              );
-            }}
-            horizontal={true}
-            pagingEnabled={true}
+            renderItem={renderWeekItem}
+            keyExtractor={(item, index) => `week-${index}-${item.getTime()}`}
+            horizontal
+            pagingEnabled
+            scrollEventThrottle={16}
+            onScroll={handleWeekScroll}
             showsHorizontalScrollIndicator={false}
-            decelerationRate="fast"
+            initialScrollIndex={currentWeekIndex}
+            scrollEnabled={true}
             getItemLayout={(data, index) => ({
-              length: calendarWidth,
-              offset: calendarWidth * index,
+              length: Dimensions.get('window').width,
+              offset: Dimensions.get('window').width * index,
               index,
             })}
-            onMomentumScrollEnd={(event) => {
-              const offsetX = event.nativeEvent.contentOffset.x;
-              // Calculate index based on exact position
-              const calculatedIndex = offsetX / calendarWidth;
-              const index = Math.round(calculatedIndex);
-              const clampedIndex = Math.max(0, Math.min(index, weekDates.length - 1));
-              
-              // Ensure we're at the exact position for this index
-              const expectedOffset = clampedIndex * calendarWidth;
-              const offsetDiff = Math.abs(offsetX - expectedOffset);
-              
-              // If we're not at the exact position, scroll to it
-              if (offsetDiff > 1 && weekScrollRef.current) {
-                weekScrollRef.current.scrollToOffset({
-                  offset: expectedOffset,
-                  animated: true,
-                });
-              }
-              
-              if (weekDates[clampedIndex]) {
-                const newWeekStart = new Date(weekDates[clampedIndex]);
-                newWeekStart.setHours(0, 0, 0, 0);
-                // Update to middle of week (day 3 or 4)
-                const newDate = new Date(newWeekStart);
-                newDate.setDate(newWeekStart.getDate() + 3);
-                newDate.setHours(12, 0, 0, 0); // Set to noon to avoid timezone issues
-                
-                // Update state
-                setSelectedDate(newDate);
-                setCurrentMonthByIndex(newDate.getMonth());
-                setCurrentWeekIndex(clampedIndex);
-                
-                // Update month progress
-                const progress = getMonthProgress(newWeekStart);
-                setMonthProgress(progress);
-              }
-            }}
-            onScroll={(event) => {
-              const offsetX = event.nativeEvent.contentOffset.x;
-              // Calculate index more accurately
-              const calculatedIndex = offsetX / calendarWidth;
-              const index = Math.round(calculatedIndex);
-              const clampedIndex = Math.max(0, Math.min(index, weekDates.length - 1));
-              
-              if (clampedIndex !== currentWeekIndex && weekDates[clampedIndex]) {
-                setCurrentWeekIndex(clampedIndex);
-                // Update monthProgress immediately during scroll for responsive UI
-                const visibleWeek = weekDates[clampedIndex];
-                if (visibleWeek) {
-                  const progress = getMonthProgress(visibleWeek);
-                  setMonthProgress(progress);
-                }
-              }
-            }}
-            scrollEventThrottle={16}
-            initialScrollIndex={initialWeekIndex >= 0 ? initialWeekIndex : 12}
-            onScrollToIndexFailed={(info) => {
-              // Fallback if scroll fails - scroll to offset instead
-              const offset = info.index * calendarWidth;
-              setTimeout(() => {
-                weekScrollRef.current?.scrollToOffset({
-                  offset: offset,
-                  animated: false,
-                });
-              }, 100);
-            }}
           />
         </View>
 
@@ -1293,9 +1554,21 @@ const WeekScreen = () => {
           <View style={styles.eventsList}>
             {selectedDateEvents.length > 0 ? (
               selectedDateEvents.slice(0, 20).map((event, index) => (
-                <View key={`${event.uid}-${index}`}
-                  style={{ display: 'flex', flexDirection: 'column', marginBottom: 10 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
+                <View
+                  key={`${event.uid}-${index}`}
+                  style={{
+                    display: 'flex',
+                    flexDirection: 'column',
+                    marginBottom: 10,
+                  }}
+                >
+                  <View
+                    style={{
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      marginBottom: spacing.sm,
+                    }}
+                  >
                     <Text style={[styles.eventTime]}>
                       {event.instanceStartTime?.toLocaleTimeString('en-US', {
                         hour: 'numeric',
@@ -1303,7 +1576,14 @@ const WeekScreen = () => {
                       })}
                     </Text>
 
-                    <View style={{ flex: 1, height: 1, backgroundColor: '#D5D7DA', marginLeft: 14 }} />
+                    <View
+                      style={{
+                        flex: 1,
+                        height: 1,
+                        backgroundColor: '#D5D7DA',
+                        marginLeft: 14,
+                      }}
+                    />
                   </View>
 
                   <TouchableOpacity
@@ -1311,22 +1591,25 @@ const WeekScreen = () => {
                     onPress={() => handleEventPress(event)}
                   >
                     <View style={styles.eventContent}>
-                      <Text style={styles.eventTitle}>
-                        {event.title}
-                      </Text>
+                      <Text style={styles.eventTitle}>{event.title}</Text>
 
                       <View style={styles.eventBadges}>
                         <View style={styles.badge}>
                           <ClockIcon height={14} width={14} />
                           <Text style={styles.eventTime}>
-                            {parseTimeToPST(event.fromTime)?.toLocaleTimeString('en-US', {
-                              hour: 'numeric',
-                              minute: '2-digit',
-                            })}
+                            {parseTimeToPST(event.fromTime)?.toLocaleTimeString(
+                              'en-US',
+                              {
+                                hour: 'numeric',
+                                minute: '2-digit',
+                              },
+                            )}
                             {!event.isTask && (
                               <>
                                 {' - '}
-                                {parseTimeToPST(event.toTime)?.toLocaleTimeString('en-US', {
+                                {parseTimeToPST(
+                                  event.toTime,
+                                )?.toLocaleTimeString('en-US', {
                                   hour: 'numeric',
                                   minute: '2-digit',
                                 })}
@@ -1344,10 +1627,19 @@ const WeekScreen = () => {
                           </View>
                         )}
 
-                        <View style={[styles.badge, {
-                          borderColor: event.isTask ? '#8DC63F' : '#00AEEF',
-                        }]}>
-                          {event.isTask ? <TaskIcon height={14} width={14} /> : <EventIcon height={14} width={14} />}
+                        <View
+                          style={[
+                            styles.badge,
+                            {
+                              borderColor: event.isTask ? '#8DC63F' : '#00AEEF',
+                            },
+                          ]}
+                        >
+                          {event.isTask ? (
+                            <TaskIcon height={14} width={14} />
+                          ) : (
+                            <EventIcon height={14} width={14} />
+                          )}
                           <Text style={styles.badgeText}>
                             {event.isTask ? 'Task' : 'Event'}
                           </Text>
@@ -1356,7 +1648,8 @@ const WeekScreen = () => {
 
                       {(() => {
                         const eventGuests = getEventGuests(event);
-                        if (!eventGuests || eventGuests.length === 0) return null;
+                        if (!eventGuests || eventGuests.length === 0)
+                          return null;
 
                         const maxVisible = 5;
                         const size = 36;
@@ -1368,10 +1661,19 @@ const WeekScreen = () => {
                           <View style={styles.guestsContainer}>
                             {visibleGuests.map((guest, index) => {
                               const initials = getGuestInitials(guest.email);
-                              const gradientColors = getGuestBackgroundColor(guest.email);
-                              const hasAvatar = guest.avatar && typeof guest.avatar === 'string' && guest.avatar.trim() !== '';
+                              const gradientColors = getGuestBackgroundColor(
+                                guest.email,
+                              );
+                              const hasAvatar =
+                                guest.avatar &&
+                                typeof guest.avatar === 'string' &&
+                                guest.avatar.trim() !== '';
                               const imageFailed = failedImages.has(guest.email);
-                              const marginLeft = isSingleGuest ? 0 : (index > 0 ? -12 : 0);
+                              const marginLeft = isSingleGuest
+                                ? 0
+                                : index > 0
+                                ? -12
+                                : 0;
 
                               return (
                                 <View
@@ -1399,7 +1701,9 @@ const WeekScreen = () => {
                                         resizeMode: 'cover',
                                       }}
                                       onError={() => {
-                                        setFailedImages(prev => new Set(prev).add(guest.email));
+                                        setFailedImages(prev =>
+                                          new Set(prev).add(guest.email),
+                                        );
                                       }}
                                     />
                                   ) : (
@@ -1511,85 +1815,113 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 100,
   },
-  calendarWrapper: {
-    marginTop: spacing.xs,
+  weekHeaderSection: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  weekTitleContainer: {
+    flex: 1,
+  },
+  weekTitleText: {
+    fontSize: 16,
+    fontFamily: Fonts.latoBold,
+    color: '#181D27',
+  },
+  weekNavigationButtons: {
+    flexDirection: 'row',
+    gap: spacing.xs,
+  },
+  iconNavButton: {
+    width: 32,
+    height: 32,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 4,
+    backgroundColor: 'transparent',
+  },
+  weekSliderContainer: {
+    width: '100%',
     marginBottom: spacing.lg,
-    borderRadius: 14,
+  },
+  thisWeekHeader: {
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  thisWeekText: {
+    fontSize: 16,
+    fontFamily: Fonts.latoBold,
+    color: '#181D27',
+  },
+  calendarWrapper: {
+    borderRadius: 12,
     overflow: 'hidden',
     backgroundColor: '#ffffff',
-    width: Dimensions.get('window').width, // Full width, no horizontal margins
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.md,
+    ...shadows.sm,
+  },
+  weekSliderContent: {
+    paddingHorizontal: 0,
+    paddingBottom: 0,
   },
   weekRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
     alignItems: 'center',
-    width: '100%', // Use 100% to fill parent container
-    paddingVertical: spacing.md,
-    paddingHorizontal: 0, // No horizontal padding to ensure 7 days fit exactly
+    width: '100%',
+    paddingHorizontal: spacing.sm,
   },
   weekDayContainer: {
     alignItems: 'center',
     justifyContent: 'center',
     flex: 1,
-    paddingVertical: spacing.sm,
+    paddingVertical: spacing.xs,
   },
   weekDaySelected: {
     backgroundColor: 'transparent',
   },
   weekDayName: {
     fontSize: 12,
-    fontFamily: Fonts.black,
+    fontFamily: Fonts.latoRegular,
     color: '#b6c1cd',
     marginBottom: spacing.xs,
-    textTransform: 'uppercase',
-  },
-  weekDayNameSelected: {
-    color: '#000',
   },
   weekDayNumber: {
     width: 36,
     height: 36,
-    borderRadius: 18,
+    borderRadius: 8,
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 4,
-  },
-  weekDayNumberSelected: {
-    backgroundColor: '#2196F3', // Exact blue color from monthly calendar selectedColor
-    borderRadius: 18, // Perfect circle like the monthly calendar
+    marginBottom: 0,
   },
   weekDayToday: {
-    backgroundColor: 'transparent',
-    borderWidth: 2,
-    borderColor: colors.figmaLightBlue || '#2196F3',
+    backgroundColor: '#00AEEF',
+    borderRadius: 18,
+  },
+  weekDaySelectedUnderline: {
+    backgroundColor: '#00AEEF',
+    borderWidth: 0,
+    borderColor: 'transparent',
+    borderRadius: 18,
   },
   weekDayNumberText: {
     fontSize: 14,
-    fontFamily: Fonts.bold,
-    color: '#202020',
+    fontFamily: Fonts.latoRegular,
+    color: '#181D27',
   },
   weekDayNumberTextSelected: {
-    color: '#ffffff',
+    color: '#FFFFFF',
+    fontFamily: Fonts.latoBold,
   },
   weekDayNumberTextToday: {
-    color: colors.figmaLightBlue || '#2196F3',
-  },
-  weekDayLinesContainer: {
-    marginTop: 4,
-    flexDirection: 'row',
-    justifyContent: 'center',
-    alignItems: 'center',
-    gap: 2,
-    height: 4,
-    width: '100%',
-  },
-  weekDayLine: {
-    height: 3,
-    borderRadius: 1.5,
-    flex: 1,
-    maxWidth: 20,
-    minWidth: 4,
+    color: '#00AEEF',
+    fontFamily: Fonts.latoBold,
   },
   eventsContainer: {
     marginHorizontal: spacing.md,
@@ -1613,14 +1945,14 @@ const styles = StyleSheet.create({
     borderColor: '#D5D7DA',
     borderWidth: 1,
     borderLeftColor: '#D5D7DA',
-    borderLeftWidth: 1
+    borderLeftWidth: 1,
   },
   eventContent: {
     gap: 12,
   },
   eventTitle: {
     fontSize: 14,
-    fontFamily: Fonts.bold,
+    fontFamily: Fonts.latoRegular,
     color: '#000',
     marginBottom: 0,
   },
@@ -1628,7 +1960,7 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontFamily: Fonts.bold,
     textAlign: 'left',
-    color: '#717680'
+    color: '#717680',
   },
   eventBadges: {
     flexDirection: 'row',
@@ -1680,6 +2012,18 @@ const styles = StyleSheet.create({
     color: '#717680',
     fontFamily: Fonts.bold,
     fontWeight: '600',
+  },
+  weekDayLinesContainer: {
+    marginTop: 4,
+    flexDirection: 'column',
+    alignItems: 'center',
+    gap: 2,
+    width: '100%',
+  },
+  weekDayLine: {
+    height: 3,
+    width: 20,
+    borderRadius: 1.5,
   },
   weekIndicatorContainer: {
     marginHorizontal: spacing.md,

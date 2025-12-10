@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Image,
   TextInput,
+  Platform,
 } from 'react-native';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { scaleHeight, scaleWidth } from '../../utils/dimensions';
@@ -15,6 +16,7 @@ import {
   spacing,
   borderRadius,
 } from '../../utils/LightTheme';
+import { Fonts } from '../../constants/Fonts';
 
 interface NotificationSettingsProps {
   notificationMinutes: number;
@@ -40,133 +42,131 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({
     setShowTimeUnitDropdown(false);
   };
   return (
-    <View style={styles.notificationRow}>
-      <View style={styles.notificationLeft}>
-        <FeatherIcon name="bell" size={24} color="#00AEEF" />
-        <Text style={styles.selectorText}>Notification</Text>
-        <FeatherIcon name="chevron-down" size={16} color="#00AEEF" style={styles.dropdownIcon} />
-      </View>
-      <View style={styles.notificationRight}>
-        <View style={styles.numberInput}>
-          <TextInput
-            style={styles.numberTextInput}
-            value={notificationMinutes.toString()}
-            onChangeText={text => {
-              const num = parseInt(text.replace(/[^0-9]/g, '')) || 0;
-              onNotificationMinutesChange(Math.min(Math.max(num, 0), 999));
-            }}
-            keyboardType="numeric"
-            maxLength={3}
-            selectTextOnFocus
-          />
-          <View style={styles.numberArrows}>
-            <TouchableOpacity
-              onPress={() =>
-                onNotificationMinutesChange(
-                  Math.min(notificationMinutes + 1, 999),
-                )
-              }
-            >
-              <FeatherIcon name="chevron-up" size={14} color="#130F26" />
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() =>
-                onNotificationMinutesChange(
-                  Math.max(notificationMinutes - 1, 0),
-                )
-              }
-            >
-              <FeatherIcon name="chevron-down" size={14} color="#130F26" />
-            </TouchableOpacity>
+    <View style={styles.fieldContainer}>
+      <Text style={styles.labelText}>Notification</Text>
+      <View style={styles.notificationInputsRow}>
+        {/* Minutes/Hours Input */}
+        <View style={styles.minutesContainer}>
+          <View style={styles.numberInput}>
+            <TextInput
+              style={styles.numberTextInput}
+              value={notificationMinutes.toString()}
+              onChangeText={text => {
+                const num = parseInt(text.replace(/[^0-9]/g, '')) || 0;
+                onNotificationMinutesChange(Math.min(Math.max(num, 0), 999));
+              }}
+              keyboardType="numeric"
+              maxLength={3}
+            />
+            <View style={styles.numberArrows}>
+              <TouchableOpacity
+                onPress={() =>
+                  onNotificationMinutesChange(
+                    Math.min(notificationMinutes + 1, 999),
+                  )
+                }
+              >
+                <FeatherIcon name="chevron-up" size={12} color="#130F26" />
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() =>
+                  onNotificationMinutesChange(
+                    Math.max(notificationMinutes - 1, 0),
+                  )
+                }
+              >
+                <FeatherIcon name="chevron-down" size={12} color="#130F26" />
+              </TouchableOpacity>
+            </View>
           </View>
         </View>
+
+        {/* Time Unit Dropdown */}
         <TouchableOpacity
-          style={styles.timeUnitDropdown}
+          style={[
+            styles.timeUnitDropdown,
+            showTimeUnitDropdown && styles.timeUnitDropdownActive,
+          ]}
           onPress={() => setShowTimeUnitDropdown(!showTimeUnitDropdown)}
         >
           <Text style={styles.timeUnitText}>{selectedTimeUnit}</Text>
-          <FeatherIcon name="chevron-down" size={14} color="#130F26" />
+          <FeatherIcon name="chevron-down" size={14} color="#6C6C6C" />
         </TouchableOpacity>
-      </View>
 
-      {/* Time Unit Dropdown */}
-      {showTimeUnitDropdown && (
-        <View style={styles.timeUnitDropdownMenu}>
-          {timeUnits.map(unit => (
-            <TouchableOpacity
-              key={unit}
-              style={[
-                styles.timeUnitOption,
-                selectedTimeUnit === unit && styles.timeUnitOptionSelected,
-              ]}
-              onPress={() => handleTimeUnitSelect(unit)}
-            >
-              <Text
+        {/* Time Unit Dropdown Menu */}
+        {showTimeUnitDropdown && (
+          <View style={styles.timeUnitDropdownMenu}>
+            {timeUnits.map(unit => (
+              <TouchableOpacity
+                key={unit}
                 style={[
-                  styles.timeUnitOptionText,
-                  selectedTimeUnit === unit &&
-                    styles.timeUnitOptionTextSelected,
+                  styles.timeUnitOption,
+                  selectedTimeUnit === unit && styles.timeUnitOptionSelected,
                 ]}
+                onPress={() => handleTimeUnitSelect(unit)}
               >
-                {unit}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </View>
-      )}
+                <Text
+                  style={[
+                    styles.timeUnitOptionText,
+                    selectedTimeUnit === unit &&
+                      styles.timeUnitOptionTextSelected,
+                  ]}
+                >
+                  {unit}
+                </Text>
+              </TouchableOpacity>
+            ))}
+          </View>
+        )}
+      </View>
     </View>
   );
 };
 
 const styles = StyleSheet.create({
-  notificationRow: {
+  fieldContainer: {
+    marginBottom: scaleHeight(20),
+  },
+  labelText: {
+    fontFamily: Fonts.latoMedium,
+    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 12,
+    letterSpacing: 0,
+    color: '#414651',
+    marginBottom: scaleHeight(8),
+  },
+  notificationInputsRow: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    marginBottom: spacing.md,
+    alignItems: 'flex-start',
+    gap: spacing.sm,
   },
-  notificationLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  selectorText: {
-    fontSize: fontSize.textSize14,
-    color: colors.blackText,
-    fontWeight: '400',
-    marginHorizontal: spacing.sm,
-  },
-  dropdownIcon: {
-    marginLeft: spacing.xs,
-  },
-  notificationRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingRight: scaleWidth(25),
+  minutesContainer: {
+    flex: 1,
   },
   numberInput: {
     flexDirection: 'row',
     alignItems: 'center',
     borderWidth: 1,
-    borderRadius: borderRadius.md,
+    borderRadius: 8,
     borderColor: '#DCE0E5',
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    marginLeft: spacing.sm,
-    height: scaleHeight(32),
-    width: scaleWidth(64),
-    justifyContent: 'center',
+    paddingVertical: scaleHeight(10),
+    height: scaleHeight(44),
+    justifyContent: 'space-between',
   },
   numberText: {
-    fontSize: fontSize.textSize16,
+    fontSize: 12,
+    fontFamily: Fonts.latoRegular,
     color: colors.textPrimary,
-    fontWeight: '600',
+    fontWeight: '400',
     marginHorizontal: spacing.xs,
   },
   numberTextInput: {
-    fontSize: fontSize.textSize16,
-    color: colors.textPrimary,
-    fontWeight: '600',
+    fontSize: 12,
+    fontFamily: Fonts.latoRegular,
+    color: '#252B37',
+    fontWeight: '500',
     textAlign: 'center',
     flex: 1,
     padding: 0,
@@ -174,42 +174,54 @@ const styles = StyleSheet.create({
   },
   numberArrows: {
     flexDirection: 'column',
+    justifyContent: 'center',
+    alignItems: 'center',
     marginLeft: spacing.xs,
   },
   timeUnitDropdown: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'space-between',
     borderWidth: 1,
-    borderRadius: borderRadius.md,
+    borderRadius: 8,
     borderColor: '#DCE0E5',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    marginLeft: spacing.sm,
+    paddingHorizontal: spacing.md,
+    paddingVertical: scaleHeight(10),
+    height: scaleHeight(44),
+    minWidth: scaleWidth(110),
+    position: 'relative',
+    zIndex: 5,
+  },
+  timeUnitDropdownActive: {
+    borderColor: '#00AEEF',
   },
   timeUnitText: {
-    fontSize: fontSize.textSize16,
-    color: colors.textPrimary,
-    fontWeight: '600',
-    marginHorizontal: spacing.xs,
+    fontSize: 12,
+    fontFamily: Fonts.latoRegular,
+    color: '#252B37',
+    fontWeight: '500',
   },
   timeUnitDropdownMenu: {
     position: 'absolute',
-    top: scaleHeight(40),
-    right: scaleWidth(25),
-    width: scaleWidth(100),
+    top: scaleHeight(48),
+    right: 0,
+    width: scaleWidth(110),
     backgroundColor: colors.white,
-    borderRadius: borderRadius.md,
+    borderRadius: 8,
     borderWidth: 1,
     borderColor: '#DCE0E5',
-    shadowColor: '#000',
-    shadowOffset: {
-      width: 0,
-      height: 2,
-    },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
     zIndex: 1000,
+    ...Platform.select({
+      ios: {
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+      },
+      android: {
+        elevation: 4,
+      },
+    }),
   },
   timeUnitOption: {
     paddingVertical: spacing.sm,
@@ -218,15 +230,17 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   timeUnitOptionSelected: {
-    backgroundColor: '#E3F2FD',
+    backgroundColor: 'transparent',
   },
   timeUnitOptionText: {
-    fontSize: fontSize.textSize14,
-    color: colors.textPrimary,
-    fontWeight: '400',
+    fontSize: 12,
+    fontFamily: Fonts.latoRegular,
+    color: '#252B37',
+    fontWeight: '500',
+    lineHeight: 18,
   },
   timeUnitOptionTextSelected: {
-    color: '#1976D2',
+    color: '#00AEEF',
     fontWeight: '600',
   },
 });

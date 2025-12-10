@@ -48,7 +48,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
   onClose,
   onSave: _onSave,
   eventData,
-  mode = 'create'
+  mode = 'create',
 }) => {
   const activeAccount = useActiveAccount(state => state.account);
   const token = useToken(state => state.token);
@@ -94,24 +94,26 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
     });
   };
 
-
-
   React.useEffect(() => {
     if (eventData && mode === 'edit') {
       setTitle(eventData.title || '');
       setDescription(eventData.description || '');
       setLocation(eventData.location || '');
-      setSelectedDate(eventData.selectedDate ? new Date(eventData.selectedDate) : null);
+      setSelectedDate(
+        eventData.selectedDate ? new Date(eventData.selectedDate) : null,
+      );
       setSelectedStartTime(eventData.selectedStartTime || '');
       setSelectedEndTime(eventData.selectedEndTime || '');
       setSelectedGuests(eventData.guests || []);
       setSelectedEventType(eventData.selectedEventType || 'Event');
       setNotificationMinutes(eventData.notificationMinutes || 10);
-      setGuestPermissions(eventData.guestPermissions || {
-        modifyEvent: false,
-        inviteOthers: true,
-        seeGuestList: false,
-      });
+      setGuestPermissions(
+        eventData.guestPermissions || {
+          modifyEvent: false,
+          inviteOthers: true,
+          seeGuestList: false,
+        },
+      );
     } else {
       resetForm();
     }
@@ -226,12 +228,12 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
     return true;
   };
 
-  const { 
-    optimisticallyUpdateEvent, 
+  const {
+    optimisticallyUpdateEvent,
     optimisticallyAddEvent,
     revertOptimisticUpdate,
     getUserEvents,
-    userEvents 
+    userEvents,
   } = useEventsStore();
   const { api } = useApiClient();
   const navigation = useNavigation();
@@ -270,11 +272,11 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
         activeAccount,
         token,
       };
-      console.log("modddd", mode)
+      console.log('modddd', mode);
       if (mode === 'edit' && eventData?.uid) {
         // Store current events for potential revert
         const previousEvents = [...(userEvents || [])];
-        
+
         // ✅ OPTIMISTIC UPDATE: Update UI immediately
         optimisticallyUpdateEvent(eventData.uid, {
           title: payload.title,
@@ -286,7 +288,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
 
         // ✅ NAVIGATE IMMEDIATELY - SYNCHRONOUS (NO DELAY)
         navigation.goBack();
-        
+
         // Show success alert asynchronously (non-blocking)
         setTimeout(() => {
           Alert.alert('Success', 'Event updated successfully!');
@@ -301,8 +303,8 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
                   uid: eventData.uid,
                   fromTime: payload.selectedStartTime, // format: YYYYMMDDTHHmmss
                   toTime: payload.selectedEndTime,
-                  repeatEvent: '',        // add logic if needed
-                  customRepeatEvent: '',  // add logic if needed
+                  repeatEvent: '', // add logic if needed
+                  customRepeatEvent: '', // add logic if needed
                 },
               ],
               active: payload.activeAccount?.username,
@@ -317,9 +319,9 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
                   Authorization: `Bearer ${token}`,
                   'Content-Type': 'application/json',
                 },
-              }
+              },
             );
-            
+
             if (response.data?.success) {
               // Refresh events in background (non-blocking)
               if (activeAccount?.username) {
@@ -330,7 +332,10 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
             } else {
               // Revert on failure
               revertOptimisticUpdate(previousEvents);
-              Alert.alert('Error', response.data?.message || 'Failed to update event');
+              Alert.alert(
+                'Error',
+                response.data?.message || 'Failed to update event',
+              );
             }
           } catch (error: any) {
             console.error('Error updating event in background:', error);
@@ -388,7 +393,6 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
         </TouchableOpacity>
       </View>
 
-
       {/* Event Type Dropdown */}
       {showEventTypeDropdown && (
         <View style={styles.eventTypeDropdown}>
@@ -432,77 +436,55 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
           {/* Date and Time Selection */}
           {showDetailedDateTime && selectedDate ? (
             <View style={styles.dateTimeContainer}>
-              {/* From Section */}
-              <View style={styles.fromToSection}>
-                <Text style={styles.fromToLabel}>From:</Text>
-                <View style={styles.dateTimeRow}>
-                  <View style={styles.dateDisplay}>
-                    <FeatherIcon name="calendar" size={16} color="#6C6C6C" />
-                    <Text style={styles.dateText}>
-                      {selectedDate.toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.timeInputContainer}
-                    onPress={() => setShowCalendarModal(true)}
-                  >
-                    <TextInput
-                      style={styles.timeInput}
-                      value={selectedStartTime}
-                      placeholder="05:25 PM"
-                      placeholderTextColor={colors.grey400}
-                      editable={false}
-                    />
-                    <FeatherIcon name="clock" size={14} color="#6C6C6C" />
-                  </TouchableOpacity>
-                </View>
+              {/* Start Date and Time Section */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.labelText}>Start Date and Time</Text>
+                <TouchableOpacity
+                  style={styles.datePicker}
+                  onPress={() => setShowCalendarModal(true)}
+                >
+                  <Text style={styles.selectorText}>
+                    {selectedDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}{' '}
+                    {selectedStartTime || 'Select'}
+                  </Text>
+                  <FeatherIcon name="calendar" size={20} color="#A4A7AE" />
+                </TouchableOpacity>
               </View>
 
-              {/* To Section */}
-              <View style={styles.fromToSection}>
-                <Text style={styles.fromToLabel}>To:</Text>
-                <View style={styles.dateTimeRow}>
-                  <View style={styles.dateDisplay}>
-                    <FeatherIcon name="calendar" size={16} color="#6C6C6C" />
-                    <Text style={styles.dateText}>
-                      {selectedDate.toLocaleDateString('en-US', {
-                        month: 'long',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
-                    </Text>
-                  </View>
-                  <TouchableOpacity
-                    style={styles.timeInputContainer}
-                    onPress={() => setShowCalendarModal(true)}
-                  >
-                    <TextInput
-                      style={styles.timeInput}
-                      value={selectedEndTime}
-                      placeholder="06:25 PM"
-                      placeholderTextColor={colors.grey400}
-                      editable={false}
-                    />
-                    <FeatherIcon name="clock" size={14} color="#6C6C6C" />
-                  </TouchableOpacity>
-                </View>
+              {/* End Date and Time Section */}
+              <View style={styles.fieldContainer}>
+                <Text style={styles.labelText}>End Date and Time</Text>
+                <TouchableOpacity
+                  style={styles.datePicker}
+                  onPress={() => setShowCalendarModal(true)}
+                >
+                  <Text style={styles.selectorText}>
+                    {selectedDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}{' '}
+                    {selectedEndTime || 'Select'}
+                  </Text>
+                  <FeatherIcon name="calendar" size={20} color="#A4A7AE" />
+                </TouchableOpacity>
               </View>
             </View>
           ) : (
-            <TouchableOpacity
-              style={styles.selectorItem}
-              onPress={() => setShowCalendarModal(true)}
-            >
-              <FeatherIcon name="calendar" size={20} color="#6C6C6C" />
-              <Text style={styles.selectorText}>Pick date and time</Text>
-              <Image
-                source={require('../assets/images/CreateEventImages/smallArrowDropdown.png')}
-              />
-            </TouchableOpacity>
+            <View style={styles.fieldContainer}>
+              <Text style={styles.labelText}>Date and Time</Text>
+              <TouchableOpacity
+                style={styles.datePicker}
+                onPress={() => setShowCalendarModal(true)}
+              >
+                <Text style={styles.selectorText}>Select</Text>
+                <FeatherIcon name="calendar" size={20} color="#A4A7AE" />
+              </TouchableOpacity>
+            </View>
           )}
 
           {/* Add guests */}
@@ -1289,6 +1271,30 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(10),
     justifyContent: 'center',
     alignItems: 'center',
+  },
+  fieldContainer: {
+    marginBottom: spacing.md,
+  },
+  labelText: {
+    fontFamily: 'Lato-Medium',
+    fontWeight: '500',
+    fontSize: 12,
+    lineHeight: 12,
+    letterSpacing: 0,
+    color: '#414651',
+    marginBottom: scaleHeight(8),
+  },
+  datePicker: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: '#DCE0E5',
+    borderRadius: 8,
+    paddingVertical: scaleHeight(12),
+    paddingHorizontal: spacing.sm,
+    backgroundColor: colors.white,
+    minHeight: scaleHeight(44),
   },
 });
 

@@ -19,10 +19,10 @@ interface AdvancedOptionsProps {
   onOrganizerPress?: () => void;
 
   // Status and visibility
-  status?: string;
-  visibility?: string;
-  onStatusPress?: () => void;
-  onVisibilityPress?: () => void;
+  selectedStatus?: string;
+  selectedVisibility?: string;
+  onStatusChange?: (value: string) => void;
+  onVisibilityChange?: (value: string) => void;
 }
 
 const AdvancedOptions: React.FC<AdvancedOptionsProps> = ({
@@ -33,10 +33,10 @@ const AdvancedOptions: React.FC<AdvancedOptionsProps> = ({
   onAddNotification,
   organizerName,
   onOrganizerPress,
-  status,
-  visibility,
-  onStatusPress,
-  onVisibilityPress,
+  selectedStatus,
+  selectedVisibility,
+  onStatusChange,
+  onVisibilityChange,
 }) => {
   return (
     <View style={styles.container}>
@@ -59,10 +59,10 @@ const AdvancedOptions: React.FC<AdvancedOptionsProps> = ({
 
       {/* Status/Visibility */}
       <StatusVisibilitySelector
-        status={status}
-        visibility={visibility}
-        onStatusPress={onStatusPress}
-        onVisibilityPress={onVisibilityPress}
+        status={selectedStatus}
+        visibility={selectedVisibility}
+        onStatusChange={onStatusChange}
+        onVisibilityChange={onVisibilityChange}
       />
     </View>
   );

@@ -1,6 +1,5 @@
 import React from 'react';
 import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
-import LinearGradient from 'react-native-linear-gradient';
 import { Colors } from '../constants/Colors';
 import { Fonts } from '../constants/Fonts';
 import * as DimensionsUtils from '../utils/dimensions';
@@ -24,19 +23,6 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
   onClose,
   buttonText = 'OK',
 }) => {
-  const getIconColor = () => {
-    switch (type) {
-      case 'success':
-        return Colors.primaryGreen;
-      case 'error':
-        return '#F44336';
-      case 'warning':
-        return '#FF9800';
-      default:
-        return Colors.primaryblue;
-    }
-  };
-
   return (
     <Modal
       transparent
@@ -46,24 +32,6 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          {/* Icon/Indicator */}
-          <View style={[styles.iconContainer, { backgroundColor: `${getIconColor()}15` }]}>
-            <View style={[styles.iconCircle, { borderColor: getIconColor() }]}>
-              {type === 'success' && (
-                <Text style={[styles.iconText, { color: getIconColor() }]}>✓</Text>
-              )}
-              {type === 'error' && (
-                <Text style={[styles.iconText, { color: getIconColor() }]}>✕</Text>
-              )}
-              {type === 'warning' && (
-                <Text style={[styles.iconText, { color: getIconColor() }]}>⚠</Text>
-              )}
-              {type === 'info' && (
-                <Text style={[styles.iconText, { color: getIconColor() }]}>ℹ</Text>
-              )}
-            </View>
-          </View>
-
           {/* Title */}
           <Text style={styles.title}>{title}</Text>
 
@@ -73,17 +41,10 @@ const CustomAlert: React.FC<CustomAlertProps> = ({
           {/* Button */}
           <TouchableOpacity
             onPress={onClose}
-            style={styles.buttonWrapper}
-            activeOpacity={0.8}
+            style={styles.button}
+            activeOpacity={0.85}
           >
-            <LinearGradient
-              colors={[Colors.primaryGreen, Colors.primaryblue]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.button}
-            >
-              <Text style={styles.buttonText}>{buttonText}</Text>
-            </LinearGradient>
+            <Text style={styles.buttonText}>{buttonText}</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -103,69 +64,48 @@ const styles = StyleSheet.create({
     width: '100%',
     maxWidth: scaleWidth(340),
     backgroundColor: Colors.white,
-    borderRadius: moderateScale(20),
-    padding: moderateScale(24),
-    alignItems: 'center',
+    borderRadius: moderateScale(14),
+    paddingHorizontal: moderateScale(20),
+    paddingVertical: moderateScale(18),
+    alignItems: 'flex-start',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 4,
+      height: 2,
     },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  iconContainer: {
-    marginBottom: scaleHeight(16),
-    borderRadius: moderateScale(50),
-    padding: moderateScale(4),
-  },
-  iconCircle: {
-    width: moderateScale(56),
-    height: moderateScale(56),
-    borderRadius: moderateScale(28),
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-    backgroundColor: Colors.white,
-  },
-  iconText: {
-    fontSize: moderateScale(28),
-    fontWeight: 'bold',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 4,
   },
   title: {
     fontFamily: Fonts.bold,
-    fontSize: moderateScale(20),
+    fontSize: moderateScale(18),
     color: Colors.black,
-    textAlign: 'center',
-    marginBottom: scaleHeight(12),
+    textAlign: 'left',
+    marginBottom: scaleHeight(10),
   },
   message: {
     fontFamily: Fonts.regular,
-    fontSize: moderateScale(15),
+    fontSize: moderateScale(14),
     color: Colors.grey,
-    textAlign: 'center',
-    marginBottom: scaleHeight(24),
-    lineHeight: moderateScale(22),
-  },
-  buttonWrapper: {
-    width: '100%',
-    borderRadius: moderateScale(14),
-    overflow: 'hidden',
+    textAlign: 'left',
+    marginBottom: scaleHeight(18),
+    lineHeight: moderateScale(20),
   },
   button: {
-    paddingVertical: scaleHeight(12),
-    paddingHorizontal: scaleWidth(24),
+    alignSelf: 'flex-end',
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(18),
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: moderateScale(14),
+    borderRadius: moderateScale(8),
+    backgroundColor: Colors.primaryblue,
   },
   buttonText: {
     fontFamily: Fonts.semiBold,
-    fontSize: moderateScale(16),
+    fontSize: moderateScale(14),
     color: Colors.white,
   },
 });
 
 export default CustomAlert;
-

@@ -20,6 +20,8 @@ import CalendarComponent from './CalendarComponent';
 // import MenuIcon from '../assets/svgs/menu.svg';
 import { ScrollView } from 'react-native';
 import MenuIcon from '../assets/svgs/menu.svg';
+import SearchIcon from '../assets/svgs/search.svg';
+import CalendarIconHeader from '../assets/svgs/calendarBlack.svg';
 import Icon from 'react-native-vector-icons/AntDesign';
 import { Fonts } from '../constants/Fonts';
 // import CalendarIconHeader from '../assets/svgs/calendarHeader.svg';
@@ -205,24 +207,32 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
               onPress={handleMonthNamePress}
             >
               <Text style={styles.monthText}>{currentMonth}</Text>
-                <Icon
+              <Icon
                 name={isMonthDropdownVisible ? 'caretup' : 'caretdown'}
-                size={14}
-                color="black"
+                size={12}
+                color="#181D27"
                 style={styles.dropdownArrow}
               />
             </TouchableOpacity>
           </View>
         </View>
 
-        {/* Right Section - Calendar Icon */}
+        {/* Right Section - Search and Calendar Icons */}
         <View style={styles.rightSection}>
+          <TouchableOpacity
+            style={styles.iconButton}
+            onPress={() => {
+              // Handle search press
+              console.log('Search pressed');
+            }}
+          >
+            <SearchIcon width={24} height={24} />
+          </TouchableOpacity>
           <TouchableOpacity
             style={styles.calendarButton}
             onPress={handleMonthPress}
           >
-           {/* <CalendarIconHeader width={20} height={20} /> */}
-           <Icon name="calendar" size={20} color={colors.black} />
+            <CalendarIconHeader width={24} height={24} />
           </TouchableOpacity>
         </View>
       </View>
@@ -467,13 +477,14 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
  monthText: {
-    fontSize: fontSize.textSize18,
-    fontFamily: Fonts.bold, 
+    fontSize: moderateScale(18),
+    fontFamily: Fonts.latoBold, 
     color: '#181D27',
     marginRight: spacing.xs,
   },
  dropdownArrow: {
     marginLeft: 4,
+    color: '#181D27',
   },
   dropdownArrowRotated: {
     transform: [{ rotate: '180deg' }],
@@ -490,6 +501,14 @@ const styles = StyleSheet.create({
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
+    gap: spacing.sm,
+  },
+  iconButton: {
+    width: moderateScale(40),
+    height: moderateScale(40),
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: borderRadius.md,
   },
   calendarButton: {
     width: moderateScale(40),
