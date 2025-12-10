@@ -888,6 +888,7 @@ const WeekScreen = () => {
   };
 
   const handleDateSelect = (date: Date) => {
+    setWeekAnchor(getWeekStart(date));
     setSelectedDate(date);
     setCurrentMonthByIndex(date.getMonth());
   };
@@ -901,6 +902,7 @@ const WeekScreen = () => {
     const newDate = new Date(day.timestamp);
     // Use requestAnimationFrame for immediate UI update
     requestAnimationFrame(() => {
+      setWeekAnchor(getWeekStart(newDate));
       setSelectedDate(newDate);
       setCurrentMonthByIndex(newDate.getMonth());
     });
@@ -1088,6 +1090,11 @@ const WeekScreen = () => {
     return d;
   };
 
+  // Anchor week list so swipes don't rebuild the dataset on every change
+  const [weekAnchor, setWeekAnchor] = useState(() =>
+    getWeekStart(selectedDate),
+  );
+
   const weekStartDate = useMemo(() => {
     return getWeekStart(selectedDate);
   }, [selectedDate, selectedDay]);
@@ -1095,7 +1102,7 @@ const WeekScreen = () => {
   // Generate weeks for horizontal scrolling (current week + 12 weeks before/after)
   const weekDates = useMemo(() => {
     const weeks: Date[] = [];
-    const startWeek = getWeekStart(selectedDate);
+    const startWeek = getWeekStart(weekAnchor);
     // Normalize to midnight for consistent comparison
     startWeek.setHours(0, 0, 0, 0);
 
@@ -1119,49 +1126,37 @@ const WeekScreen = () => {
     }
 
     return weeks;
-  }, [selectedDate, selectedDay]);
-
-  // Find initial index (current week) - normalize dates for comparison
-  const initialWeekIndex = useMemo(() => {
-    const normalizedWeekStart = new Date(weekStartDate);
-    normalizedWeekStart.setHours(0, 0, 0, 0);
-    const weekStartStr = formatDate(normalizedWeekStart);
-
-    const index = weekDates.findIndex(week => {
-      const normalizedWeek = new Date(week);
-      normalizedWeek.setHours(0, 0, 0, 0);
-      return formatDate(normalizedWeek) === weekStartStr;
-    });
-
-    return index >= 0 ? index : 12; // Default to middle if not found
-  }, [weekDates, weekStartDate]);
+  }, [weekAnchor, selectedDay]);
 
   const weekScrollRef = useRef<FlatList>(null);
-  const [currentWeekIndex, setCurrentWeekIndex] = useState(() => {
-    const normalizedWeekStart = new Date(weekStartDate);
-    normalizedWeekStart.setHours(0, 0, 0, 0);
-    const weekStartStr = formatDate(normalizedWeekStart);
 
-    const idx = weekDates.findIndex(week => {
-      const normalizedWeek = new Date(week);
-      normalizedWeek.setHours(0, 0, 0, 0);
-      return formatDate(normalizedWeek) === weekStartStr;
-    });
-    return idx >= 0 ? idx : 12; // Default to middle if not found
-  });
+  const findWeekIndex = useCallback(
+    (target: Date) => {
+      const normalizedTarget = new Date(target);
+      normalizedTarget.setHours(0, 0, 0, 0);
+      const targetStr = formatDate(normalizedTarget);
 
-  // Scroll to current week when selectedDate changes
+      const idx = weekDates.findIndex(week => {
+        const normalizedWeek = new Date(week);
+        normalizedWeek.setHours(0, 0, 0, 0);
+        return formatDate(normalizedWeek) === targetStr;
+      });
+
+      return idx >= 0 ? idx : 12;
+    },
+    [weekDates],
+  );
+
+  const [currentWeekIndex, setCurrentWeekIndex] = useState(() =>
+    findWeekIndex(weekStartDate),
+  );
+
+  // Keep list aligned when anchor changes (manual date pick), but do not recenter on swipe
   useEffect(() => {
-    if (weekScrollRef.current && initialWeekIndex >= 0) {
-      setTimeout(() => {
-        weekScrollRef.current?.scrollToIndex({
-          index: initialWeekIndex,
-          animated: false,
-        });
-        setCurrentWeekIndex(initialWeekIndex);
-      }, 100);
-    }
-  }, [initialWeekIndex]);
+    const idx = findWeekIndex(weekAnchor);
+    setCurrentWeekIndex(idx);
+    weekScrollRef.current?.scrollToIndex({ index: idx, animated: false });
+  }, [findWeekIndex, weekAnchor]);
 
   // Cache for month progress calculations
   const monthProgressCache = useRef<Map<string, any>>(new Map());
@@ -1401,14 +1396,31 @@ const WeekScreen = () => {
         index < weekDates.length
       ) {
         setCurrentWeekIndex(index);
-        // Update selected date to the Monday of the selected week
         const newWeekStart = new Date(weekDates[index]);
         setSelectedDate(newWeekStart);
-        // Update the month in header if it changed
         setCurrentMonthByIndex(newWeekStart.getMonth());
+
+        // Preload events for the newly visible week to keep indicators visible
+        const cacheKey = `${formatDate(
+          newWeekStart,
+        )}-${selectedTimeZone}-${selectedDay}`;
+        if (!eventsCacheRef.current.get(cacheKey)) {
+          const result = processEventsForWeek(newWeekStart);
+          eventsCacheRef.current.set(cacheKey, result);
+          setMarkedDatesBase(result.markedDatesBase);
+          setEventsByDate(result.eventsByDate);
+        }
       }
     },
-    [currentWeekIndex, weekDates, setSelectedDate, setCurrentMonthByIndex],
+    [
+      currentWeekIndex,
+      weekDates,
+      setSelectedDate,
+      setCurrentMonthByIndex,
+      selectedTimeZone,
+      selectedDay,
+      processEventsForWeek,
+    ],
   );
 
   // Navigate to previous week
@@ -1536,9 +1548,8 @@ const WeekScreen = () => {
             horizontal
             pagingEnabled
             scrollEventThrottle={16}
-            onScroll={handleWeekScroll}
+            onMomentumScrollEnd={handleWeekScroll}
             showsHorizontalScrollIndicator={false}
-            initialScrollIndex={currentWeekIndex}
             scrollEnabled={true}
             getItemLayout={(data, index) => ({
               length: Dimensions.get('window').width,
@@ -1863,7 +1874,6 @@ const styles = StyleSheet.create({
     backgroundColor: '#ffffff',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.md,
-    ...shadows.sm,
   },
   weekSliderContent: {
     paddingHorizontal: 0,
