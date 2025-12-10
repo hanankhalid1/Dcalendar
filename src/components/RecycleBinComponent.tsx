@@ -15,6 +15,7 @@ import {
   borderRadius,
   shadows,
 } from '../utils/LightTheme';
+import TrashIcon from '../assets/svgs/trash.svg';
 
 interface Reminder {
   id: string;
@@ -23,6 +24,7 @@ interface Reminder {
 }
 
 interface RecycleBinComponentProps {
+  deletedReminders?: Reminder[];
   onItemPress: (reminder: Reminder) => void;
   onItemSelect: (reminderId: string) => void;
   onRestoreAll: () => void;
@@ -30,25 +32,12 @@ interface RecycleBinComponentProps {
 }
 
 const RecycleBinComponent: React.FC<RecycleBinComponentProps> = ({
+  deletedReminders = [],
   onItemPress,
   onItemSelect,
   onRestoreAll,
   onDeleteAll,
 }) => {
-  // Sample data matching the "Recycle bin" image
-  const deletedReminders: Reminder[] = [
-    {
-      id: '1',
-      title: 'Trip day',
-      time: 'Sat, 30 Aug, 04:00 pm',
-    },
-    {
-      id: '2',
-      title: 'Project submission deadline',
-      time: 'Sun, 31 Aug, 12:00 am',
-    },
-  ];
-
   const renderReminderCard = (reminder: Reminder) => (
     <TouchableOpacity
       key={reminder.id}
@@ -74,23 +63,20 @@ const RecycleBinComponent: React.FC<RecycleBinComponentProps> = ({
       <ScrollView
         style={styles.scrollContainer}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={undefined}
       >
         {/* Deletion Warning */}
-        <View style={styles.warningContainer}>
-          <Text style={styles.warningText}>30 days until deletion.</Text>
-        </View>
+        {deletedReminders.length > 0 && (
+          <View style={styles.warningContainer}>
+            <Text style={styles.warningText}>30 days until deletion.</Text>
+          </View>
+        )}
 
         {/* Deleted Items */}
         <View style={styles.section}>
-          {deletedReminders.length > 0 ? (
-            deletedReminders.map(renderReminderCard)
-          ) : (
-            <View style={styles.emptyState}>
-              <Text style={styles.emptyStateText}>
-                No items in recycle bin.
-              </Text>
-            </View>
-          )}
+          {deletedReminders.length > 0
+            ? deletedReminders.map(renderReminderCard)
+            : null}
         </View>
       </ScrollView>
 
@@ -174,16 +160,43 @@ const styles = StyleSheet.create({
     color: colors.grey400,
     textDecorationLine: 'line-through',
   },
-  emptyState: {
+  emptyStateContainer: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: spacing.xl,
   },
-  emptyStateText: {
+  emptyStateIllustration: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: spacing.lg,
+    gap: spacing.sm,
+  },
+  emptyStateIcon: {
+    width: scaleWidth(72),
+    height: scaleWidth(72),
+    borderRadius: scaleWidth(36),
+    backgroundColor: '#E5F2FB',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: spacing.xs,
+  },
+  emptyStateTitle: {
     fontSize: fontSize.textSize16,
-    color: colors.mediumgray,
+    color: colors.black,
+    fontWeight: '700',
+    textAlign: 'center',
+  },
+  emptyStateSubtitle: {
+    fontSize: fontSize.textSize14,
+    color: '#717680',
     fontWeight: '400',
     textAlign: 'center',
+    lineHeight: fontSize.textSize18,
+  },
+  emptyContentContainer: {
+    flexGrow: 1,
+    justifyContent: 'center',
   },
   actionButtonsContainer: {
     flexDirection: 'row',

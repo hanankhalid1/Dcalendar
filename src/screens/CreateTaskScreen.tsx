@@ -1471,9 +1471,11 @@ const CreateTaskScreen = () => {
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>
-          {mode === 'edit' ? 'Edit Task' : 'Create Task'}
-        </Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>
+            {mode === 'edit' ? 'Edit Task' : 'Create Task'}
+          </Text>
+        </View>
       </View>
 
       <KeyboardAvoidingView
@@ -2238,18 +2240,22 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: scaleHeight(18),
+    paddingTop: scaleHeight(16),
     paddingBottom: scaleHeight(12),
-    paddingHorizontal: scaleWidth(18),
+    paddingHorizontal: scaleWidth(16),
     width: '100%',
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-    gap: scaleWidth(12),
+    gap: scaleWidth(4),
+  },
+  headerTitleContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: 16,
-    color: colors.blackText,
+    fontSize: 18,
+    color: '#252B37',
     fontWeight: '700',
     fontFamily: Fonts.latoBold,
   },

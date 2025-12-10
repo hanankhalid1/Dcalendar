@@ -81,15 +81,14 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
 const styles = StyleSheet.create({
   container: {
     position: 'absolute',
-    top: scaleHeight(720),
-    left: scaleWidth(303),
-    width: scaleWidth(52),
-    height: scaleHeight(52),
-    borderRadius: scaleWidth(12),
-    // Box shadow: 0px 4px 14px 0px #00000033
+    bottom: screenHeight > 700 ? scaleHeight(100) : scaleHeight(80),
+    right: screenWidth > 400 ? scaleWidth(24) : scaleWidth(20),
+    width: screenWidth > 380 ? scaleWidth(52) : scaleWidth(48),
+    height: screenWidth > 380 ? scaleWidth(52) : scaleWidth(48),
+    borderRadius: screenWidth > 380 ? scaleWidth(12) : scaleWidth(10),
     shadowColor: '#000000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2, // #00000033 = rgba(0,0,0,0.2)
+    shadowOpacity: 0.2,
     shadowRadius: 14,
     elevation: 8,
   },
@@ -97,8 +96,8 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-    borderRadius: scaleWidth(12),
-    backgroundColor: '#00AEEF', // Solid blue color
+    borderRadius: screenWidth > 380 ? scaleWidth(12) : scaleWidth(10),
+    backgroundColor: '#00AEEF',
     justifyContent: 'center',
     alignItems: 'center',
     padding: scaleWidth(12),

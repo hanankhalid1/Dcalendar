@@ -198,6 +198,9 @@ const CreateEventScreen = () => {
   const [showUnitDropdown, setShowUnitDropdown] = useState(false);
   const endsOptions = ['Never', 'On', 'After'];
   const [showIntegrationModal, setShowIntegrationModal] = useState(false);
+  const [integrationType, setIntegrationType] = useState<'google' | 'zoom'>(
+    'google',
+  );
   const integrationModalSlideAnim = useRef(
     new Animated.Value(Dimensions.get('window').height),
   ).current;
@@ -2642,9 +2645,11 @@ const CreateEventScreen = () => {
           <Text style={styles.closeButtonText}>✕</Text>
         </TouchableOpacity>
 
-        <Text style={styles.headerTitle}>
-          {mode === 'edit' ? 'Edit Event' : 'Create Event'}
-        </Text>
+        <View style={styles.headerTitleContainer}>
+          <Text style={styles.headerTitle}>
+            {mode === 'edit' ? 'Edit Event' : 'Create Event'}
+          </Text>
+        </View>
       </View>
 
       {/* Event Type Dropdown */}
@@ -3109,9 +3114,8 @@ const CreateEventScreen = () => {
                     ]}
                     onPress={() => {
                       if (!isLoading) {
-                        setSelectedVideoConferencing(
-                          selectedVideoConferencing === 'zoom' ? null : 'zoom',
-                        );
+                        setIntegrationType('zoom');
+                        setShowIntegrationModal(true);
                         setShowVideoConferencingOptions(false);
                       }
                     }}
@@ -3320,13 +3324,13 @@ const CreateEventScreen = () => {
           <View style={styles.timezoneModal}>
             {/* Modal Header */}
             <View style={styles.timezoneModalHeader}>
-              <Text style={styles.timezoneModalTitle}>Event time zone</Text>
               <TouchableOpacity
                 style={styles.timezoneModalCloseButton}
                 onPress={() => setShowTimezoneModal(false)}
               >
                 <Text style={styles.timezoneModalCloseText}>✕</Text>
               </TouchableOpacity>
+              <Text style={styles.timezoneModalTitle}>Event time zone</Text>
             </View>
 
             {/* Current Timezone Display */}
@@ -3879,7 +3883,7 @@ const CreateEventScreen = () => {
       <Modal
         visible={showIntegrationModal}
         transparent={true}
-        animationType="none"
+        animationType="fade"
         onRequestClose={() => setShowIntegrationModal(false)}
       >
         <View style={styles.integrationModalOverlay}>
@@ -3888,22 +3892,8 @@ const CreateEventScreen = () => {
             activeOpacity={1}
             onPress={() => setShowIntegrationModal(false)}
           />
-          <Animated.View
-            style={[
-              styles.integrationModalContainer,
-              {
-                transform: [{ translateY: integrationModalSlideAnim }],
-              },
-            ]}
-          >
+          <View style={styles.integrationModalContainer}>
             <View style={styles.integrationModalHeader}>
-              <View style={styles.integrationModalIconContainer}>
-                <FeatherIcon
-                  name="video"
-                  size={32}
-                  color={Colors.primaryBlue}
-                />
-              </View>
               <Text style={styles.integrationModalTitle}>
                 Integration Required
               </Text>
@@ -3911,11 +3901,14 @@ const CreateEventScreen = () => {
 
             <View style={styles.integrationModalContent}>
               <Text style={styles.integrationModalDescription}>
-                To use Google Meet, you need to integrate your Google account
-                first.
+                {integrationType === 'google'
+                  ? 'To use Google Meet, you need to integrate your Google account first.'
+                  : 'To use Zoom Meeting, you need to integrate your Zoom account first.'}
               </Text>
               <Text style={styles.integrationModalSubDescription}>
-                You'll be redirected to Settings to connect your Google account.
+                {integrationType === 'google'
+                  ? "You'll be redirected to Settings to connect your Google account."
+                  : "You'll be redirected to Settings to connect your Zoom account."}
               </Text>
             </View>
 
@@ -3943,7 +3936,7 @@ const CreateEventScreen = () => {
                 </Text>
               </TouchableOpacity>
             </View>
-          </Animated.View>
+          </View>
         </View>
       </Modal>
 
@@ -3985,24 +3978,22 @@ const styles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: scaleHeight(40),
-    paddingBottom: spacing.lg,
-    paddingHorizontal: scaleWidth(10),
+    paddingTop: scaleHeight(16),
+    paddingBottom: scaleHeight(12),
+    paddingHorizontal: scaleWidth(16),
     width: '100%',
     backgroundColor: colors.white,
     borderBottomWidth: 1,
     borderBottomColor: '#E5E7EB',
-    gap: scaleWidth(12),
+    gap: scaleWidth(4),
   },
   headerTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
-    paddingHorizontal: spacing.sm,
   },
   headerTitle: {
-    fontSize: 16,
-    color: colors.blackText,
+    fontSize: 18,
+    color: '#252B37',
     fontWeight: '700',
     fontFamily: Fonts.latoBold,
   },
@@ -5020,26 +5011,26 @@ const styles = StyleSheet.create({
   },
   timezoneModalHeader: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
+    gap: scaleWidth(4),
     marginBottom: spacing.lg,
   },
   timezoneModalTitle: {
-    fontSize: fontSize.textSize18,
-    fontWeight: '600',
-    color: colors.blackText,
-    fontFamily: Fonts.latoSemiBold,
+    fontSize: 18,
+    fontWeight: '400',
+    color: '#252B37',
+    fontFamily: Fonts.latoRegular,
   },
   timezoneModalCloseButton: {
-    width: moderateScale(24),
-    height: moderateScale(24),
+    width: moderateScale(40),
+    height: moderateScale(40),
     justifyContent: 'center',
     alignItems: 'center',
   },
   timezoneModalCloseText: {
-    fontSize: fontSize.textSize16,
+    fontSize: fontSize.textSize17,
     color: colors.blackText,
-    fontWeight: 'bold',
+    fontWeight: '400',
   },
   currentTimezoneContainer: {
     marginBottom: spacing.md,
@@ -5060,35 +5051,35 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   timezoneItem: {
-    paddingVertical: spacing.sm,
+    paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: '#F0F0F0',
   },
   timezoneItemSelected: {
-    backgroundColor: '#F0F8FF',
+    backgroundColor: '#F8F9FA',
   },
   timezoneItemText: {
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
+    fontSize: 14,
+    color: '#252B37',
     fontWeight: '400',
     fontFamily: Fonts.latoRegular,
   },
   timezoneItemTextSelected: {
-    color: '#0B6DE0',
-    fontWeight: '500',
-    fontFamily: Fonts.latoMedium,
+    color: colors.primaryBlue,
+    fontWeight: '600',
+    fontFamily: Fonts.latoBold,
   },
   useCurrentTimezoneButton: {
-    paddingVertical: spacing.sm,
+    paddingVertical: scaleHeight(12),
     paddingHorizontal: spacing.md,
     marginBottom: spacing.lg,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: '#F0F0F0',
   },
   useCurrentTimezoneButtonText: {
-    fontSize: fontSize.textSize16,
-    color: colors.blackText,
+    fontSize: 14,
+    color: '#252B37',
     fontWeight: '400',
     fontFamily: Fonts.latoRegular,
   },
@@ -5259,20 +5250,25 @@ const styles = StyleSheet.create({
   integrationModalOverlay: {
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   integrationModalBackdrop: {
-    flex: 1,
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
   },
   integrationModalContainer: {
     backgroundColor: colors.white,
-    borderTopLeftRadius: moderateScale(20),
-    borderTopRightRadius: moderateScale(20),
+    borderRadius: moderateScale(12),
     paddingTop: scaleHeight(24),
-    paddingBottom: scaleHeight(40),
+    paddingBottom: scaleHeight(24),
     paddingHorizontal: spacing.lg,
     maxHeight: '70%',
     minHeight: scaleHeight(300),
+    width: '85%',
   },
   integrationModalHeader: {
     alignItems: 'center',
@@ -5314,8 +5310,6 @@ const styles = StyleSheet.create({
   },
   integrationModalButtons: {
     flexDirection: 'row',
-    borderTopWidth: 1,
-    borderTopColor: themeColors.grey20,
     paddingTop: spacing.md,
     gap: spacing.sm,
     marginTop: spacing.md,

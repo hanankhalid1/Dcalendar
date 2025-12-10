@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   Modal,
   Animated,
+  Dimensions,
 } from 'react-native';
 import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
 import {
@@ -18,6 +19,8 @@ import {
 import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import CrossIcon from '../assets/svgs/crossIcon.svg';
+
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 interface MenuOptionsComponentProps {
   isVisible: boolean;
@@ -140,7 +143,7 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
             } else if (option.id === 'task') {
               itemStyle = [styles.menuItem, styles.taskItem];
             }
-            
+
             return (
               <TouchableOpacity
                 key={option.id}
@@ -148,7 +151,7 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
                   itemStyle,
                   index === menuOptions.length - 1 && styles.lastMenuItem,
                 ]}
-                onPress={(e) => {
+                onPress={e => {
                   e.stopPropagation();
                   handleOptionPress(option);
                 }}
@@ -159,11 +162,11 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
               </TouchableOpacity>
             );
           })}
-          
+
           {/* Close Button */}
           <TouchableOpacity
             style={styles.closeButton}
-            onPress={(e) => {
+            onPress={e => {
               e.stopPropagation();
               onClose();
             }}
@@ -180,11 +183,11 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)', // Darker backdrop to match image
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
-    paddingBottom: scaleHeight(100), // Position above the FAB
-    paddingRight: scaleWidth(20), // Align with FAB position (303 - 52/2 = 277, but using 20 for padding)
+    paddingBottom: SCREEN_HEIGHT > 700 ? scaleHeight(100) : scaleHeight(80),
+    paddingRight: SCREEN_WIDTH > 400 ? scaleWidth(20) : scaleWidth(16),
   },
   menuContainer: {
     backgroundColor: 'transparent',
@@ -199,32 +202,35 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(12),
     marginBottom: scaleHeight(12),
     height: scaleHeight(42),
+    minWidth: scaleWidth(140),
+    maxWidth: SCREEN_WIDTH * 0.5,
     ...shadows.sm,
   },
   eventItem: {
-    width: scaleWidth(160), // Increased width to show full "Create event" text
+    width: SCREEN_WIDTH > 380 ? scaleWidth(160) : scaleWidth(145),
   },
   taskItem: {
-    width: scaleWidth(150), // Width for "Create task"
+    width: SCREEN_WIDTH > 380 ? scaleWidth(150) : scaleWidth(140),
   },
   lastMenuItem: {
-    marginBottom: scaleHeight(24), // Space before close button
+    marginBottom: scaleHeight(24),
   },
   menuLabel: {
-    fontSize: moderateScale(14), // Smaller text size as requested
+    fontSize: SCREEN_WIDTH > 380 ? moderateScale(14) : moderateScale(13),
     color: colors.blackText,
     fontWeight: '500',
     marginLeft: scaleWidth(12),
     flex: 1,
     fontFamily: 'Lato-Medium',
-    includeFontPadding: false, // Remove extra padding for better text visibility
-    lineHeight: moderateScale(18), // Adjusted line height for smaller text
+    includeFontPadding: false,
+    lineHeight: SCREEN_WIDTH > 380 ? moderateScale(18) : moderateScale(16),
   },
   iconWrapper: {
     width: moderateScale(24),
     height: moderateScale(24),
     justifyContent: 'center',
     alignItems: 'center',
+    flexShrink: 0,
   },
   iconContainer: {
     width: moderateScale(24),
@@ -233,9 +239,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeButton: {
-    width: scaleWidth(56),
-    height: scaleWidth(56),
-    borderRadius: scaleWidth(28),
+    width: SCREEN_WIDTH > 380 ? scaleWidth(56) : scaleWidth(50),
+    height: SCREEN_WIDTH > 380 ? scaleWidth(56) : scaleWidth(50),
+    borderRadius: SCREEN_WIDTH > 380 ? scaleWidth(28) : scaleWidth(25),
     backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',

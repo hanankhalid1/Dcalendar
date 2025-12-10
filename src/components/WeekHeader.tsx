@@ -20,7 +20,6 @@ import CalendarComponent from './CalendarComponent';
 // import MenuIcon from '../assets/svgs/menu.svg';
 import { ScrollView } from 'react-native';
 import MenuIcon from '../assets/svgs/menu.svg';
-import SearchIcon from '../assets/svgs/search.svg';
 import CalendarIconHeader from '../assets/svgs/calendarBlack.svg';
 import Icon from 'react-native-vector-icons/AntDesign';
 import { Fonts } from '../constants/Fonts';
@@ -88,7 +87,9 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
         year: currentDate.getFullYear(),
         month: currentDate.getMonth(),
         date: currentDate.toISOString(),
-        formatted: `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`,
+        formatted: `${
+          currentDate.getMonth() + 1
+        }/${currentDate.getDate()}/${currentDate.getFullYear()}`,
       });
       // Increment the key to force CalendarComponent to remount with latest date
       calendarKeyRef.current += 1;
@@ -104,7 +105,9 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
         year: currentDate.getFullYear(),
         month: currentDate.getMonth(),
         date: currentDate.toISOString(),
-        formatted: `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`,
+        formatted: `${
+          currentDate.getMonth() + 1
+        }/${currentDate.getDate()}/${currentDate.getFullYear()}`,
       });
     }
     setIsMonthDropdownVisible(!isMonthDropdownVisible);
@@ -117,14 +120,15 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
     console.log('WeekHeader: Date selected from calendar:', {
       year: date.getFullYear(),
       month: date.getMonth(),
-      formatted: `${date.getMonth() + 1}/${date.getDate()}/${date.getFullYear()}`,
+      formatted: `${
+        date.getMonth() + 1
+      }/${date.getDate()}/${date.getFullYear()}`,
     });
     onDateSelect?.(date);
     // Also update the month display to keep slider synchronized
     onMonthSelect?.(date.getMonth());
     setIsCalendarVisible(false);
   };
-
 
   const handleYearSelect = (year: number) => {
     if (currentDate) {
@@ -157,15 +161,23 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
       console.log('WeekHeader: currentDate prop changed:', {
         year: currentDate.getFullYear(),
         month: currentDate.getMonth(),
-        formatted: `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}`,
+        formatted: `${
+          currentDate.getMonth() + 1
+        }/${currentDate.getDate()}/${currentDate.getFullYear()}`,
       });
       // Increment key to force CalendarComponent remount if calendar is visible
       if (isCalendarVisible) {
         calendarKeyRef.current += 1;
-        console.log('WeekHeader: Updated calendar key because currentDate changed and calendar is visible');
+        console.log(
+          'WeekHeader: Updated calendar key because currentDate changed and calendar is visible',
+        );
       }
     }
-  }, [currentDate?.getFullYear(), currentDate?.getMonth(), currentDate?.getDate()]);
+  }, [
+    currentDate?.getFullYear(),
+    currentDate?.getMonth(),
+    currentDate?.getDate(),
+  ]);
 
   // Auto-scroll to current month when dropdown opens
   // Auto-scroll to center the current month when dropdown opens
@@ -173,7 +185,10 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
     if (isMonthDropdownVisible && currentDate && scrollViewRef.current) {
       const currentMonthIndex = 13; // always center index (since you have 25 items total: -12..+12)
       const itemWidth = 70;
-      const scrollPosition = currentMonthIndex * itemWidth - Dimensions.get('window').width / 2 + itemWidth / 2;
+      const scrollPosition =
+        currentMonthIndex * itemWidth -
+        Dimensions.get('window').width / 2 +
+        itemWidth / 2;
 
       setTimeout(() => {
         scrollViewRef.current?.scrollTo({
@@ -188,10 +203,12 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
 
-      <View style={[
-        styles.header,
-        isMonthDropdownVisible && styles.headerNoBorder // Remove shadow when dropdown is open
-      ]}>
+      <View
+        style={[
+          styles.header,
+          isMonthDropdownVisible && styles.headerNoBorder, // Remove shadow when dropdown is open
+        ]}
+      >
         {/* Left Section - Menu Icon and Month Component */}
         <View style={styles.leftSection}>
           {/* Hamburger Menu */}
@@ -217,17 +234,8 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
           </View>
         </View>
 
-        {/* Right Section - Search and Calendar Icons */}
+        {/* Right Section - Calendar Icon */}
         <View style={styles.rightSection}>
-          <TouchableOpacity
-            style={styles.iconButton}
-            onPress={() => {
-              // Handle search press
-              console.log('Search pressed');
-            }}
-          >
-            <SearchIcon width={24} height={24} />
-          </TouchableOpacity>
           <TouchableOpacity
             style={styles.calendarButton}
             onPress={handleMonthPress}
@@ -238,170 +246,207 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
       </View>
 
       {/* Month Slider - Full width horizontal slider */}
-      {isMonthDropdownVisible && (() => {
-        // Generate dynamic months centered around current month
-        // From same month in previous year to same month in next year
-        const dynamicItems: Array<{ type: 'month'; monthIndex: number; year: number } | { type: 'year'; year: number }> = [];
+      {isMonthDropdownVisible &&
+        (() => {
+          // Generate dynamic months centered around current month
+          // From same month in previous year to same month in next year
+          const dynamicItems: Array<
+            | { type: 'month'; monthIndex: number; year: number }
+            | { type: 'year'; year: number }
+          > = [];
 
-        if (currentDate) {
-          const currentMonthIndex = currentDate.getMonth();
-          const currentYear = currentDate.getFullYear();
-          
-          console.log('WeekHeader: Generating month dropdown for:', {
-            currentMonthIndex,
-            currentYear,
-            currentDate: currentDate.toISOString(),
-          });
+          if (currentDate) {
+            const currentMonthIndex = currentDate.getMonth();
+            const currentYear = currentDate.getFullYear();
 
-          let lastYearAdded: number | null = null;
+            console.log('WeekHeader: Generating month dropdown for:', {
+              currentMonthIndex,
+              currentYear,
+              currentDate: currentDate.toISOString(),
+            });
 
-          // Generate 25 months: 12 months before + current month + 12 months after
-          for (let i = -12; i <= 12; i++) {
-            const totalMonths = currentMonthIndex + i;
-            const monthIndex = ((totalMonths % 12) + 12) % 12; // Handle negative modulo
-            const year = currentYear + Math.floor(totalMonths / 12);
+            let lastYearAdded: number | null = null;
 
-            // Debug: Log the first few items to verify year calculation
-            if (i >= -2 && i <= 2) {
-              console.log(`WeekHeader: Generating slider item ${i}:`, {
-                currentMonthIndex,
-                currentYear,
-                totalMonths,
-                monthIndex,
-                calculatedYear: year,
-                monthName: monthNamesShort[monthIndex],
-                calculation: `currentYear(${currentYear}) + floor(${totalMonths}/12) = ${year}`,
-              });
+            // Generate 25 months: 12 months before + current month + 12 months after
+            for (let i = -12; i <= 12; i++) {
+              const totalMonths = currentMonthIndex + i;
+              const monthIndex = ((totalMonths % 12) + 12) % 12; // Handle negative modulo
+              const year = currentYear + Math.floor(totalMonths / 12);
+
+              // Debug: Log the first few items to verify year calculation
+              if (i >= -2 && i <= 2) {
+                console.log(`WeekHeader: Generating slider item ${i}:`, {
+                  currentMonthIndex,
+                  currentYear,
+                  totalMonths,
+                  monthIndex,
+                  calculatedYear: year,
+                  monthName: monthNamesShort[monthIndex],
+                  calculation: `currentYear(${currentYear}) + floor(${totalMonths}/12) = ${year}`,
+                });
+              }
+
+              // Add year label when year changes
+              if (lastYearAdded !== year) {
+                dynamicItems.push({ type: 'year', year });
+                lastYearAdded = year;
+              }
+
+              dynamicItems.push({ type: 'month', monthIndex, year });
             }
 
-            // Add year label when year changes
-            if (lastYearAdded !== year) {
-              dynamicItems.push({ type: 'year', year });
-              lastYearAdded = year;
-            }
-
-            dynamicItems.push({ type: 'month', monthIndex, year });
+            console.log(
+              'WeekHeader: Generated items:',
+              dynamicItems
+                .slice(0, 5)
+                .map(item =>
+                  item.type === 'month'
+                    ? `${monthNamesShort[item.monthIndex]} ${item.year}`
+                    : `Year ${item.year}`,
+                ),
+            );
           }
-          
-          console.log('WeekHeader: Generated items:', dynamicItems.slice(0, 5).map(item => 
-            item.type === 'month' ? `${monthNamesShort[item.monthIndex]} ${item.year}` : `Year ${item.year}`
-          ));
-        }
 
-        return (
-          <View style={styles.monthSliderWrapper}>
-            <ScrollView
-              ref={scrollViewRef}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.monthScrollContainer}
-              style={styles.monthScrollViewStyle}
-              nestedScrollEnabled={true}
-              scrollEnabled={true}
-              bounces={false}
-            >
-              {dynamicItems.map((item, index) => {
-                if (item.type === 'month') {
-                  const isSelected =
-                    currentDate?.getMonth() === item.monthIndex &&
-                    currentDate?.getFullYear() === item.year;
+          return (
+            <View style={styles.monthSliderWrapper}>
+              <ScrollView
+                ref={scrollViewRef}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.monthScrollContainer}
+                style={styles.monthScrollViewStyle}
+                nestedScrollEnabled={true}
+                scrollEnabled={true}
+                bounces={false}
+              >
+                {dynamicItems.map((item, index) => {
+                  if (item.type === 'month') {
+                    const isSelected =
+                      currentDate?.getMonth() === item.monthIndex &&
+                      currentDate?.getFullYear() === item.year;
 
-                  return (
-                    <TouchableOpacity
-                      key={`month-${item.monthIndex}-${item.year}-${index}`}
-                      style={[
-                        styles.monthScrollItem,
-                        isSelected && styles.monthScrollItemSelected,
-                      ]}
-                      onPress={() => {
-                        // Create date with the selected year and month
-                        // IMPORTANT: JavaScript Date months are 0-indexed (0=Jan, 11=Dec)
-                        // item.monthIndex is already 0-indexed, so use it directly
-                        const newDate = new Date(
-                          item.year,        // Year from slider item
-                          item.monthIndex,  // Month index (0-11)
-                          1,                // Day 1 of the month
-                          12,               // Hour 12 (noon) to avoid timezone issues
-                          0,                // Minutes
-                          0,                // Seconds
-                          0,                // Milliseconds
-                        );
-                        
-                        // Verify the date was created correctly
-                        const createdYear = newDate.getFullYear();
-                        const createdMonth = newDate.getMonth();
-                        const createdDay = newDate.getDate();
-                        
-                        console.log('WeekHeader: Month selected from slider - DETAILED:', {
-                          'Slider Item Year': item.year,
-                          'Slider Item Month Index': item.monthIndex,
-                          'Slider Item Month Name': monthNamesShort[item.monthIndex],
-                          'Created Date Year': createdYear,
-                          'Created Date Month': createdMonth,
-                          'Created Date Day': createdDay,
-                          'Created Date Full': newDate.toISOString(),
-                          'Created Date Formatted': `${createdMonth + 1}/${createdDay}/${createdYear}`,
-                          'Date Match Check': createdYear === item.year && createdMonth === item.monthIndex ? '✅ MATCH' : '❌ MISMATCH',
-                          'Current Date Before': currentDate ? `${currentDate.getMonth() + 1}/${currentDate.getDate()}/${currentDate.getFullYear()}` : 'none',
-                        });
-                        
-                        // Double-check: if there's a mismatch, log a warning
-                        if (createdYear !== item.year || createdMonth !== item.monthIndex) {
-                          console.error('❌ WeekHeader: Date creation mismatch!', {
-                            expected: `${item.year}-${item.monthIndex}`,
-                            actual: `${createdYear}-${createdMonth}`,
-                          });
-                        }
-                        
-                        // IMPORTANT: Call onDateSelect FIRST to update the date in the parent
-                        // This ensures both the slider and calendar icon stay synchronized
-                        console.log('WeekHeader: Calling onDateSelect with newDate:', {
-                          year: newDate.getFullYear(),
-                          month: newDate.getMonth(),
-                          formatted: `${newDate.getMonth() + 1}/${newDate.getDate()}/${newDate.getFullYear()}`,
-                        });
-                        onDateSelect?.(newDate);
-                        // Update month display immediately (don't use setTimeout)
-                        // The date has already been set correctly by onDateSelect
-                        onMonthSelect?.(item.monthIndex);
-                        setIsMonthDropdownVisible(false);
-                      }}
-                    >
-                      <Text
+                    return (
+                      <TouchableOpacity
+                        key={`month-${item.monthIndex}-${item.year}-${index}`}
                         style={[
-                          styles.monthScrollText,
-                          isSelected && styles.monthScrollTextSelected,
+                          styles.monthScrollItem,
+                          isSelected && styles.monthScrollItemSelected,
                         ]}
+                        onPress={() => {
+                          // Create date with the selected year and month
+                          // IMPORTANT: JavaScript Date months are 0-indexed (0=Jan, 11=Dec)
+                          // item.monthIndex is already 0-indexed, so use it directly
+                          const newDate = new Date(
+                            item.year, // Year from slider item
+                            item.monthIndex, // Month index (0-11)
+                            1, // Day 1 of the month
+                            12, // Hour 12 (noon) to avoid timezone issues
+                            0, // Minutes
+                            0, // Seconds
+                            0, // Milliseconds
+                          );
+
+                          // Verify the date was created correctly
+                          const createdYear = newDate.getFullYear();
+                          const createdMonth = newDate.getMonth();
+                          const createdDay = newDate.getDate();
+
+                          console.log(
+                            'WeekHeader: Month selected from slider - DETAILED:',
+                            {
+                              'Slider Item Year': item.year,
+                              'Slider Item Month Index': item.monthIndex,
+                              'Slider Item Month Name':
+                                monthNamesShort[item.monthIndex],
+                              'Created Date Year': createdYear,
+                              'Created Date Month': createdMonth,
+                              'Created Date Day': createdDay,
+                              'Created Date Full': newDate.toISOString(),
+                              'Created Date Formatted': `${
+                                createdMonth + 1
+                              }/${createdDay}/${createdYear}`,
+                              'Date Match Check':
+                                createdYear === item.year &&
+                                createdMonth === item.monthIndex
+                                  ? '✅ MATCH'
+                                  : '❌ MISMATCH',
+                              'Current Date Before': currentDate
+                                ? `${
+                                    currentDate.getMonth() + 1
+                                  }/${currentDate.getDate()}/${currentDate.getFullYear()}`
+                                : 'none',
+                            },
+                          );
+
+                          // Double-check: if there's a mismatch, log a warning
+                          if (
+                            createdYear !== item.year ||
+                            createdMonth !== item.monthIndex
+                          ) {
+                            console.error(
+                              '❌ WeekHeader: Date creation mismatch!',
+                              {
+                                expected: `${item.year}-${item.monthIndex}`,
+                                actual: `${createdYear}-${createdMonth}`,
+                              },
+                            );
+                          }
+
+                          // IMPORTANT: Call onDateSelect FIRST to update the date in the parent
+                          // This ensures both the slider and calendar icon stay synchronized
+                          console.log(
+                            'WeekHeader: Calling onDateSelect with newDate:',
+                            {
+                              year: newDate.getFullYear(),
+                              month: newDate.getMonth(),
+                              formatted: `${
+                                newDate.getMonth() + 1
+                              }/${newDate.getDate()}/${newDate.getFullYear()}`,
+                            },
+                          );
+                          onDateSelect?.(newDate);
+                          // Update month display immediately (don't use setTimeout)
+                          // The date has already been set correctly by onDateSelect
+                          onMonthSelect?.(item.monthIndex);
+                          setIsMonthDropdownVisible(false);
+                        }}
                       >
-                        {monthNamesShort[item.monthIndex]}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                } else {
-                  // Year item
-                  const isYearSelected = currentDate?.getFullYear() === item.year;
-                  return (
-                    <TouchableOpacity
-                      key={`year-${item.year}-${index}`}
-                      style={styles.yearContainer}
-                      onPress={() => handleYearSelect(item.year)}
-                    >
-                      <Text
-                        style={[
-                          styles.yearText,
-                          isYearSelected && styles.yearTextSelected,
-                        ]}
+                        <Text
+                          style={[
+                            styles.monthScrollText,
+                            isSelected && styles.monthScrollTextSelected,
+                          ]}
+                        >
+                          {monthNamesShort[item.monthIndex]}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  } else {
+                    // Year item
+                    const isYearSelected =
+                      currentDate?.getFullYear() === item.year;
+                    return (
+                      <TouchableOpacity
+                        key={`year-${item.year}-${index}`}
+                        style={styles.yearContainer}
+                        onPress={() => handleYearSelect(item.year)}
                       >
-                        {item.year}
-                      </Text>
-                    </TouchableOpacity>
-                  );
-                }
-              })}
-            </ScrollView>
-          </View>
-        );
-      })()}
+                        <Text
+                          style={[
+                            styles.yearText,
+                            isYearSelected && styles.yearTextSelected,
+                          ]}
+                        >
+                          {item.year}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  }
+                })}
+              </ScrollView>
+            </View>
+          );
+        })()}
 
       {/* Backdrop for both dropdowns */}
       {(isCalendarVisible || isMonthDropdownVisible) && (
@@ -419,7 +464,9 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
       {isCalendarVisible && currentDate && (
         <View style={styles.calendarContainer}>
           <CalendarComponent
-            key={`calendar-${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}-${calendarKeyRef.current}-${isCalendarVisible}`}
+            key={`calendar-${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}-${
+              calendarKeyRef.current
+            }-${isCalendarVisible}`}
             onDateSelect={handleDateSelect}
             currentDate={currentDate}
             selectedDate={selectedDate}
@@ -476,13 +523,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
   },
- monthText: {
+  monthText: {
     fontSize: moderateScale(18),
-    fontFamily: Fonts.latoBold, 
+    fontFamily: Fonts.latoBold,
     color: '#181D27',
     marginRight: spacing.xs,
   },
- dropdownArrow: {
+  dropdownArrow: {
     marginLeft: 4,
     color: '#181D27',
   },
@@ -518,12 +565,11 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
   },
   backdrop: {
-
     position: 'absolute',
-    top: 0,           // Change from -Dimensions.get('window').height
-    left: 0,          // Change from -Dimensions.get('window').width
-    right: 0,         // Add
-    bottom: 0,        // Add
+    top: 0, // Change from -Dimensions.get('window').height
+    left: 0, // Change from -Dimensions.get('window').width
+    right: 0, // Add
+    bottom: 0, // Add
 
     zIndex: 999, // Backdrop Z-Index
   },
@@ -536,7 +582,6 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.xs,
     minWidth: 150,
     zIndex: 1001,
-
   },
   monthDropdownItem: {
     paddingHorizontal: spacing.md,
@@ -573,7 +618,7 @@ const styles = StyleSheet.create({
     flexWrap: 'nowrap',
   },
   monthScrollItem: {
-      backgroundColor: '#F9F9F9', 
+    backgroundColor: '#F9F9F9',
     borderRadius: 20,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
@@ -581,7 +626,7 @@ const styles = StyleSheet.create({
     borderWidth: 0,
   },
   monthScrollItemSelected: {
-    backgroundColor: '#00AEEF' // App's primary green for selected
+    backgroundColor: '#00AEEF', // App's primary green for selected
   },
   monthScrollText: {
     fontSize: fontSize.textSize14,

@@ -1,6 +1,14 @@
 import { useNavigation } from '@react-navigation/native';
 import React, { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Text, TouchableOpacity, View, Image } from 'react-native';
+import {
+  Alert,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+  Image,
+} from 'react-native';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import Feather from 'react-native-vector-icons/Feather';
 import FontAwesome from 'react-native-vector-icons/FontAwesome';
@@ -8,7 +16,12 @@ import MaterialCommunityIcons from 'react-native-vector-icons/MaterialCommunityI
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import { useApiClient } from '../hooks/useApi';
 import { useActiveAccount } from '../stores/useActiveAccount';
-import { moderateScale, scaleHeight, scaleWidth, screenWidth } from '../utils/dimensions';
+import {
+  moderateScale,
+  scaleHeight,
+  scaleWidth,
+  screenWidth,
+} from '../utils/dimensions';
 import {
   borderRadius,
   colors,
@@ -32,11 +45,11 @@ interface EventTag {
   label: string;
   icon: string;
   iconType?:
-  | 'MaterialIcons'
-  | 'MaterialCommunityIcons'
-  | 'Feather'
-  | 'FontAwesome'
-  | 'AntDesign';
+    | 'MaterialIcons'
+    | 'MaterialCommunityIcons'
+    | 'Feather'
+    | 'FontAwesome'
+    | 'AntDesign';
   color: string;
   textColor?: string;
   iconColor?: string;
@@ -124,12 +137,12 @@ const EventCard: React.FC<EventCardProps> = ({
   const [editingEvent, setEditingEvent] = useState(null);
   const token = useToken(state => state.token);
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
-  const { 
-    getUserEvents, 
-    setUserEvents, 
+  const {
+    getUserEvents,
+    setUserEvents,
     userEvents,
     optimisticallyDeleteEvent,
-    revertOptimisticUpdate
+    revertOptimisticUpdate,
   } = useEventsStore();
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
 
@@ -146,7 +159,8 @@ const EventCard: React.FC<EventCardProps> = ({
         } else if (tag.value && typeof tag.value === 'object') {
           guests.push({
             email: tag.value.email || tag.value,
-            avatar: tag.value.avatar || tag.value.picture || tag.value.profilePicture
+            avatar:
+              tag.value.avatar || tag.value.picture || tag.value.profilePicture,
           });
         }
       }
@@ -176,19 +190,26 @@ const EventCard: React.FC<EventCardProps> = ({
       ['#BB8FCE', '#C9A3D9'],
       ['#85C1E2', '#9DCFE8'],
     ];
-    const hash = email.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+    const hash = email
+      .split('')
+      .reduce((acc, char) => acc + char.charCodeAt(0), 0);
     return colors[hash % colors.length];
   };
 
   // Check if event is a task
   const eventData = (event as any)?.originalRawEventData || event;
   const eventTags = eventData?.list || tags || [];
-  const isTask = Array.isArray(eventTags) && eventTags.some((tag: any) => tag && tag.key === 'task');
+  const isTask =
+    Array.isArray(eventTags) &&
+    eventTags.some((tag: any) => tag && tag.key === 'task');
 
   // Get recurrence info
   const getRecurrenceInfo = () => {
     if (!Array.isArray(eventTags)) return null;
-    const recurrenceTag = eventTags.find((tag: any) => tag && (tag.key === 'recurrence' || tag.key === 'repeatEvent'));
+    const recurrenceTag = eventTags.find(
+      (tag: any) =>
+        tag && (tag.key === 'recurrence' || tag.key === 'repeatEvent'),
+    );
     if (!recurrenceTag || !recurrenceTag.value) return null;
     return recurrenceTag.value;
   };
@@ -196,7 +217,9 @@ const EventCard: React.FC<EventCardProps> = ({
   // Get progress percentage
   const getProgress = (): number => {
     if (!Array.isArray(eventTags)) return 0;
-    const progressItem = eventTags.find((tag: any) => tag && (tag.key === 'progress' || tag.key === 'completion'));
+    const progressItem = eventTags.find(
+      (tag: any) => tag && (tag.key === 'progress' || tag.key === 'completion'),
+    );
     if (progressItem && typeof progressItem.value === 'number') {
       return Math.min(100, Math.max(0, progressItem.value));
     }
@@ -213,12 +236,12 @@ const EventCard: React.FC<EventCardProps> = ({
         console.log('Error', 'No active account found. Please log in again.');
         return false;
       }
-      
-      console.log("Account found: ", account);
-      
+
+      console.log('Account found: ', account);
+
       // Store current events for potential revert
       const currentEvents = [...(userEvents || [])];
-      
+
       // ✅ OPTIMISTIC UPDATE: Remove event from UI immediately
       optimisticallyDeleteEvent(eventId);
 
@@ -230,23 +253,24 @@ const EventCard: React.FC<EventCardProps> = ({
 
           // Delayed refresh in background (non-blocking, skip loading screen)
           setTimeout(() => {
-            getUserEvents(account.userName, api, undefined, { skipLoading: true }).catch(err => {
+            getUserEvents(account.userName, api, undefined, {
+              skipLoading: true,
+            }).catch(err => {
               console.error('Background event refresh failed:', err);
               // If refresh fails, revert optimistic update
               revertOptimisticUpdate(currentEvents);
             });
           }, 2000);
         } catch (err) {
-          console.error("Delete Event Failed:", err);
+          console.error('Delete Event Failed:', err);
           // Revert optimistic update on error
           revertOptimisticUpdate(currentEvents);
-          Alert.alert("Error", "Failed to move the event to the trash");
+          Alert.alert('Error', 'Failed to move the event to the trash');
         }
       })();
-
     } catch (err) {
-      console.error("Delete Event Failed:", err);
-      Alert.alert("Error", "Failed to move the event to the trash");
+      console.error('Delete Event Failed:', err);
+      Alert.alert('Error', 'Failed to move the event to the trash');
     }
   };
 
@@ -288,8 +312,6 @@ const EventCard: React.FC<EventCardProps> = ({
     onPress?.();
   };
 
-
-
   if (compact) {
     const ContainerComponent = onPress ? TouchableOpacity : View;
     const containerProps = onPress
@@ -298,14 +320,12 @@ const EventCard: React.FC<EventCardProps> = ({
 
     return (
       <>
-        {isLoading && (
-
-          <CustomLoader />
-
-        )}
+        {isLoading && <CustomLoader />}
         <ContainerComponent
           style={[
-            expanded ? styles.compactContainerExpanded : styles.compactContainer,
+            expanded
+              ? styles.compactContainerExpanded
+              : styles.compactContainer,
           ]}
           {...containerProps}
         >
@@ -318,7 +338,7 @@ const EventCard: React.FC<EventCardProps> = ({
             >
               {title}
             </Text>
-            
+
             {/* Badges Row */}
             <View style={styles.compactBadgesRow}>
               {/* Time Badge */}
@@ -332,16 +352,27 @@ const EventCard: React.FC<EventCardProps> = ({
                 <View style={styles.compactBadge}>
                   <CalendarIcon height={14} width={14} />
                   <Text style={styles.compactBadgeText}>
-                    {typeof recurrenceInfo === 'string' ? recurrenceInfo : 'Recurring'}
+                    {typeof recurrenceInfo === 'string'
+                      ? recurrenceInfo
+                      : 'Recurring'}
                   </Text>
                 </View>
               )}
 
               {/* Type Badge */}
-              <View style={[styles.compactBadge, {
-                borderColor: isTask ? '#8DC63F' : '#00AEEF',
-              }]}>
-                {isTask ? <TaskIcon height={14} width={14} /> : <EventIcon height={14} width={14} />}
+              <View
+                style={[
+                  styles.compactBadge,
+                  {
+                    borderColor: isTask ? '#8DC63F' : '#00AEEF',
+                  },
+                ]}
+              >
+                {isTask ? (
+                  <TaskIcon height={14} width={14} />
+                ) : (
+                  <EventIcon height={14} width={14} />
+                )}
                 <Text style={styles.compactBadgeText}>
                   {isTask ? 'Task' : 'Event'}
                 </Text>
@@ -354,7 +385,10 @@ const EventCard: React.FC<EventCardProps> = ({
                 {eventGuests.slice(0, 5).map((guest, index) => {
                   const initials = getGuestInitials(guest.email);
                   const gradientColors = getGuestBackgroundColor(guest.email);
-                  const hasAvatar = guest.avatar && typeof guest.avatar === 'string' && guest.avatar.trim() !== '';
+                  const hasAvatar =
+                    guest.avatar &&
+                    typeof guest.avatar === 'string' &&
+                    guest.avatar.trim() !== '';
                   const imageFailed = failedImages.has(guest.email);
                   const marginLeft = index > 0 ? -12 : 0;
 
@@ -375,19 +409,37 @@ const EventCard: React.FC<EventCardProps> = ({
                         <Image
                           source={{ uri: guest.avatar }}
                           style={styles.compactGuestAvatarImage}
-                          onError={() => setFailedImages(prev => new Set(prev).add(guest.email))}
+                          onError={() =>
+                            setFailedImages(prev =>
+                              new Set(prev).add(guest.email),
+                            )
+                          }
                         />
                       ) : (
-                        <View style={[styles.compactGuestAvatarPlaceholder, { backgroundColor: gradientColors[0] }]}>
-                          <Text style={styles.compactGuestInitials}>{initials}</Text>
+                        <View
+                          style={[
+                            styles.compactGuestAvatarPlaceholder,
+                            { backgroundColor: gradientColors[0] },
+                          ]}
+                        >
+                          <Text style={styles.compactGuestInitials}>
+                            {initials}
+                          </Text>
                         </View>
                       )}
                     </View>
                   );
                 })}
                 {eventGuests.length > 5 && (
-                  <View style={[styles.compactGuestAvatar, styles.compactGuestRemaining]}>
-                    <Text style={styles.compactGuestRemainingText}>+{eventGuests.length - 5}</Text>
+                  <View
+                    style={[
+                      styles.compactGuestAvatar,
+                      styles.compactGuestRemaining,
+                    ]}
+                  >
+                    <Text style={styles.compactGuestRemainingText}>
+                      +{eventGuests.length - 5}
+                    </Text>
                   </View>
                 )}
               </View>
@@ -397,7 +449,12 @@ const EventCard: React.FC<EventCardProps> = ({
             {progress > 0 && (
               <View style={styles.compactProgressContainer}>
                 <View style={styles.compactProgressBar}>
-                  <View style={[styles.compactProgressFill, { width: `${progress}%` }]} />
+                  <View
+                    style={[
+                      styles.compactProgressFill,
+                      { width: `${progress}%` },
+                    ]}
+                  />
                 </View>
                 <Text style={styles.compactProgressText}>{progress}%</Text>
               </View>
@@ -462,23 +519,23 @@ const EventCard: React.FC<EventCardProps> = ({
                     onPress={() => {
                       // 2. Use Alert.alert to show the confirmation dialog
                       Alert.alert(
-                        "Confirm Deletion", // Title
-                        "Are you sure you want to move this event to the trash?", // Message
+                        'Confirm Deletion', // Title
+                        'Are you sure you want to move this event to the trash?', // Message
                         [
                           // Button 1: Cancel (does nothing)
                           {
-                            text: "Cancel",
-                            style: "cancel",
+                            text: 'Cancel',
+                            style: 'cancel',
                           },
                           // Button 2: Delete (calls the main handler)
                           {
-                            text: "Delete",
-                            style: "destructive", // To show it in red/warning color
+                            text: 'Delete',
+                            style: 'destructive', // To show it in red/warning color
                             onPress: () => handleDeleteEvent(eventId),
                           },
                         ],
                         // Optional: Configuration options (e.g., { cancelable: false })
-                        { cancelable: true }
+                        { cancelable: true },
                       );
                     }}
                   >
@@ -494,24 +551,18 @@ const EventCard: React.FC<EventCardProps> = ({
                   {renderIcon('more-vert', 'MaterialIcons', 18, colors.black)}
                 </TouchableOpacity> */}
                 </View>
-
-              
               </View>
             </ScrollView>
           )}
         </ContainerComponent>
       </>
-
     );
   }
 
   // Original standalone card design
   return (
     <>
-      {isLoading && (
-          <CustomLoader />
-      )}
-
+      {isLoading && <CustomLoader />}
 
       <TouchableOpacity
         style={[styles.container, { borderLeftColor: color }]}
@@ -596,8 +647,6 @@ const EventCard: React.FC<EventCardProps> = ({
                 )}
               </TouchableOpacity>
             </View>
-
-          
           </View>
         )}
       </TouchableOpacity>
@@ -709,7 +758,8 @@ const styles = StyleSheet.create({
   compactContainer: {
     backgroundColor: '#fff',
     borderRadius: moderateScale(12),
-    padding: scaleWidth(16),
+    paddingVertical: scaleHeight(10),
+    paddingHorizontal: scaleWidth(12),
     borderLeftWidth: 4,
     borderLeftColor: '#00AEEF',
     ...shadows.sm,
@@ -788,12 +838,13 @@ const styles = StyleSheet.create({
     flexShrink: 0, // Prevent time from shrinking
   },
   compactTitle: {
-    fontSize: moderateScale(16),
+    fontSize: moderateScale(14),
     fontWeight: '600',
     color: '#000',
-    marginBottom: scaleHeight(8),
+    marginBottom: scaleHeight(6),
     fontFamily: Fonts.latoBold,
     flexWrap: 'wrap',
+    lineHeight: moderateScale(18),
   },
   compactEditButton: {
     padding: spacing.xs,
@@ -889,19 +940,19 @@ const styles = StyleSheet.create({
   compactBadgesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scaleWidth(8),
-    marginTop: scaleHeight(8),
+    gap: scaleWidth(6),
+    marginTop: scaleHeight(6),
   },
   compactBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scaleWidth(8),
-    paddingVertical: scaleHeight(4),
-    borderRadius: moderateScale(16),
+    paddingHorizontal: scaleWidth(6),
+    paddingVertical: scaleHeight(3),
+    borderRadius: moderateScale(12),
     backgroundColor: 'transparent',
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
-    gap: scaleWidth(4),
+    gap: scaleWidth(3),
   },
   compactBadgeText: {
     fontSize: moderateScale(10),
@@ -912,12 +963,12 @@ const styles = StyleSheet.create({
   compactGuestsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: scaleHeight(8),
+    marginTop: scaleHeight(6),
   },
   compactGuestAvatar: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(18),
+    width: moderateScale(30),
+    height: moderateScale(30),
+    borderRadius: moderateScale(15),
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
@@ -974,9 +1025,6 @@ const styles = StyleSheet.create({
     color: '#717680',
     fontFamily: Fonts.latoMedium,
   },
-
 });
 
 export default EventCard;
-
-

@@ -14,6 +14,7 @@ import { useNavigation } from '@react-navigation/native';
 import CustomDrawer from '../components/CustomDrawer';
 import EventDetailsModal from '../components/EventDetailsModal';
 import FloatingActionButton from '../components/FloatingActionButton';
+import WeekHeader from '../components/WeekHeader';
 import { useApiClient } from '../hooks/useApi';
 import { Screen } from '../navigations/appNavigation.type';
 import { useActiveAccount } from '../stores/useActiveAccount';
@@ -21,16 +22,18 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST, isEventInPast } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
-import { colors, spacing, fontSize, shadows, borderRadius } from '../utils/LightTheme';
+import {
+  colors,
+  spacing,
+  fontSize,
+  shadows,
+  borderRadius,
+} from '../utils/LightTheme';
 import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
 import { Fonts } from '../constants/Fonts';
-import MenuIcon from '../assets/svgs/menu.svg';
-import SearchIcon from '../assets/svgs/search.svg';
-import CalendarIcon from '../assets/svgs/calendar.svg';
 import ClockIcon from '../assets/svgs/clock.svg';
 import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
-import AntDesign from 'react-native-vector-icons/AntDesign';
 import { useSettingsStore } from '../stores/useSetting';
 import EventCard from '../components/EventCard';
 
@@ -47,7 +50,7 @@ const DailyCalendarScreen = () => {
   const { account } = useActiveAccount();
   const { api } = useApiClient();
   const { selectedTimeZone } = useSettingsStore();
-  
+
   // Custom Alert State
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
@@ -56,7 +59,7 @@ const DailyCalendarScreen = () => {
   const showAlert = (
     title: string,
     message: string,
-    type: 'success' | 'error' | 'warning' | 'info' = 'warning'
+    type: 'success' | 'error' | 'warning' | 'info' = 'warning',
   ) => {
     setAlertTitle(title);
     setAlertMessage(message);
@@ -83,24 +86,24 @@ const DailyCalendarScreen = () => {
   // Group events by date
   const { eventsByDate } = useMemo(() => {
     const grouped: { [key: string]: any[] } = {};
-    
-    userEvents.forEach((event) => {
+
+    userEvents.forEach(event => {
       if (!event.fromTime) return;
-      
-        const startDate = parseTimeToPST(event.fromTime);
+
+      const startDate = parseTimeToPST(event.fromTime);
       if (!startDate || isNaN(startDate.getTime())) return;
-      
+
       const year = startDate.getFullYear();
       const month = String(startDate.getMonth() + 1).padStart(2, '0');
       const day = String(startDate.getDate()).padStart(2, '0');
       const dateKey = `${year}-${month}-${day}`;
-      
+
       if (!grouped[dateKey]) {
         grouped[dateKey] = [];
       }
       grouped[dateKey].push(event);
     });
-    
+
     return { eventsByDate: grouped };
   }, [userEvents]);
 
@@ -120,13 +123,15 @@ const DailyCalendarScreen = () => {
     const from = parseTimeToPST(fromTime);
     const to = parseTimeToPST(toTime);
     if (!from || !to) return '0h';
-    
+
     const diffMs = to.getTime() - from.getTime();
     const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
     const diffMinutes = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
-    
+
     if (diffHours > 0) {
-      return diffMinutes > 0 ? `${diffHours}h ${diffMinutes}m` : `${diffHours}h`;
+      return diffMinutes > 0
+        ? `${diffHours}h ${diffMinutes}m`
+        : `${diffHours}h`;
     }
     return `${diffMinutes}m`;
   };
@@ -135,43 +140,56 @@ const DailyCalendarScreen = () => {
   const formatTime = (dateString: string) => {
     const date = parseTimeToPST(dateString);
     if (!date) return 'Invalid Time';
-    
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }).toLowerCase().replace(' ', '');
+
+    return date
+      .toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+        hour12: true,
+      })
+      .toLowerCase()
+      .replace(' ', '');
   };
 
   // Extract guests from event
-  const getEventGuests = (event: any): Array<{ email: string; avatar?: string }> => {
+  const getEventGuests = (
+    event: any,
+  ): Array<{ email: string; avatar?: string }> => {
     if (!event) return [];
     const guests: Array<{ email: string; avatar?: string }> = [];
-    
+
     if (event.guests && Array.isArray(event.guests)) {
       event.guests.forEach((g: any) => {
         if (typeof g === 'string') {
           guests.push({ email: g });
         } else if (g && typeof g === 'object' && g.email) {
-          guests.push({ email: g.email, avatar: g.avatar || g.picture || g.profilePicture });
+          guests.push({
+            email: g.email,
+            avatar: g.avatar || g.picture || g.profilePicture,
+          });
         }
       });
     }
-    
+
     if (event.list && Array.isArray(event.list)) {
-      const guestItems = event.list.filter((item: any) => item && item.key === 'guest');
+      const guestItems = event.list.filter(
+        (item: any) => item && item.key === 'guest',
+      );
       guestItems.forEach((item: any) => {
         if (typeof item.value === 'string') {
           guests.push({ email: item.value });
         } else if (item.value && typeof item.value === 'object') {
           guests.push({
             email: item.value.email || item.value,
-            avatar: item.value.avatar || item.value.picture || item.value.profilePicture
+            avatar:
+              item.value.avatar ||
+              item.value.picture ||
+              item.value.profilePicture,
           });
         }
       });
     }
-    
+
     return guests.filter((g: any) => g && g.email);
   };
 
@@ -214,7 +232,10 @@ const DailyCalendarScreen = () => {
   // Get progress percentage
   const getProgress = (event: any): number => {
     if (!event.list || !Array.isArray(event.list)) return 0;
-    const progressItem = event.list.find((item: any) => item && (item.key === 'progress' || item.key === 'completion'));
+    const progressItem = event.list.find(
+      (item: any) =>
+        item && (item.key === 'progress' || item.key === 'completion'),
+    );
     if (progressItem && typeof progressItem.value === 'number') {
       return Math.min(100, Math.max(0, progressItem.value));
     }
@@ -242,7 +263,7 @@ const DailyCalendarScreen = () => {
 
   const handleEventPress = (event: any) => {
     setSelectedEvent(event);
-      setIsEventModalVisible(true);
+    setIsEventModalVisible(true);
   };
 
   const handleCloseEventModal = () => {
@@ -252,24 +273,25 @@ const DailyCalendarScreen = () => {
 
   const handleEditEvent = (event: any) => {
     handleCloseEventModal();
-    
+
     const eventToPass = event.originalRawEventData || event;
-    const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
+    const list =
+      eventToPass.list || eventToPass.tags || event.list || event.tags || [];
     const isTaskEvent = list.some((item: any) => item.key === 'task');
-    
+
     if (isEventInPast(eventToPass)) {
       showAlert(
         isTaskEvent ? 'Cannot edit past Task' : 'Cannot edit past Event',
         '',
-        'warning'
+        'warning',
       );
       return;
     }
-    
+
     const targetScreen = isTaskEvent
       ? Screen.CreateTaskScreen
       : Screen.CreateEventScreen;
-    
+
     (navigation as any).navigate(targetScreen, {
       mode: 'edit',
       eventData: eventToPass,
@@ -285,12 +307,41 @@ const DailyCalendarScreen = () => {
     setIsDatePickerVisible(true);
   };
 
-  const handleSearchPress = () => {
-    // TODO: Implement search functionality
-  };
-
   const handleCalendarPress = () => {
     // TODO: Navigate to monthly calendar or show calendar picker
+  };
+
+  const handleMonthPress = () => {
+    // Handle month press for WeekHeader
+  };
+
+  const handleMonthSelect = (monthIndex: number) => {
+    setCurrentMonthByIndex(monthIndex);
+  };
+
+  const handleDateSelect = (date: Date) => {
+    setSelectedDate(date);
+  };
+
+  const formatDateForHeader = (date: Date) => {
+    const monthNames = [
+      'January',
+      'February',
+      'March',
+      'April',
+      'May',
+      'June',
+      'July',
+      'August',
+      'September',
+      'October',
+      'November',
+      'December',
+    ];
+    const day = date.getDate();
+    const month = monthNames[date.getMonth()];
+    const year = date.getFullYear();
+    return `${day} ${month} ${year}`;
   };
 
   // Transform events for EventCard component
@@ -298,22 +349,30 @@ const DailyCalendarScreen = () => {
     const startTime = parseTimeToPST(event.fromTime);
     const endTime = parseTimeToPST(event.toTime);
     const duration = calculateDuration(event.fromTime, event.toTime);
-    const startTimeStr = startTime?.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }).toLowerCase().replace(' ', '') || '';
-    const endTimeStr = endTime?.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    }).toLowerCase().replace(' ', '') || '';
+    const startTimeStr =
+      startTime
+        ?.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        })
+        .toLowerCase()
+        .replace(' ', '') || '';
+    const endTimeStr =
+      endTime
+        ?.toLocaleTimeString('en-US', {
+          hour: 'numeric',
+          minute: '2-digit',
+          hour12: true,
+        })
+        .toLowerCase()
+        .replace(' ', '') || '';
     const timeRange = `${startTimeStr}-${endTimeStr}`;
     const timeDisplay = `${duration} (${timeRange})`;
-    
+
     const isTaskEvent = isTask(event);
     const eventColor = isTaskEvent ? '#8DC63F' : '#00AEEF';
-    
+
     return {
       id: event.uid,
       eventId: event.uid,
@@ -329,35 +388,24 @@ const DailyCalendarScreen = () => {
 
   return (
     <View style={styles.container}>
-      {/* Custom Header */}
-      <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <TouchableOpacity onPress={handleMenuPress} style={styles.headerIcon}>
-            <MenuIcon width={24} height={24} />
-          </TouchableOpacity>
-          
-          <TouchableOpacity 
-            onPress={handleDatePress}
-            style={styles.dateContainer}
-          >
-            <Text style={styles.dateText}>{formatDateDisplay(selectedDate)}</Text>
-            <AntDesign name="down" size={12} color="#000" style={styles.dateCaret} />
-          </TouchableOpacity>
-        </View>
-        
-        <TouchableOpacity onPress={handleSearchPress} style={styles.headerIcon}>
-          <SearchIcon width={24} height={24} />
-        </TouchableOpacity>
-      </View>
+      <WeekHeader
+        onMenuPress={handleMenuPress}
+        currentMonth={formatDateForHeader(selectedDate)}
+        onMonthPress={handleMonthPress}
+        onMonthSelect={handleMonthSelect}
+        onDateSelect={handleDateSelect}
+        currentDate={selectedDate}
+        selectedDate={selectedDate}
+      />
 
       {/* Today's Schedule Section */}
-      <ScrollView 
+      <ScrollView
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
         <Text style={styles.sectionTitle}>Today's schedule</Text>
-        
+
         {selectedDateEvents.length === 0 ? (
           <View style={styles.emptyState}>
             <Text style={styles.emptyText}>No events scheduled for today</Text>
@@ -366,20 +414,24 @@ const DailyCalendarScreen = () => {
           (() => {
             // Group events by time (hour) for display
             const groupedByTime: { [key: string]: any[] } = {};
-            selectedDateEvents.forEach((event) => {
+            selectedDateEvents.forEach(event => {
               const startTime = parseTimeToPST(event.fromTime);
-              const timeLabel = startTime?.toLocaleTimeString('en-US', {
-                hour: 'numeric',
-                minute: '2-digit',
-                hour12: true,
-              }).toLowerCase().replace(' ', '') || '';
-              
+              const timeLabel =
+                startTime
+                  ?.toLocaleTimeString('en-US', {
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true,
+                  })
+                  .toLowerCase()
+                  .replace(' ', '') || '';
+
               if (!groupedByTime[timeLabel]) {
                 groupedByTime[timeLabel] = [];
               }
               groupedByTime[timeLabel].push(event);
             });
-            
+
             return Object.entries(groupedByTime).map(([timeLabel, events]) => (
               <View key={timeLabel} style={styles.timeGroup}>
                 <View style={styles.timeHeader}>
@@ -389,16 +441,22 @@ const DailyCalendarScreen = () => {
                   <View style={styles.timeDivider} />
                 </View>
                 {events.map((event, index) => {
-                  const duration = calculateDuration(event.fromTime, event.toTime);
+                  const duration = calculateDuration(
+                    event.fromTime,
+                    event.toTime,
+                  );
                   const startTimeStr = formatTime(event.fromTime);
                   const endTimeStr = formatTime(event.toTime);
                   const timeRange = `${startTimeStr}-${endTimeStr}`;
                   const timeDisplay = `${duration} (${timeRange})`;
-                  
+
                   const isTaskEvent = isTask(event);
-                  
+
                   return (
-                    <View key={`${event.uid}-${index}`} style={styles.eventCardWrapper}>
+                    <View
+                      key={`${event.uid}-${index}`}
+                      style={styles.eventCardWrapper}
+                    >
                       <EventCard
                         title={event.title}
                         eventId={event.uid}
@@ -436,10 +494,7 @@ const DailyCalendarScreen = () => {
       />
 
       {/* Custom Drawer */}
-      <CustomDrawer
-        isOpen={isDrawerOpen}
-        onClose={handleDrawerClose}
-      />
+      <CustomDrawer isOpen={isDrawerOpen} onClose={handleDrawerClose} />
 
       <CustomAlert
         visible={alertVisible}
@@ -458,37 +513,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: scaleWidth(20),
-    paddingTop: scaleHeight(50),
-    paddingBottom: scaleHeight(16),
-    backgroundColor: colors.white,
-  },
-  headerLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  headerIcon: {
-    padding: scaleWidth(8),
-  },
-  dateContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginLeft: scaleWidth(12),
-  },
-  dateText: {
-    fontSize: fontSize.textSize16,
-    fontFamily: Fonts.latoBold,
-    color: '#000',
-    marginRight: scaleWidth(4),
-  },
-  dateCaret: {
-    marginLeft: scaleWidth(4),
   },
   scrollView: {
     flex: 1,

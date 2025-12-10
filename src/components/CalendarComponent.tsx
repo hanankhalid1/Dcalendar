@@ -21,24 +21,24 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
 }) => {
   // ✅ Get start of week setting from store
   const { selectedDay } = useSettingsStore();
-  
+
   // ✅ Helper function to convert day name to numeric value (0=Sunday, 1=Monday, etc.)
   const getDayNumber = (dayName: string): number => {
     const dayMap: { [key: string]: number } = {
-      'Sunday': 0,
-      'Monday': 1,
-      'Tuesday': 2,
-      'Wednesday': 3,
-      'Thursday': 4,
-      'Friday': 5,
-      'Saturday': 6,
+      Sunday: 0,
+      Monday: 1,
+      Tuesday: 2,
+      Wednesday: 3,
+      Thursday: 4,
+      Friday: 5,
+      Saturday: 6,
     };
     return dayMap[dayName] || 0;
   };
-  
+
   // ✅ Get the numeric value for the start of week
   const startOfWeekNumber = getDayNumber(selectedDay);
-  
+
   // Initialize with propCurrentDate if available, otherwise use today
   // This ensures the calendar always starts with the correct date when it mounts
   const [currentDate, setCurrentDate] = useState(() => {
@@ -54,7 +54,9 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
         0,
       );
       console.log('CalendarComponent: Initializing with propCurrentDate:', {
-        date: `${normalized.getMonth() + 1}/${normalized.getDate()}/${normalized.getFullYear()}`,
+        date: `${
+          normalized.getMonth() + 1
+        }/${normalized.getDate()}/${normalized.getFullYear()}`,
       });
       return normalized;
     }
@@ -96,16 +98,22 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
       // Always update to ensure sync with parent component
       // This is especially important when the calendar is opened after a date change
       setCurrentDate(prevDate => {
-        const shouldUpdate = 
+        const shouldUpdate =
           !prevDate ||
           prevDate.getFullYear() !== normalizedDate.getFullYear() ||
           prevDate.getMonth() !== normalizedDate.getMonth() ||
           prevDate.getDate() !== normalizedDate.getDate();
-        
+
         if (shouldUpdate) {
           console.log('CalendarComponent: Updating currentDate from prop:', {
-            old: prevDate ? `${prevDate.getMonth() + 1}/${prevDate.getDate()}/${prevDate.getFullYear()}` : 'none',
-            new: `${normalizedDate.getMonth() + 1}/${normalizedDate.getDate()}/${normalizedDate.getFullYear()}`,
+            old: prevDate
+              ? `${
+                  prevDate.getMonth() + 1
+                }/${prevDate.getDate()}/${prevDate.getFullYear()}`
+              : 'none',
+            new: `${
+              normalizedDate.getMonth() + 1
+            }/${normalizedDate.getDate()}/${normalizedDate.getFullYear()}`,
           });
           return normalizedDate;
         }
@@ -143,24 +151,35 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
         'Normalized Year': normalizedDate.getFullYear(),
         'Normalized Month': normalizedDate.getMonth(),
         'Normalized Day': normalizedDate.getDate(),
-        'Normalized Formatted': `${normalizedDate.getMonth() + 1}/${normalizedDate.getDate()}/${normalizedDate.getFullYear()}`,
-        'Date Match Check': normalizedDate.getFullYear() === propCurrentDate.getFullYear() && 
-                           normalizedDate.getMonth() === propCurrentDate.getMonth() ? '✅ MATCH' : '❌ MISMATCH',
+        'Normalized Formatted': `${
+          normalizedDate.getMonth() + 1
+        }/${normalizedDate.getDate()}/${normalizedDate.getFullYear()}`,
+        'Date Match Check':
+          normalizedDate.getFullYear() === propCurrentDate.getFullYear() &&
+          normalizedDate.getMonth() === propCurrentDate.getMonth()
+            ? '✅ MATCH'
+            : '❌ MISMATCH',
       });
-      
+
       // Double-check: if there's a mismatch, log a warning
-      if (normalizedDate.getFullYear() !== propCurrentDate.getFullYear() || 
-          normalizedDate.getMonth() !== propCurrentDate.getMonth()) {
+      if (
+        normalizedDate.getFullYear() !== propCurrentDate.getFullYear() ||
+        normalizedDate.getMonth() !== propCurrentDate.getMonth()
+      ) {
         console.error('❌ CalendarComponent: Date normalization mismatch!', {
           expected: `${propCurrentDate.getFullYear()}-${propCurrentDate.getMonth()}`,
           actual: `${normalizedDate.getFullYear()}-${normalizedDate.getMonth()}`,
         });
       }
-      
+
       setCurrentDate(normalizedDate);
     }
-  }, [isVisible, propCurrentDate?.getFullYear(), propCurrentDate?.getMonth(), propCurrentDate?.getDate()]);
-
+  }, [
+    isVisible,
+    propCurrentDate?.getFullYear(),
+    propCurrentDate?.getMonth(),
+    propCurrentDate?.getDate(),
+  ]);
 
   useEffect(() => {
     if (propSelectedDate) {
@@ -174,7 +193,8 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
         0,
       );
       setSelectedDate(prevDate => {
-        if (!prevDate ||
+        if (
+          !prevDate ||
           prevDate.getFullYear() !== normalizedDate.getFullYear() ||
           prevDate.getMonth() !== normalizedDate.getMonth() ||
           prevDate.getDate() !== normalizedDate.getDate()
@@ -210,7 +230,7 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
   const weekDays = useMemo(() => {
     return [
       ...baseWeekDays.slice(startOfWeekNumber),
-      ...baseWeekDays.slice(0, startOfWeekNumber)
+      ...baseWeekDays.slice(0, startOfWeekNumber),
     ];
   }, [startOfWeekNumber, selectedDay]);
 
@@ -234,7 +254,9 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
       )} (day ${startingDayOfWeek})`,
     );
     console.log(`CalendarComponent - Days in month: ${daysInMonth}`);
-    console.log(`CalendarComponent - Start of week setting: ${selectedDay} (numeric: ${startOfWeekNumber})`);
+    console.log(
+      `CalendarComponent - Start of week setting: ${selectedDay} (numeric: ${startOfWeekNumber})`,
+    );
 
     const days = [];
 
@@ -348,7 +370,9 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
     console.log('CalendarComponent - Notifying parent of month navigation:', {
       year: newDate.getFullYear(),
       month: newDate.getMonth(),
-      formatted: `${newDate.getMonth() + 1}/${newDate.getDate()}/${newDate.getFullYear()}`,
+      formatted: `${
+        newDate.getMonth() + 1
+      }/${newDate.getDate()}/${newDate.getFullYear()}`,
     });
     setCurrentDate(newDate);
     // IMPORTANT: Notify parent component so it can update selectedDate and currentMonth
@@ -420,12 +444,18 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
               dayData.isCurrentMonth && handleDatePress(dayData.day)
             }
           >
-            {dayData.isSelected && dayData.isCurrentMonth ? (
-              // Selected date (including today) - using solid blue color
+            {dayData.isSelected &&
+            !dayData.isToday &&
+            dayData.isCurrentMonth ? (
+              // Selected date (not today) - blue background with white text
               <View style={styles.selectedDay}>
                 <Text style={styles.selectedDayText}>{dayData.day}</Text>
               </View>
+            ) : dayData.isToday && dayData.isCurrentMonth ? (
+              // Today - just blue text, no background
+              <Text style={styles.todayDayText}>{dayData.day}</Text>
             ) : (
+              // Regular day
               <Text
                 style={[
                   styles.dayText,
@@ -477,9 +507,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   monthYear: {
-    fontSize: moderateScale(18),
+    fontSize: moderateScale(16),
     fontFamily: Fonts.latoBold,
-    color: '#181D27',
+    color: '#252B37',
+    fontWeight: '700',
   },
   weekdayRow: {
     flexDirection: 'row',
@@ -487,12 +518,13 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   weekdayText: {
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(13),
     fontFamily: Fonts.latoMedium,
-    color: '#6c757d',
+    color: '#717680',
     width: '13%',
     textAlign: 'center',
     minWidth: 40,
+    fontWeight: '600',
   },
   calendarGrid: {
     flexDirection: 'row',
@@ -501,7 +533,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   dayCell: {
-    width: '13%', // 7 days = ~14.28% each, but use 13% to account for margins
+    width: '13%',
     height: 40,
     justifyContent: 'center',
     alignItems: 'center',
@@ -509,12 +541,13 @@ const styles = StyleSheet.create({
     minWidth: 40,
   },
   dayText: {
-    fontSize: moderateScale(16),
+    fontSize: moderateScale(12),
     fontFamily: Fonts.latoRegular,
-    color: '#181D27',
+    color: '#202020',
+    fontWeight: '400',
   },
   inactiveDayText: {
-    color: '#adb5bd',
+    color: '#D0D5DD',
   },
   selectedDay: {
     width: 32,
@@ -525,21 +558,22 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   selectedDayText: {
-    fontSize: moderateScale(16),
-    fontFamily: Fonts.latoMedium,
+    fontSize: moderateScale(12),
+    fontFamily: Fonts.latoRegular,
     color: '#ffffff',
+    fontWeight: '400',
   },
   todayDay: {
     width: 32,
     height: 32,
     borderRadius: 8,
-    backgroundColor: '#00AEEF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   todayDayText: {
-    fontSize: moderateScale(16),
-    fontFamily: Fonts.latoMedium,
-    color: '#ffffff',
+    fontSize: moderateScale(12),
+    fontFamily: Fonts.latoRegular,
+    color: '#00AEEF',
+    fontWeight: '400',
   },
 });
