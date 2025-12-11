@@ -98,13 +98,28 @@ const CreateEventScreen = () => {
   const [videoConferencing, setVideoConferencing] = useState(
     editEventData?.videoConferencing ?? '',
   );
-  const [notificationMinutes, setNotificationMinutes] = useState('0');
-  const [selectedTimeUnit, setSelectedTimeUnit] = useState('Minutes');
-  const [selectedNotificationType, setSelectedNotificationType] =
-    useState('Notification');
-  const [selectedStatus, setSelectedStatus] = useState('Busy');
-  const [selectedVisibility, setSelectedVisibility] =
-    useState('Default Visibility');
+  const [notificationMinutes, setNotificationMinutes] = useState(
+    editEventData?.seconds
+      ? convertSecondsToUnit(
+          parseInt(editEventData.seconds, 10),
+          convertionISOToTime(editEventData.trigger)?.Label || 'Minutes',
+        ).toString()
+      : '0',
+  );
+  const [selectedTimeUnit, setSelectedTimeUnit] = useState(
+    editEventData?.trigger
+      ? convertionISOToTime(editEventData.trigger)?.Label || 'Minutes'
+      : 'Minutes',
+  );
+  const [selectedNotificationType, setSelectedNotificationType] = useState(
+    editEventData?.notification || 'Notification',
+  );
+  const [selectedStatus, setSelectedStatus] = useState(
+    editEventData?.busy || 'Busy',
+  );
+  const [selectedVisibility, setSelectedVisibility] = useState(
+    editEventData?.visibility || 'Default Visibility',
+  );
   const [showCalendarModal, setShowCalendarModal] = useState(false);
   const [selectedStartDate, setSelectedStartDate] = useState<Date | null>(
     editEventData?.selectedStartDate
@@ -1682,19 +1697,28 @@ const CreateEventScreen = () => {
     }
 
     // Validate location format (if provided) - reject whitespace-only strings
+    // Skip validation if video conferencing is selected (Google Meet/Zoom link stored separately)
     const trimmedLocation = location.trim();
-    if (trimmedLocation && trimmedLocation.length > 0) {
+    if (
+      trimmedLocation &&
+      trimmedLocation.length > 0 &&
+      selectedVideoConferencing !== 'google' &&
+      selectedVideoConferencing !== 'zoom'
+    ) {
       // Check for invalid characters that could cause issues
       // Blocked: < > { } [ ] | \ ` ~ ^ / @ # $ % & * + = ?
       const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
       if (invalidChars.test(location)) {
-        setLocationError(
-          'Location contains invalid characters. Please use letters, numbers, spaces, commas, periods, and hyphens.',
-        );
+        setLocationError('Enter valid location');
         isValid = false;
         if (!firstErrorField) firstErrorField = 'location';
       }
-    } else if (location && location.length > 0) {
+    } else if (
+      location &&
+      location.length > 0 &&
+      selectedVideoConferencing !== 'google' &&
+      selectedVideoConferencing !== 'zoom'
+    ) {
       // Location has only whitespace - reject it
       setLocationError('Location cannot be empty or contain only spaces');
       isValid = false;
@@ -2015,6 +2039,8 @@ const CreateEventScreen = () => {
             );
             eventData.location = data.hangoutLink;
             eventData.meetingEventId = data.id;
+            setMeetingLink(data.hangoutLink);
+            setMeetingEventId(data.id);
           } else {
             console.error('❌ Failed to update Google Meet via backend:', data);
             Alert.alert('Error', 'Failed to update Google Meet');
@@ -3128,6 +3154,8 @@ const CreateEventScreen = () => {
                       if (!isLoading) {
                         handleGoogleMeetClick();
                         setSelectedVideoConferencing('google');
+                        setLocation(''); // Clear location when Google Meet is selected
+                        setLocationError('');
                         setShowVideoConferencingOptions(false);
                       }
                     }}
@@ -3158,6 +3186,8 @@ const CreateEventScreen = () => {
                     onPress={() => {
                       if (!isLoading) {
                         setIntegrationType('zoom');
+                        setLocation(''); // Clear location when Zoom is selected
+                        setLocationError('');
                         setShowIntegrationModal(true);
                         setShowVideoConferencingOptions(false);
                       }
@@ -3193,23 +3223,41 @@ const CreateEventScreen = () => {
                 style={[
                   styles.datePicker,
                   activeField === 'location' && styles.fieldActive,
+                  (selectedVideoConferencing === 'google' ||
+                    selectedVideoConferencing === 'zoom') &&
+                    styles.fieldDisabled,
                 ]}
                 onPress={() => {
                   if (!isLoading) {
-                    setActiveField('location');
-                    handleOpenLocationModal();
+                    if (
+                      selectedVideoConferencing !== 'google' &&
+                      selectedVideoConferencing !== 'zoom'
+                    ) {
+                      setActiveField('location');
+                      handleOpenLocationModal();
+                    }
                   }
                 }}
-                disabled={isLoading}
+                disabled={
+                  isLoading ||
+                  selectedVideoConferencing === 'google' ||
+                  selectedVideoConferencing === 'zoom'
+                }
               >
                 <FeatherIcon name="map-pin" size={20} color="#A4A7AE" />
                 <Text
                   style={[
                     styles.selectorText,
                     location && styles.selectorTextFilled,
+                    (selectedVideoConferencing === 'google' ||
+                      selectedVideoConferencing === 'zoom') &&
+                      styles.fieldDisabledText,
                   ]}
                 >
-                  {location || 'Add Location'}
+                  {selectedVideoConferencing === 'google' ||
+                  selectedVideoConferencing === 'zoom'
+                    ? 'Location cannot be selected'
+                    : location || 'Add Location'}
                 </Text>
                 <FeatherIcon name="plus" size={20} color="#6C6C6C" />
               </TouchableOpacity>
@@ -3855,9 +3903,7 @@ const CreateEventScreen = () => {
                   const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
                   if (invalidChars.test(text)) {
                     // Show error message and don't update the location
-                    setLocationError(
-                      'Special characters (@, #, $, %, &, *, +, =, ?, <, >, {, }, [, ], |, \\, `, ~, ^, /) are not allowed. Please use letters, numbers, spaces, commas, periods, and hyphens.',
-                    );
+                    setLocationError('Enter valid location');
                     return;
                   }
 
@@ -4166,6 +4212,11 @@ const styles = StyleSheet.create({
   fieldActive: {
     borderColor: colors.primaryBlue,
   },
+  fieldDisabled: {
+    borderColor: '#DCE0E5',
+    backgroundColor: '#F5F5F5',
+    opacity: 0.7,
+  },
   datePicker: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -4190,6 +4241,10 @@ const styles = StyleSheet.create({
   },
   selectorTextFilled: {
     color: '#252B37', // Text color when value is entered
+  },
+  fieldDisabledText: {
+    color: '#A4A7AE',
+    fontStyle: 'italic',
   },
   inputUnderline: {
     height: 1,

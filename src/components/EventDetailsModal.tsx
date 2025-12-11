@@ -12,10 +12,12 @@ import {
 import Clipboard from '@react-native-clipboard/clipboard';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 import Feather from 'react-native-vector-icons/Feather';
+import FeatherIcon from 'react-native-vector-icons/Feather';
 import { Colors } from '../constants/Colors';
 import { Fonts } from '../constants/Fonts';
 import { parseTimeToPST } from '../utils';
 import * as DimensionsUtils from '../utils/dimensions';
+import MeetIcon from '../assets/svgs/meet.svg';
 
 const { width: screenWidth } = Dimensions.get('window');
 const { scaleWidth, scaleHeight, moderateScale } = DimensionsUtils;
@@ -123,7 +125,8 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
       const locationItem = event.list.find(
         (item: any) => item.key === 'location',
       );
-      return locationItem ? locationItem.value : null;
+      // Return either the meeting link or a placeholder
+      return locationItem?.value || 'no-meeting-link';
     }
     return null;
   };
@@ -190,26 +193,42 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     const isGoogleMeet =
       linkType === 'google' || link.includes('meet.google.com');
     const isZoom = linkType === 'zoom' || link.includes('zoom.us');
-    const iconName = isGoogleMeet ? 'video-call' : isZoom ? 'video' : 'link';
+    const isNoLink = link === 'no-meeting-link';
+
+    const getIconComponent = () => {
+      if (isGoogleMeet) {
+        return <MeetIcon width={18} height={18} />;
+      } else if (isZoom) {
+        return <FeatherIcon name="video" size={18} color="#0B6DE0" />;
+      } else {
+        return (
+          <MaterialIcons name="link" size={18} color={Colors.primaryblue} />
+        );
+      }
+    };
 
     return (
       <View style={styles.detailRow}>
-        <View style={styles.iconWrapper}>
-          {renderIconWithGradient(iconName, 18)}
-        </View>
+        <View style={styles.iconWrapper}>{getIconComponent()}</View>
         <View style={styles.detailContent}>
-          <Text style={styles.detailLabel}>Meeting Link</Text>
-          <View style={styles.meetingLinkContainer}>
-            <Text style={styles.meetingLinkText} numberOfLines={1}>
-              {link}
-            </Text>
-            <TouchableOpacity
-              style={styles.copyButton}
-              onPress={() => handleCopyLink(link)}
-            >
-              <Feather name="copy" size={16} color={Colors.primaryblue} />
-            </TouchableOpacity>
-          </View>
+          <Text style={styles.detailLabel}>
+            {isGoogleMeet ? 'Google Meet' : isZoom ? 'Zoom' : 'Meeting Link'}
+          </Text>
+          {isNoLink ? (
+            <Text style={styles.meetingLinkText}>No meeting link</Text>
+          ) : (
+            <View style={styles.meetingLinkContainer}>
+              <Text style={styles.meetingLinkText} numberOfLines={1}>
+                {link}
+              </Text>
+              <TouchableOpacity
+                style={styles.copyButton}
+                onPress={() => handleCopyLink(link)}
+              >
+                <Feather name="copy" size={16} color={Colors.primaryblue} />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
       </View>
     );

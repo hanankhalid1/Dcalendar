@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Modal,
   View,
@@ -54,6 +54,13 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
   const toast = useToast();
   const [loading, setloading] = useState(false);
   const { token, setToken } = useToken();
+
+  // Reset loading state when modal visibility changes
+  useEffect(() => {
+    if (!visible) {
+      setloading(false);
+    }
+  }, [visible]);
 
   const onSubmit = async (data: AddAccountFormData) => {
     console.log('Accountt Checking');
@@ -112,6 +119,7 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
   };
 
   const handleClose = () => {
+    setloading(false);
     reset();
     onClose();
   };
@@ -191,7 +199,10 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
                     autoCorrect={false}
                   />
                   <Text
-                    style={[styles.domainText, { fontFamily: Fonts.latoRegular }]}
+                    style={[
+                      styles.domainText,
+                      { fontFamily: Fonts.latoRegular },
+                    ]}
                   >
                     {domain}
                   </Text>
@@ -204,12 +215,18 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
             {watchedUsername && (
               <View style={styles.previewContainer}>
                 <Text
-                  style={[styles.previewLabel, { fontFamily: Fonts.latoRegular }]}
+                  style={[
+                    styles.previewLabel,
+                    { fontFamily: Fonts.latoRegular },
+                  ]}
                 >
                   Your email will be:{' '}
                 </Text>
                 <Text
-                  style={[styles.previewEmail, { fontFamily: Fonts.latoRegular }]}
+                  style={[
+                    styles.previewEmail,
+                    { fontFamily: Fonts.latoRegular },
+                  ]}
                 >
                   {watchedUsername}
                   {domain}
@@ -220,11 +237,13 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
 
           {/* Action Buttons */}
           <View style={styles.buttonContainer}>
-            <TouchableOpacity
-              style={styles.cancelButton}
-              onPress={handleClose}
-            >
-              <Text style={[styles.cancelButtonText, { fontFamily: Fonts.latoMedium }]}>
+            <TouchableOpacity style={styles.cancelButton} onPress={handleClose}>
+              <Text
+                style={[
+                  styles.cancelButtonText,
+                  { fontFamily: Fonts.latoMedium },
+                ]}
+              >
                 Cancel
               </Text>
             </TouchableOpacity>
@@ -236,7 +255,12 @@ const AddAccountModal: React.FC<AddAccountModalProps> = ({
               onPress={handleSubmit(onSubmit)}
               disabled={!isValid}
             >
-              <Text style={[styles.confirmButtonText, { fontFamily: Fonts.latoMedium }]}>
+              <Text
+                style={[
+                  styles.confirmButtonText,
+                  { fontFamily: Fonts.latoMedium },
+                ]}
+              >
                 Confirm
               </Text>
             </TouchableOpacity>
