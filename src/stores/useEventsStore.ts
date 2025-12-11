@@ -294,8 +294,19 @@ export const useEventsStore = create<EventsStore>()(
                 const filteredList = existingList.filter((item: any) => 
                     item.key !== 'isDeleted' && item.key !== 'deletedTime'
                 );
-                // Add isDeleted and deletedTime
-                const deletedTime = new Date().toISOString().replace(/[-:]/g, '').split('.')[0];
+                // Add isDeleted and deletedTime (format: YYYYMMDDTHHMMSS expected by parseTimeToPST)
+                const now = new Date();
+                const deletedTime = [
+                    now.getFullYear().toString().padStart(4, '0'),
+                    (now.getMonth() + 1).toString().padStart(2, '0'),
+                    now.getDate().toString().padStart(2, '0'),
+                ].join('') +
+                    'T' +
+                    [
+                        now.getHours().toString().padStart(2, '0'),
+                        now.getMinutes().toString().padStart(2, '0'),
+                        now.getSeconds().toString().padStart(2, '0'),
+                    ].join('');
                 const updatedList = [
                     ...filteredList,
                     { key: 'isDeleted', value: 'true' },

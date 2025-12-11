@@ -1,4 +1,11 @@
-import { View, Text, TouchableOpacity, Linking, StyleSheet, ScrollView } from 'react-native';
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  Linking,
+  StyleSheet,
+  ScrollView,
+} from 'react-native';
 import React, { useEffect, useState } from 'react';
 import { Colors } from '../../constants/Colors';
 import { NcogWallet } from '../../assets/svgs';
@@ -66,7 +73,10 @@ const WalletScreen = () => {
         <View style={styles.mainContentFrame}>
           {/* Top Calendar Icon */}
           <View style={styles.topIconContainer}>
-            <DIcon width={scale(69.9806900024414)} height={scale(72.00009155273438)} />
+            <DIcon
+              width={scale(69.9806900024414)}
+              height={scale(72.00009155273438)}
+            />
           </View>
 
           {/* Title Container */}
@@ -81,10 +91,7 @@ const WalletScreen = () => {
 
           {/* Wallet Icon Container with dotted border */}
           <View style={styles.walletIconContainer}>
-            <TouchableOpacity 
-              onPress={handleWalletConnect}
-              activeOpacity={0.8}
-            >
+            <TouchableOpacity onPress={handleWalletConnect} activeOpacity={0.8}>
               <View style={styles.walletIconWrapper}>
                 <NcogWallet width={54} height={54} />
               </View>
@@ -96,15 +103,6 @@ const WalletScreen = () => {
           <Text style={styles.continueText}>
             Connect your Wallet to continue
           </Text>
-
-          {/* Action Button */}
-          <TouchableOpacity
-            onPress={handleWalletConnect}
-            style={styles.connectButton}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.buttonText}>Get free test tokens? (NFC Faucet)</Text>
-          </TouchableOpacity>
         </View>
       </View>
     </SafeAreaView>

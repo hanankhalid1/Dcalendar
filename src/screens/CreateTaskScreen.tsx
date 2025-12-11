@@ -46,6 +46,7 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { useApiClient } from '../hooks/useApi';
 import { generateEventUID } from '../utils/eventUtils';
 import CustomAlert from '../components/CustomAlert';
+import { useToast } from '../hooks/useToast';
 
 const CreateTaskScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
@@ -66,6 +67,7 @@ const CreateTaskScreen = () => {
   } = useEventsStore();
   const { api } = useApiClient();
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+  const toast = useToast();
   const [showRecurrenceDropdown, setShowRecurrenceDropdown] = useState(false);
   const [selectedRecurrence, setSelectedRecurrence] =
     useState('Does not repeat');
@@ -1276,6 +1278,15 @@ const CreateTaskScreen = () => {
         // Navigate after successful save
         navigation.goBack();
 
+        // Show success toast at the top
+        setTimeout(() => {
+          if (mode === 'edit') {
+            toast.success('', 'Task updated successfully!');
+          } else {
+            toast.success('', 'Task created successfully!');
+          }
+        }, 300);
+
         // ✅ STEP 3: TRIGGER BLOCKCHAIN OPERATION IN BACKGROUND (NON-BLOCKING)
         // Start blockchain operations as soon as possible after navigation
         (async () => {
@@ -1443,14 +1454,6 @@ const CreateTaskScreen = () => {
           setUserEvents(updatedEvents);
         }
 
-        // Show success and navigate immediately
-        showAlert(
-          'Task Updated',
-          'Task has been successfully updated.',
-          'success',
-        );
-
-        // Note: getUserEvents is not called here to avoid showing "Loading Events" indicator
         // The optimistic UI update already updates the local state
       } else {
         throw new Error('Failed to update the task on blockchain');
@@ -1508,7 +1511,10 @@ const CreateTaskScreen = () => {
                 placeholder="Write here"
                 placeholderTextColor="#A4A7AE"
                 value={title}
-                onFocus={() => setActiveField('title')}
+                onFocus={() => {
+                  setActiveField('title');
+                  setShowRecurrenceDropdown(false);
+                }}
                 onBlur={() => setActiveField(null)}
                 onChangeText={text => {
                   setTitle(text);
@@ -1722,7 +1728,10 @@ const CreateTaskScreen = () => {
                 placeholder="Enter here.."
                 value={description}
                 onChangeText={setDescription}
-                onFocus={() => setActiveField('description')}
+                onFocus={() => {
+                  setActiveField('description');
+                  setShowRecurrenceDropdown(false);
+                }}
                 onBlur={() => setActiveField(null)}
                 multiline
                 placeholderTextColor="#A4A7AE"
@@ -1741,7 +1750,13 @@ const CreateTaskScreen = () => {
                 onPress={createTask}
               >
                 <Text style={styles.saveButtonText}>
-                  {isLoading ? 'Creating...' : 'Create'}
+                  {isLoading
+                    ? mode === 'edit'
+                      ? 'Updating...'
+                      : 'Creating...'
+                    : mode === 'edit'
+                    ? 'Update'
+                    : 'Create'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -2480,6 +2495,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F2F4F7',
     minHeight: scaleHeight(38), // Reduced from 44 to make more compact
     backgroundColor: colors.white,
+    flexWrap: 'nowrap',
   },
 
   repeatOptionSelected: {
@@ -2492,6 +2508,7 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.latoMedium,
     flex: 1,
     marginRight: scaleWidth(8),
+    flexShrink: 1,
   },
 
   repeatOptionTextSelected: {

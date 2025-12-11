@@ -77,6 +77,7 @@ import Icon from 'react-native-vector-icons/Feather';
 import { useAuthStore } from '../stores/useAuthStore';
 import CustomAlert from '../components/CustomAlert';
 import { useSettingsStore } from '../stores/useSetting';
+import { useToast } from '../hooks/useToast';
 const CreateEventScreen = () => {
   const navigation: any = useNavigation<AppNavigationProp>();
   const activeAccount = useActiveAccount(state => state.account);
@@ -86,6 +87,7 @@ const CreateEventScreen = () => {
   const { getUserEvents, setUserEvents, userEvents } = useEventsStore();
   const { googleIntegration } = useAuthStore();
   const currentTimezone = useSettingsStore();
+  const toast = useToast();
   // Initialize blockchain service and get contract instance
   // Form state
   const [title, setTitle] = useState(editEventData?.title ?? '');
@@ -644,7 +646,7 @@ const CreateEventScreen = () => {
 
       if (parsedData.locationType) {
         setSelectedVideoConferencing(parsedData.locationType);
-        setShowVideoConferencingOptions(true);
+        // Don't auto-open dropdown in edit mode
       }
 
       // ✅ Handle Google Meet or any video meeting
@@ -655,7 +657,7 @@ const CreateEventScreen = () => {
         console.log('Detected Google Meet in existing event');
 
         setSelectedVideoConferencing('google');
-        setShowVideoConferencingOptions(true);
+        // Don't auto-open dropdown in edit mode
 
         if (editEventData.meetingLink) {
           setMeetingLink(editEventData.meetingLink);
@@ -2063,10 +2065,37 @@ const CreateEventScreen = () => {
         const apiResponse = await api('POST', '/updateevents', updatePayload);
         console.log('API response data (edit):', apiResponse.data);
 
-        await getUserEvents(activeAccount.userName, api);
+        // Optimistically update event in local state for immediate UI feedback (like create flow)
+        if (userEvents && Array.isArray(userEvents)) {
+          const updatedEvents = userEvents.map((event: any) => {
+            if (event.uid === eventData.uid) {
+              return {
+                ...event,
+                title: eventData.title,
+                description: eventData.description,
+                fromTime: eventData.fromTime,
+                toTime: eventData.toTime,
+                list: eventData.list || [],
+              };
+            }
+            return event;
+          });
+          setUserEvents(updatedEvents);
+          console.log('✅ Event updated optimistically in local state');
+        }
 
+        // Navigate back immediately (don't wait for refresh)
         navigation.goBack();
-        showAlert('Event Updated', 'Event updated successfully!', 'success');
+
+        // Show success toast at the top
+        setTimeout(() => {
+          toast.success('', 'Event updated successfully!');
+        }, 300);
+
+        // Refresh events in background (non-blocking) - this will sync with server
+        getUserEvents(activeAccount.userName, api).catch(err => {
+          console.error('Background event refresh failed:', err);
+        });
       } else {
         showAlert(
           'Event Update Failed',
@@ -2224,9 +2253,9 @@ const CreateEventScreen = () => {
         // Navigate back immediately (don't wait for refresh)
         navigation.goBack();
 
-        // Show success alert after navigation
+        // Show success toast at the top
         setTimeout(() => {
-          showAlert('Event Created', 'Event created successfully!', 'success');
+          toast.success('', 'Event created successfully!');
         }, 300);
       } else {
         showAlert(
@@ -2497,8 +2526,11 @@ const CreateEventScreen = () => {
 
       // Prepare event data in the new format (before building metadata)
       const eventDataForMetadata = {
-        uuid: editEventData?.uuid || '', // Keep uuid if editing
-        uid: editEventData?.id || editEventData?.uid || generateEventUID(), // Generate UID using the utility method
+        uuid: mode === 'edit' && editEventData?.uuid ? editEventData.uuid : '', // Preserve original uuid when editing
+        uid:
+          mode === 'edit' && editEventData?.uid
+            ? editEventData.uid
+            : generateEventUID(), // Preserve original UID when editing
         title: title.trim(),
         description: description.trim(),
         fromTime: formatToISO8601Local(
@@ -2711,7 +2743,11 @@ const CreateEventScreen = () => {
                 placeholder="Write here"
                 placeholderTextColor="#A4A7AE"
                 value={title}
-                onFocus={() => setActiveField('title')}
+                onFocus={() => {
+                  setActiveField('title');
+                  setShowRecurrenceDropdown(false);
+                  setShowVideoConferencingOptions(false);
+                }}
                 onBlur={() => setActiveField(null)}
                 onChangeText={text => {
                   setTitle(text);
@@ -2827,6 +2863,13 @@ const CreateEventScreen = () => {
                 if (isLoading) return;
                 const newIsAllDay = !isAllDayEvent;
                 setIsAllDayEvent(newIsAllDay);
+
+                // Clear all error messages when toggling All Day
+                setStartDateError('');
+                setStartTimeError('');
+                setEndDateError('');
+                setEndTimeError('');
+                setDateTimeError('');
 
                 if (newIsAllDay) {
                   // ✅ When switching TO all-day:
@@ -3247,7 +3290,11 @@ const CreateEventScreen = () => {
                 placeholder="Enter here.."
                 value={description}
                 onChangeText={setDescription}
-                onFocus={() => setActiveField('description')}
+                onFocus={() => {
+                  setActiveField('description');
+                  setShowRecurrenceDropdown(false);
+                  setShowVideoConferencingOptions(false);
+                }}
                 onBlur={() => setActiveField(null)}
                 multiline
                 placeholderTextColor="#A4A7AE"
@@ -3289,7 +3336,13 @@ const CreateEventScreen = () => {
                 onPress={handleSaveEvent}
               >
                 <Text style={styles.saveButtonText}>
-                  {isLoading ? 'Creating...' : 'Create'}
+                  {isLoading
+                    ? mode === 'edit'
+                      ? 'Updating...'
+                      : 'Creating...'
+                    : mode === 'edit'
+                    ? 'Update'
+                    : 'Create'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -4638,6 +4691,7 @@ const styles = StyleSheet.create({
   },
   repeatOption: {
     flexDirection: 'row',
+    flexWrap: 'nowrap',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: scaleWidth(16),
@@ -4655,6 +4709,7 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     fontFamily: Fonts.latoMedium,
     flex: 1,
+    flexShrink: 1,
     marginRight: scaleWidth(8),
   },
   repeatOptionTextSelected: {

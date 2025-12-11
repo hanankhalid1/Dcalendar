@@ -30,6 +30,7 @@ import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
 import { useSettingsStore } from '../stores/useSetting';
 import EventDetailsModal from '../components/EventDetailsModal';
+import { useToast } from '../hooks/useToast';
 import { colors, spacing, shadows } from '../utils/LightTheme';
 import { BlockchainService } from '../services/BlockChainService';
 import { useToken } from '../stores/useTokenStore';
@@ -77,6 +78,7 @@ const WeekScreen = () => {
   const [selectedEvent, setSelectedEvent] = useState<any>(null);
   const [isEventModalVisible, setIsEventModalVisible] = useState(false);
   const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+  const toast = useToast();
   const token = useToken(state => state.token);
   const { api } = useApiClient();
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
@@ -955,6 +957,9 @@ const WeekScreen = () => {
 
       const currentEvents = [...(userEvents || [])];
       optimisticallyDeleteEvent(event.uid);
+
+      // Show success toast at the top
+      toast.success('', 'Event moved to trash successfully!');
 
       (async () => {
         try {

@@ -51,11 +51,11 @@ const ToastItem: React.FC<{
     switch (type) {
       case 'success':
         return {
-          backgroundColor: '#E8F5E8',
-          borderColor: '#4CAF50',
-          iconColor: '#4CAF50',
-          iconName: 'check-circle',
-          titleColor: '#2E7D32',
+          backgroundColor: '#FFFFFF',
+          borderColor: '#00AEEF',
+          iconColor: '#31AA7A',
+          iconName: 'check',
+          titleColor: '#606873',
         };
       case 'error':
         return {
@@ -141,7 +141,7 @@ const ToastItem: React.FC<{
     >
       <View style={styles.toastContent}>
         <View style={styles.iconContainer}>
-          <Icon name={config.iconName} size={24} color={config.iconColor} />
+          <Icon name={config.iconName} size={28} color={config.iconColor} />
         </View>
 
         <View style={styles.textContainer}>
@@ -156,7 +156,10 @@ const ToastItem: React.FC<{
           </Text>
           {toast.message && (
             <Text
-              style={[styles.toastMessage, { fontFamily: Fonts.regular }]}
+              style={[
+                styles.toastMessage,
+                { fontFamily: Fonts.regular, color: '#606873' },
+              ]}
               numberOfLines={2}
             >
               {toast.message}
@@ -283,20 +286,23 @@ const styles = StyleSheet.create({
   },
   toastContent: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
+    alignItems: 'center',
     padding: 16,
   },
   iconContainer: {
     marginRight: 12,
-    marginTop: 2,
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 30,
   },
   textContainer: {
     flex: 1,
     marginRight: 8,
+    marginBottom: 14,
   },
   toastTitle: {
     fontSize: scale(16),
-    marginBottom: 2,
+    lineHeight: scale(22),
   },
   toastMessage: {
     fontSize: scale(14),
