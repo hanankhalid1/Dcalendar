@@ -2,6 +2,7 @@ import axios, { AxiosRequestConfig, AxiosResponse } from 'axios';
 import CryptoJS from 'crypto-js';
 import { useEffect, useRef } from 'react';
 import { useToken } from '../stores/useTokenStore';
+import { useAuthStore } from '../stores/useAuthStore';
 
 
 export const apiClient = axios.create({
@@ -68,6 +69,17 @@ export function useApiClient() {
 		console.log("API Request data:", data);
 		console.log("Current token:", token);
 
+		// Resolve the final request URL for precise logging (helps debug 404s)
+		let resolvedUrl = '';
+		try {
+			// Support both '/path' and 'path' while respecting baseURL
+			const base = apiClient.defaults?.baseURL || '';
+			resolvedUrl = new URL(url, base).toString();
+		} catch (e) {
+			resolvedUrl = `${apiClient.defaults?.baseURL || ''}${url}`;
+		}
+		console.log('🔗 API resolved URL:', resolvedUrl);
+
 		controllerRef.current = new AbortController();
 
 		try {
@@ -93,7 +105,7 @@ export function useApiClient() {
 				...config,
 			});
 
-			console.log(`API ${method} ${url} response:`, response.data);
+			console.log(`API ${method} ${resolvedUrl} response:`, response.data);
 			return response;
 		} catch (error: any) {
 			if (axios.isCancel(error)) {
@@ -102,7 +114,7 @@ export function useApiClient() {
 				console.error('API Error Response:', {
 					status: error.response.status,
 					data: error.response.data,
-					url: error.config?.url,
+					url: resolvedUrl || error.config?.url,
 				});
 			} else {
 				console.error('API Error:', error.message);

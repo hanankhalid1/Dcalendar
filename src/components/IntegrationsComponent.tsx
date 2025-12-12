@@ -56,6 +56,16 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [isLoadingZoom, setIsLoadingZoom] = useState(false);
 
+  // Debug: Log Zoom integration state changes
+  // Debug: Log Zoom integration state changes
+  useEffect(() => {
+    console.log('🔄 Zoom Integration State Updated:', {
+      isConnected: zoomIntegration.isConnected,
+      hasAccessToken: !!zoomIntegration.accessToken,
+      email: zoomIntegration.email,
+    });
+  }, [zoomIntegration]);
+
   // Configure Google Sign-In on mount
   useEffect(() => {
     GoogleSignin.configure({
@@ -325,21 +335,65 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
               username: userName,
             });
 
-            console.log(
-              '✅ Zoom callback response received:',
-              JSON.stringify(callbackResponse.data, null, 2),
-            );
+            console.log('═══════════════════════════════════════════════════');
+            console.log('🔐 ZOOM CALLBACK RESPONSE (COMPLETE):');
+            console.log('═══════════════════════════════════════════════════');
+            console.log(JSON.stringify(callbackResponse.data, null, 2));
+            console.log('═══════════════════════════════════════════════════');
 
             if (callbackResponse.data?.status && callbackResponse.data?.data) {
               const data = callbackResponse.data.data;
 
+              console.log(
+                '═══════════════════════════════════════════════════',
+              );
+              console.log('🎫 TOKEN DETAILS FROM BACKEND:');
+              console.log(
+                '═══════════════════════════════════════════════════',
+              );
+              console.log('access_token:', data.access_token);
+              console.log('accessToken:', data.accessToken);
+              console.log('refresh_token:', data.refresh_token);
+              console.log('refreshToken:', data.refreshToken);
+              console.log('token:', data.token);
+              console.log('zoomToken:', data.zoomToken);
+              console.log('Full data object:', JSON.stringify(data, null, 2));
+              console.log(
+                '═══════════════════════════════════════════════════',
+              );
+
               // Store tokens in state
-              connectZoom({
-                accessToken: data.access_token || data.accessToken,
+              const zoomData = {
+                accessToken:
+                  data.access_token ||
+                  data.accessToken ||
+                  data.token ||
+                  data.zoomToken,
                 refreshToken: data.refresh_token || data.refreshToken,
                 email: data.email || '',
                 fullName: data.fullName || data.full_name || '',
-              });
+              };
+
+              console.log('💾 STORING IN ZUSTAND:');
+              console.log('Token to be stored:', zoomData.accessToken);
+              console.log('Full zoomData:', JSON.stringify(zoomData, null, 2));
+
+              connectZoom(zoomData);
+
+              // Verify state was updated
+              setTimeout(() => {
+                const currentZoomState =
+                  useAuthStore.getState().zoomIntegration;
+                console.log('✅ VERIFIED IN ZUSTAND STORE:');
+                console.log('isConnected:', currentZoomState?.isConnected);
+                console.log(
+                  'accessToken in store:',
+                  currentZoomState?.accessToken,
+                );
+                console.log('email in store:', currentZoomState?.email);
+              }, 100);
+
+              console.log('✅ Zoom state should now be connected');
 
               Alert.alert('Success', 'Zoom connected successfully!');
             } else {
@@ -360,103 +414,31 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
           }
         };
 
-        // Check if InAppBrowser is available
-        if (await InAppBrowser.isAvailable()) {
-          // Set up deep link listener BEFORE opening browser
-          let deepLinkSubscription: any = null;
-          let hasProcessedCallback = false;
+        // Set up deep link listener BEFORE opening browser
+        let deepLinkSubscription: any = null;
+        let hasProcessedCallback = false;
 
-          const handleDeepLink = async (event: { url: string }) => {
-            const url = event.url;
-            console.log('🔗 Deep link received:', url);
+        const handleDeepLink = async (event: { url: string }) => {
+          const url = event.url;
+          console.log('🔗 Deep link received:', url);
 
-            if (
-              url.includes('zoom-callback') ||
-              (url.includes('zoom') && url.includes('code='))
-            ) {
-              if (hasProcessedCallback) return;
-              hasProcessedCallback = true;
+          // Check if this is a Zoom-related deep link
+          if (url.includes('zoom')) {
+            if (hasProcessedCallback) return;
+            hasProcessedCallback = true;
 
-              if (deepLinkSubscription) {
-                deepLinkSubscription.remove();
-              }
-
-              try {
-                InAppBrowser.close();
-
-                // Extract code from URL
-                const urlObj = new URL(url);
-                const params = new URLSearchParams(urlObj.search);
-                const code = params.get('code');
-                const error = params.get('error');
-
-                if (error) {
-                  Alert.alert('Error', `Zoom authentication failed: ${error}`);
-                  setIsLoadingZoom(false);
-                  return;
-                }
-
-                if (code && code !== 'undefined') {
-                  await processZoomCallback(code);
-                }
-              } catch (err) {
-                console.error('❌ Error handling deep link:', err);
-                setIsLoadingZoom(false);
-              }
+            if (deepLinkSubscription) {
+              deepLinkSubscription.remove();
             }
-          };
 
-          deepLinkSubscription = Linking.addEventListener(
-            'url',
-            handleDeepLink,
-          );
-
-          // Use openAuth with deep link redirect
-          // If backend redirects to web URL, we'll need to handle it differently
-          const deepLinkRedirect = 'dcalendar://zoom-callback';
-          const result = await InAppBrowser.openAuth(
-            zoomAuthUrl,
-            deepLinkRedirect,
-            {
-              ephemeralWebSession: false,
-              showTitle: false,
-              enableUrlBarHiding: true,
-              enableDefaultShare: false,
-            },
-          );
-
-          // Remove deep link listener
-          if (deepLinkSubscription) {
-            deepLinkSubscription.remove();
-          }
-
-          console.log(
-            '🔗 InAppBrowser result:',
-            JSON.stringify(result, null, 2),
-          );
-
-          if (result.type === 'cancel') {
-            console.log('❌ User cancelled Zoom OAuth');
-            Alert.alert('Cancelled', 'Zoom connection was cancelled.');
-            setIsLoadingZoom(false);
-            return;
-          }
-
-          if (result.type === 'dismiss') {
-            console.log('❌ Browser was dismissed');
-            setIsLoadingZoom(false);
-            return;
-          }
-
-          // Process the result
-          if (result.type === 'success' && (result as any).url) {
-            const callbackUrl = (result as any).url;
-            console.log('✅ Zoom callback URL received:', callbackUrl);
-
-            // Extract code from callback URL (could be deep link or web URL)
             try {
-              const urlObj = new URL(callbackUrl);
+              InAppBrowser.close();
+
+              // Extract parameters from URL
+              const urlObj = new URL(url);
               const params = new URLSearchParams(urlObj.search);
+              const status = params.get('status');
+              const user = params.get('user');
               const code = params.get('code');
               const error = params.get('error');
 
@@ -466,96 +448,134 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
                 return;
               }
 
+              // Handle status=success from backend redirect (backend stores token)
+              if (status === 'success' && user) {
+                console.log(
+                  '✅ Zoom OAuth successful! Backend has stored the Zoom tokens.',
+                );
+
+                // Backend handles the Zoom token internally
+                // We just need to mark Zoom as connected on the mobile side
+                const zoomData = {
+                  accessToken: 'backend-managed', // Token is stored on backend
+                  refreshToken: 'backend-managed',
+                  email: user || userName || '',
+                  fullName:
+                    user?.split('@')[0] || userName?.split('@')[0] || '',
+                };
+
+                console.log('💾 Storing Zoom connection state:', {
+                  isConnected: true,
+                  email: zoomData.email,
+                  note: 'Backend manages the actual token',
+                });
+
+                connectZoom(zoomData);
+
+                Alert.alert('Success', 'Zoom connected successfully!');
+                setIsLoadingZoom(false);
+                return;
+              }
+
+              // Handle traditional OAuth code flow
               if (code && code !== 'undefined') {
                 await processZoomCallback(code);
-              } else {
-                // No code in URL - this shouldn't happen with proper OAuth flow
-                console.warn('⚠️ No code in callback URL');
-                Alert.alert(
-                  'Error',
-                  'Authorization code not received. Please try again.',
-                );
-                setIsLoadingZoom(false);
               }
-            } catch (urlError) {
-              console.error('❌ Error parsing callback URL:', urlError);
-              Alert.alert('Error', 'Invalid callback URL received.');
+            } catch (err) {
+              console.error('❌ Error handling deep link:', err);
               setIsLoadingZoom(false);
             }
-          } else {
-            // No URL in result - user may have closed browser manually
-            // The backend redirects to web URL, so openAuth doesn't capture it
-            // We need to check connection status or show instructions
-            console.log(
-              '⚠️ No callback URL in result - backend may have processed it',
-            );
-            Alert.alert(
-              'Authorization Complete',
-              "Please check if Zoom connection was successful. If the connection status doesn't update, please try connecting again.",
-              [
-                {
-                  text: 'OK',
-                  onPress: () => {
-                    setIsLoadingZoom(false);
-                  },
-                },
-              ],
-            );
+          }
+        };
+
+        deepLinkSubscription = Linking.addEventListener('url', handleDeepLink);
+
+        // Use openAuth with deep link redirect
+        // If backend redirects to web URL, we'll need to handle it differently
+        const deepLinkRedirect = 'dcalendar://zoom-callback';
+        const result = await InAppBrowser.openAuth(
+          zoomAuthUrl,
+          deepLinkRedirect,
+          {
+            ephemeralWebSession: false,
+            showTitle: false,
+            enableUrlBarHiding: true,
+            enableDefaultShare: false,
+          },
+        );
+
+        // Remove deep link listener
+        if (deepLinkSubscription) {
+          deepLinkSubscription.remove();
+        }
+
+        console.log('🔗 InAppBrowser result:', JSON.stringify(result, null, 2));
+
+        if (result.type === 'cancel') {
+          console.log('❌ User cancelled Zoom OAuth');
+          Alert.alert('Cancelled', 'Zoom connection was cancelled.');
+          setIsLoadingZoom(false);
+          return;
+        }
+
+        if (result.type === 'dismiss') {
+          console.log('❌ Browser was dismissed');
+          setIsLoadingZoom(false);
+          return;
+        }
+
+        // Process the result
+        if (result.type === 'success' && (result as any).url) {
+          const callbackUrl = (result as any).url;
+          console.log('✅ Zoom callback URL received:', callbackUrl);
+
+          // Extract code from callback URL (could be deep link or web URL)
+          try {
+            const urlObj = new URL(callbackUrl);
+            const params = new URLSearchParams(urlObj.search);
+            const code = params.get('code');
+            const error = params.get('error');
+
+            if (error) {
+              Alert.alert('Error', `Zoom authentication failed: ${error}`);
+              setIsLoadingZoom(false);
+              return;
+            }
+
+            if (code && code !== 'undefined') {
+              await processZoomCallback(code);
+            } else {
+              // No code in URL - this shouldn't happen with proper OAuth flow
+              console.warn('⚠️ No code in callback URL');
+              Alert.alert(
+                'Error',
+                'Authorization code not received. Please try again.',
+              );
+              setIsLoadingZoom(false);
+            }
+          } catch (urlError) {
+            console.error('❌ Error parsing callback URL:', urlError);
+            Alert.alert('Error', 'Invalid callback URL received.');
+            setIsLoadingZoom(false);
           }
         } else {
-          // Fallback to regular browser
+          // No URL in result - user may have closed browser manually
+          // The backend redirects to web URL, so openAuth doesn't capture it
+          // We need to check connection status or show instructions
           console.log(
-            '⚠️ InAppBrowser not available, using regular browser...',
+            '⚠️ No callback URL in result - backend may have processed it',
           );
-          await Linking.openURL(zoomAuthUrl);
-
-          // Set up listener for deep link callback
-          const subscription = Linking.addEventListener(
-            'url',
-            async ({ url }) => {
-              if (
-                url.includes('zoom-callback') ||
-                (url.includes('zoom') && url.includes('code='))
-              ) {
-                subscription.remove();
-                console.log('🔗 Zoom callback received via deep link:', url);
-
-                try {
-                  const urlObj = new URL(url);
-                  const params = new URLSearchParams(urlObj.search);
-                  const code = params.get('code');
-
-                  if (code && code !== 'undefined') {
-                    const callbackResponse = await api(
-                      'POST',
-                      '/zoom/callback',
-                      {
-                        code,
-                        username: userName,
-                      },
-                    );
-
-                    if (
-                      callbackResponse.data?.status &&
-                      callbackResponse.data?.data
-                    ) {
-                      const data = callbackResponse.data.data;
-                      connectZoom({
-                        accessToken: data.access_token || data.accessToken,
-                        refreshToken: data.refresh_token || data.refreshToken,
-                        email: data.email || '',
-                        fullName: data.fullName || data.full_name || '',
-                      });
-                      Alert.alert('Success', 'Zoom connected successfully!');
-                    }
-                  }
-                } catch (err) {
-                  console.error('❌ Error handling deep link:', err);
-                } finally {
+          Alert.alert(
+            'Authorization Complete',
+            "Please check if Zoom connection was successful. If the connection status doesn't update, please try connecting again.",
+            [
+              {
+                text: 'OK',
+                onPress: () => {
                   setIsLoadingZoom(false);
-                }
-              }
-            },
+                },
+              },
+            ],
           );
         }
       } catch (browserError: any) {

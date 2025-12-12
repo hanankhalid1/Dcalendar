@@ -85,7 +85,7 @@ const CreateEventScreen = () => {
   const route = useRoute<any>();
   const { mode, eventData: editEventData } = route.params || {};
   const { getUserEvents, setUserEvents, userEvents } = useEventsStore();
-  const { googleIntegration } = useAuthStore();
+  const { googleIntegration, zoomIntegration } = useAuthStore();
   const currentTimezone = useSettingsStore();
   const toast = useToast();
   // Initialize blockchain service and get contract instance
@@ -2213,6 +2213,85 @@ const CreateEventScreen = () => {
         }
       }
 
+      // If Zoom is selected
+      if (eventData.locationType === 'zoom' && zoomIntegration?.isConnected) {
+        console.log('Creating Zoom meeting...');
+        console.log(
+          '🔍 Full Zoom Integration State:',
+          JSON.stringify(zoomIntegration, null, 2),
+        );
+
+        // Validate token exists
+        if (!zoomIntegration.accessToken) {
+          console.error('❌ Zoom access token is missing!');
+          Alert.alert(
+            'Error',
+            'Zoom access token is missing. Please reconnect your Zoom account.',
+          );
+          return; // Don't proceed with event creation if token is missing
+        }
+
+        // ✅ Build Zoom-native payload matching backend requirements
+        const startTime = new Date(selectedStartDate);
+        const endTime = new Date(selectedEndDate);
+        const durationMinutes = Math.round(
+          (endTime.getTime() - startTime.getTime()) / (1000 * 60),
+        );
+
+        const zoomMeeting = {
+          topic: eventData.title || 'New Meeting',
+          start_time: startTime.toISOString(),
+          end_time: endTime.toISOString(),
+          duration: durationMinutes,
+          timezone: 'UTC',
+          userName: activeAccount.userName,
+          type: 'appointment',
+        };
+
+        console.log('📤 Sending to /zoom/meetings with payload:', zoomMeeting);
+        console.log(
+          ' Zoom access token:',
+          zoomIntegration.accessToken.substring(0, 20) + '...',
+        );
+
+        try {
+          //  Call backend API with correct payload structure
+          const response = await api('POST', '/zoom/meetings', zoomMeeting);
+
+          console.log(' Zoom API Response Status:', response.status);
+          console.log('Zoom API Response Data:', response.data);
+
+          // Extract zoom meeting link from response
+          const data = response?.data?.data || response?.data;
+
+          if (data?.join_url || data?.joinUrl || data?.hangoutLink) {
+            const zoomLink = data.join_url || data.joinUrl || data.hangoutLink;
+            console.log('Zoom meeting created via backend:', zoomLink);
+            eventData.location = zoomLink;
+            eventData.meetingEventId = data.id;
+          } else {
+            console.warn(
+              'No Zoom meeting link returned, continuing without it',
+            );
+          }
+        } catch (err: any) {
+          console.error('Zoom meeting creation error:', {
+            status: err.response?.status,
+            statusText: err.response?.statusText,
+            fullUrl: err.config?.url,
+            baseURL: err.config?.baseURL,
+            urlPath: err.config?.url?.replace(err.config?.baseURL, ''),
+            method: err.config?.method,
+            headers: err.config?.headers,
+            message: err.message,
+            data: err.response?.data,
+            requestPayload: err.config?.data,
+          });
+          // Don't fail event creation if Zoom meeting fails - continue with event
+          console.log('Continuing event creation without Zoom meeting');
+        }
+      }
+
       console.log('Active account: ', activeAccount.userName);
       console.log('Create event payload: ', eventData);
       const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
@@ -2264,9 +2343,9 @@ const CreateEventScreen = () => {
             list: eventData.list || [],
           };
           setUserEvents([...userEvents, newEvent]);
-          console.log('✅ Event added optimistically to local state');
+          console.log(' Event added optimistically to local state');
           console.log(
-            '✅ Event list includes guests:',
+            ' Event list includes guests:',
             eventData.list?.filter((item: any) => item.key === 'guest') || [],
           );
         }
@@ -3185,11 +3264,20 @@ const CreateEventScreen = () => {
                     ]}
                     onPress={() => {
                       if (!isLoading) {
-                        setIntegrationType('zoom');
                         setLocation(''); // Clear location when Zoom is selected
                         setLocationError('');
-                        setShowIntegrationModal(true);
                         setShowVideoConferencingOptions(false);
+
+                        // If Zoom is connected, create meeting link directly
+                        if (zoomIntegration.isConnected) {
+                          setSelectedVideoConferencing('zoom');
+                          // Optionally create Zoom meeting link here
+                          // For now, just mark as selected and let the create event handler create it
+                        } else {
+                          // Show integration modal if not connected
+                          setIntegrationType('zoom');
+                          setShowIntegrationModal(true);
+                        }
                       }
                     }}
                     disabled={isLoading}

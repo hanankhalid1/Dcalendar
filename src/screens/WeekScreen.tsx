@@ -1262,6 +1262,92 @@ const WeekScreen = () => {
   }, [currentWeekIndex, weekDates, weekStartDate]);
 
   // Memoized week component for better performance
+  // Memoized DayItem component to prevent unnecessary re-renders
+  const DayItem = React.memo(
+    ({
+      dayStr,
+      dayDate,
+      isSelected,
+      isToday,
+      dayName,
+      dayEvents,
+      dayMarked,
+      onPress,
+    }: any) => {
+      return (
+        <TouchableOpacity
+          style={[
+            styles.weekDayContainer,
+            isSelected && styles.weekDaySelected,
+          ]}
+          onPress={onPress}
+          activeOpacity={0.7}
+        >
+          <Text style={styles.weekDayName}>{dayName}</Text>
+          <View
+            style={[
+              styles.weekDayNumber,
+              isSelected && styles.weekDaySelectedUnderline,
+            ]}
+          >
+            <Text
+              style={[
+                styles.weekDayNumberText,
+                isToday && !isSelected && styles.weekDayNumberTextToday,
+                isSelected && styles.weekDayNumberTextSelected,
+              ]}
+            >
+              {dayDate.getDate()}
+            </Text>
+          </View>
+          <View style={styles.weekDayLinesContainer}>
+            {dayEvents.length > 0
+              ? dayEvents.map((event: any, idx: number) => {
+                  const lineColor = event.isTask ? '#8DC63F' : '#00AEEF';
+                  return (
+                    <View
+                      key={`${event.uid}-${idx}`}
+                      style={[
+                        styles.weekDayLine,
+                        { backgroundColor: lineColor },
+                      ]}
+                    />
+                  );
+                })
+              : dayMarked && dayMarked.periods && dayMarked.periods.length > 0
+              ? dayMarked.periods.map((period: any, idx: number) => {
+                  const matchingEvent = dayEvents.find(
+                    (e: any) => e.color === period.color,
+                  );
+                  const isTask = matchingEvent ? matchingEvent.isTask : false;
+                  const lineColor = isTask
+                    ? '#8DC63F'
+                    : period.color || '#00AEEF';
+                  return (
+                    <View
+                      key={idx}
+                      style={[
+                        styles.weekDayLine,
+                        { backgroundColor: lineColor },
+                      ]}
+                    />
+                  );
+                })
+              : null}
+          </View>
+        </TouchableOpacity>
+      );
+    },
+    (prevProps, nextProps) => {
+      return (
+        prevProps.dayStr === nextProps.dayStr &&
+        prevProps.isSelected === nextProps.isSelected &&
+        prevProps.isToday === nextProps.isToday &&
+        prevProps.dayEvents.length === nextProps.dayEvents.length
+      );
+    },
+  );
+
   const WeekRow = React.memo(
     ({
       weekStart,
@@ -1271,97 +1357,59 @@ const WeekScreen = () => {
       firstDayNumber,
       onDayPress,
     }: any) => {
-      const days = [];
-      const weekStartStr = formatDate(weekStart);
-
-      // Get day names based on firstDay
       const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
       const reorderedDayNames = [
         ...dayNames.slice(firstDayNumber),
         ...dayNames.slice(0, firstDayNumber),
       ];
+      const todayStr = formatDate(new Date());
 
-      for (let i = 0; i < 7; i++) {
-        const dayDate = new Date(weekStart);
-        dayDate.setDate(weekStart.getDate() + i);
-        const dayStr = formatDate(dayDate);
-        const isSelected = dayStr === selectedDateString;
-        const isToday = dayStr === formatDate(new Date());
-        const dayMarked = markedDates[dayStr];
-        const dayEvents = eventsByDate[dayStr] || [];
+      const days = useMemo(() => {
+        const result = [];
+        for (let i = 0; i < 7; i++) {
+          const dayDate = new Date(weekStart);
+          dayDate.setDate(weekStart.getDate() + i);
+          const dayStr = formatDate(dayDate);
+          const isSelected = dayStr === selectedDateString;
+          const isToday = dayStr === todayStr;
+          const dayMarked = markedDates[dayStr];
+          const dayEvents = eventsByDate[dayStr] || [];
 
-        days.push(
-          <TouchableOpacity
-            key={dayStr}
-            style={[
-              styles.weekDayContainer,
-              isSelected && styles.weekDaySelected,
-            ]}
-            onPress={() =>
-              onDayPress({ dateString: dayStr, timestamp: dayDate.getTime() })
-            }
-          >
-            <Text style={styles.weekDayName}>
-              {reorderedDayNames[i].charAt(0)}
-            </Text>
-            <View
-              style={[
-                styles.weekDayNumber,
-                isSelected && styles.weekDaySelectedUnderline,
-              ]}
-            >
-              <Text
-                style={[
-                  styles.weekDayNumberText,
-                  isToday && !isSelected && styles.weekDayNumberTextToday,
-                  isSelected && styles.weekDayNumberTextSelected,
-                ]}
-              >
-                {dayDate.getDate()}
-              </Text>
-            </View>
-            {/* Event/Task lines - stacked vertically under date */}
-            <View style={styles.weekDayLinesContainer}>
-              {dayEvents.length > 0
-                ? dayEvents.map((event: any, idx: number) => {
-                    const lineColor = event.isTask ? '#8DC63F' : '#00AEEF';
-                    return (
-                      <View
-                        key={`${event.uid}-${idx}`}
-                        style={[
-                          styles.weekDayLine,
-                          { backgroundColor: lineColor },
-                        ]}
-                      />
-                    );
-                  })
-                : dayMarked && dayMarked.periods && dayMarked.periods.length > 0
-                ? dayMarked.periods.map((period: any, idx: number) => {
-                    // Check if any event for this date with this color is a task
-                    const matchingEvent = dayEvents.find(
-                      (e: any) => e.color === period.color,
-                    );
-                    const isTask = matchingEvent ? matchingEvent.isTask : false;
-                    const lineColor = isTask
-                      ? '#8DC63F'
-                      : period.color || '#00AEEF';
-                    return (
-                      <View
-                        key={idx}
-                        style={[
-                          styles.weekDayLine,
-                          { backgroundColor: lineColor },
-                        ]}
-                      />
-                    );
-                  })
-                : null}
-            </View>
-          </TouchableOpacity>,
-        );
-      }
+          result.push(
+            <DayItem
+              key={dayStr}
+              dayStr={dayStr}
+              dayDate={dayDate}
+              isSelected={isSelected}
+              isToday={isToday}
+              dayName={reorderedDayNames[i].charAt(0)}
+              dayEvents={dayEvents}
+              dayMarked={dayMarked}
+              onPress={() =>
+                onDayPress({ dateString: dayStr, timestamp: dayDate.getTime() })
+              }
+            />,
+          );
+        }
+        return result;
+      }, [
+        weekStart,
+        selectedDateString,
+        todayStr,
+        markedDates,
+        eventsByDate,
+        reorderedDayNames,
+        onDayPress,
+      ]);
 
       return <View style={styles.weekRow}>{days}</View>;
+    },
+    (prevProps, nextProps) => {
+      return (
+        prevProps.weekStart.getTime() === nextProps.weekStart.getTime() &&
+        prevProps.selectedDateString === nextProps.selectedDateString &&
+        prevProps.firstDayNumber === nextProps.firstDayNumber
+      );
     },
   );
 
@@ -1561,6 +1609,11 @@ const WeekScreen = () => {
               offset: Dimensions.get('window').width * index,
               index,
             })}
+            removeClippedSubviews={true}
+            initialNumToRender={3}
+            maxToRenderPerBatch={2}
+            windowSize={5}
+            updateCellsBatchingPeriod={50}
           />
         </View>
 
