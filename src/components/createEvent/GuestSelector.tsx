@@ -61,25 +61,25 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
 
     setIsLoading(true);
     setError(null);
-    console.log("Loading contacts for user:", account?.userName);
+    console.log('Loading contacts for user:', account?.userName);
 
     try {
       const result = await getAllContacts(account?.userName);
-      console.log("Contact result:", result);
-      
+      console.log('Contact result:', result);
+
       if (result.success && Array.isArray(result.data)) {
         setGuests(result.data);
-        console.log("Loaded contacts:", result.data.length);
+        console.log('Loaded contacts:', result.data.length);
       } else {
         setError(result.error || 'Failed to load contacts');
         setGuests([]);
-        console.error("Failed to load contacts:", result.error);
+        console.error('Failed to load contacts:', result.error);
       }
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Unknown error';
       setError(errorMessage);
       setGuests([]);
-      console.error("Error loading contacts:", err);
+      console.error('Error loading contacts:', err);
     } finally {
       setIsLoading(false);
     }
@@ -105,7 +105,8 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
       guest.username.toLowerCase().includes(normalizedQuery),
   );
   const hasSearchTerm = normalizedQuery.length > 0;
-  const hasNoResults = hasSearchTerm && filteredGuests.length === 0 && guests.length > 0;
+  const hasNoResults =
+    hasSearchTerm && filteredGuests.length === 0 && guests.length > 0;
   // Allow adding if guests are selected, even if current search has no results
   const isAddDisabled = selectedGuests.length === 0 || disabled;
   return (
@@ -148,14 +149,16 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
             </View>
 
             {/* Search Bar */}
-            <View style={[
-              styles.searchContainer,
-              hasNoResults && styles.searchContainerError,
-            ]}>
-              <FeatherIcon 
-                name="search" 
-                size={20} 
-                color={hasNoResults ? "#EF4444" : "#6C6C6C"} 
+            <View
+              style={[
+                styles.searchContainer,
+                hasNoResults && styles.searchContainerError,
+              ]}
+            >
+              <FeatherIcon
+                name="search"
+                size={20}
+                color={hasNoResults ? '#EF4444' : '#6C6C6C'}
               />
               <TextInput
                 style={[
@@ -169,15 +172,6 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                 editable={!disabled}
               />
             </View>
-            
-            {/* Error Message for No Guest Found */}
-            {hasNoResults && (
-              <View style={styles.errorMessageContainer}>
-                <Text style={styles.errorMessageText}>
-                  No such guest found.
-                </Text>
-              </View>
-            )}
 
             {/* Guest List */}
             {isLoading ? (
@@ -197,18 +191,15 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
             ) : filteredGuests.length === 0 ? (
               <View style={styles.emptyContainer}>
                 {hasSearchTerm ? (
-                  <View style={styles.errorContainer}>
-                    <Text style={styles.errorText}>
-                      No such guest found
-                    </Text>
+                  <View style={styles.noResultsContainer}>
+                    <Text style={styles.errorText}>No such guest found</Text>
                     <Text style={styles.errorSubtext}>
-                      Please check the spelling or try searching by email or username.
+                      Please check the spelling or try searching by \n email or
+                      username.
                     </Text>
                   </View>
                 ) : (
-                  <Text style={styles.emptyText}>
-                    No contacts available
-                  </Text>
+                  <Text style={styles.emptyText}>No contacts available</Text>
                 )}
               </View>
             ) : (
@@ -224,46 +215,48 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                     style={styles.guestItem}
                     onPress={() => onGuestSelect(item.email)}
                   >
-                  <View style={styles.guestInfo}>
-                    {/* Avatar */}
-                    <View style={styles.guestAvatar}>
-                      {item.avatar ? (
-                        <Image
-                          source={{ uri: item.avatar }}
-                          style={styles.avatarImage}
-                        />
-                      ) : (
-                        <View style={styles.avatarInitials}>
-                          <Text style={styles.avatarInitialsText}>
-                            {item.name
-                              .split(' ')
-                              .map(n => n[0])
-                              .join('')}
-                          </Text>
-                        </View>
+                    <View style={styles.guestInfo}>
+                      {/* Avatar */}
+                      <View style={styles.guestAvatar}>
+                        {item.avatar ? (
+                          <Image
+                            source={{ uri: item.avatar }}
+                            style={styles.avatarImage}
+                          />
+                        ) : (
+                          <View style={styles.avatarInitials}>
+                            <Text style={styles.avatarInitialsText}>
+                              {item.name
+                                .split(' ')
+                                .map(n => n[0])
+                                .join('')}
+                            </Text>
+                          </View>
+                        )}
+                      </View>
+
+                      {/* Name and Username */}
+                      <View style={styles.guestDetails}>
+                        <Text style={styles.guestName}>{item.name}</Text>
+                        <Text style={styles.guestUsername}>
+                          @{item.username}
+                        </Text>
+                      </View>
+                    </View>
+
+                    {/* Checkbox */}
+                    <View
+                      style={[
+                        styles.checkbox,
+                        selectedGuests.includes(item.email) &&
+                          styles.checkboxSelected,
+                      ]}
+                    >
+                      {selectedGuests.includes(item.email) && (
+                        <FeatherIcon name="check" size={14} color="white" />
                       )}
                     </View>
-
-                    {/* Name and Username */}
-                    <View style={styles.guestDetails}>
-                      <Text style={styles.guestName}>{item.name}</Text>
-                      <Text style={styles.guestUsername}>@{item.username}</Text>
-                    </View>
-                  </View>
-
-                  {/* Checkbox */}
-                  <View
-                    style={[
-                      styles.checkbox,
-                      selectedGuests.includes(item.email) &&
-                        styles.checkboxSelected,
-                    ]}
-                  >
-                    {selectedGuests.includes(item.email) && (
-                      <FeatherIcon name="check" size={14} color="white" />
-                    )}
-                  </View>
-                </TouchableOpacity>
+                  </TouchableOpacity>
                 )}
               />
             )}
@@ -535,6 +528,10 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
     fontFamily: Fonts.latoMedium,
   },
+  noResultsContainer: {
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
   emptySubtext: {
     fontSize: fontSize.textSize14,
     color: '#6B7280',
@@ -542,9 +539,11 @@ const styles = StyleSheet.create({
   },
   errorSubtext: {
     fontSize: fontSize.textSize14,
-    color: '#EF4444',
+    color: '#9CA3AF',
     textAlign: 'center',
-    marginTop: spacing.xs,
+    marginTop: spacing.sm,
+    lineHeight: 20,
+    paddingHorizontal: spacing.md,
   },
 });
 

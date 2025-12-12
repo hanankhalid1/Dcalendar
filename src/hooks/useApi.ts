@@ -14,9 +14,24 @@ export const apiClient = axios.create({
 	timeout: 15000,
 });
 
-// Helper function to generate HMAC token for x-api-token header
-export const generateOpenApiToken = (data: string, secret: string): string => {
-	return CryptoJS.HmacSHA256(data, secret).toString();
+// Helper function to generate OpenAPI token (JWT-style) matching web implementation
+export const generateOpenApiToken = (secretKey: string): string => {
+	// Create payload
+	const payload = {
+		iat: Math.floor(Date.now() / 1000), // Issued at
+		exp: Math.floor(Date.now() / 1000) + 60 * 60, // Expires in 1 hour
+		iss: 'dcalendar', // Issuer identifier
+	};
+
+	// Convert payload to base64 using CryptoJS (React Native compatible)
+	const payloadString = JSON.stringify(payload);
+	const payloadBase64 = CryptoJS.enc.Base64.stringify(CryptoJS.enc.Utf8.parse(payloadString));
+
+	// Generate signature using HMAC-SHA256
+	const signature = CryptoJS.HmacSHA256(payloadBase64, secretKey).toString();
+
+	// Return token in format: payload.signature
+	return `${payloadBase64}.${signature}`;
 };
 
 // Add request interceptor for token
@@ -64,10 +79,12 @@ export function useApiClient() {
 		url: string,
 		data?: any,
 		config?: AxiosRequestConfig,
+		tokenType: 'bearer' | 'api' = 'bearer', // Add token type parameter
 	): Promise<AxiosResponse<T>> => {
-		const token = useToken.getState().token;
+		const bearerToken = useToken.getState().token;
 		console.log("API Request data:", data);
-		console.log("Current token:", token);
+		console.log("Current bearer token:", bearerToken);
+		console.log("Token type:", tokenType);
 
 		// Resolve the final request URL for precise logging (helps debug 404s)
 		let resolvedUrl = '';
@@ -88,9 +105,17 @@ export function useApiClient() {
 				'Content-Type': 'application/json',
 			};
 
-			// Add Bearer token if available (for authenticated requests)
-			if (token && url !== 'login') {
-				headers.Authorization = `Bearer ${token}`;
+			// Add appropriate token based on token type
+			if (tokenType === 'api') {
+				// Import Config at runtime to avoid circular dependencies
+				const Config = require('../config').default;
+				const apiToken = generateOpenApiToken(Config.CRYPTO_SECRET);
+				headers['x-api-token'] = apiToken;
+				console.log('🔑 Using API token authentication');
+			} else if (bearerToken && url !== 'login') {
+				// Add Bearer token for authenticated requests
+				headers.Authorization = `Bearer ${bearerToken}`;
+				console.log('🔑 Using Bearer token authentication');
 			}
 
 			// For login requests, we don't need Bearer token

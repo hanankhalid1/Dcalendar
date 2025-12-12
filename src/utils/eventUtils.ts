@@ -111,6 +111,9 @@ export const buildEventMetadata = (
   if (eventData.locationType == "google") {
     metadata.push({ key: 'locationType', value: eventData.locationType });
     metadata.push({ key: 'meetingEventId', value: eventData.meetingEventId });
+  } else if (eventData.locationType == "zoom") {
+    metadata.push({ key: 'locationType', value: eventData.locationType });
+    metadata.push({ key: 'meetingEventId', value: eventData.meetingEventId });
   } else if (eventData.locationType == "inperson") {
     metadata.push({ key: 'locationType', value: 'inperson' });
   }
