@@ -209,7 +209,11 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
 
     return (
       <View style={styles.detailRow}>
-        <View style={styles.iconWrapper}>{getIconComponent()}</View>
+        <View style={styles.iconWrapper}>
+          <View style={styles.iconContainer}>
+            {getIconComponent()}
+          </View>
+        </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>
             {isGoogleMeet ? 'Google Meet' : isZoom ? 'Zoom' : 'Meeting Link'}
@@ -489,9 +493,10 @@ const styles = StyleSheet.create({
   meetingLinkText: {
     fontSize: moderateScale(14),
     fontFamily: Fonts.latoRegular,
-    color: Colors.primaryblue,
+    color: '#0B6DE0',
     flex: 1,
     marginRight: scaleWidth(8),
+    lineHeight: moderateScale(20),
   },
   copyButton: {
     padding: scaleWidth(4),
