@@ -1599,11 +1599,12 @@ const WeekScreen = () => {
             renderItem={renderWeekItem}
             keyExtractor={(item, index) => `week-${index}-${item.getTime()}`}
             horizontal
-            pagingEnabled
+            pagingEnabled={false}
             scrollEventThrottle={16}
             onMomentumScrollEnd={handleWeekScroll}
             showsHorizontalScrollIndicator={false}
             scrollEnabled={false}
+            nestedScrollEnabled={false}
             getItemLayout={(data, index) => ({
               length: Dimensions.get('window').width,
               offset: Dimensions.get('window').width * index,
