@@ -19,7 +19,7 @@ import Share from 'react-native-share';
 
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
 
-import { useRoute } from '@react-navigation/native';
+import { useRoute, useNavigation } from '@react-navigation/native';
 
 import Header from '../components/Header';
 
@@ -28,6 +28,8 @@ import { Fonts } from '../constants/Fonts';
 import { Colors } from '../constants/Colors';
 
 import { useSettingsStore } from '../stores/useSetting';
+
+import { Screen } from '../navigations/appNavigation.type';
 
 import { BlockchainService } from '../services/BlockChainService';
 
@@ -42,6 +44,10 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { useToken } from '../stores/useTokenStore';
 
 import { useActiveAccount } from '../stores/useActiveAccount';
+
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+import LogoutConfirmModal from '../components/LogoutConfirmModal';
 
 import RNFS from 'react-native-fs';
 
@@ -538,6 +544,7 @@ const TimeZoneModal = ({
 
 const SettingsScreen = () => {
   const route = useRoute<any>();
+  const navigation = useNavigation<any>();
 
   const { expandIntegration } = route.params || {};
 
@@ -549,11 +556,15 @@ const SettingsScreen = () => {
 
   const [settings, setSettings] = useState<any[]>([]);
 
-  const { userEvents: events } = useEventsStore();
+  const { userEvents: events, clearAllEventsData } = useEventsStore();
 
-  const { account } = useActiveAccount();
+  const { account, setAccount } = useActiveAccount();
+
+  const { clearToken } = useToken();
 
   const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+
+  const [logoutModalVisible, setLogoutModalVisible] = useState(false);
 
   // Custom Alert State
 
@@ -592,6 +603,38 @@ const SettingsScreen = () => {
   const { api } = useApiClient();
 
   const token = useToken(state => state.token);
+
+  // Logout handler with confirmation
+  const handleLogout = () => {
+    setLogoutModalVisible(true);
+  };
+
+  const confirmLogout = async () => {
+    try {
+      setLogoutModalVisible(false);
+      console.log('🚪 Logging out user...');
+
+      // Clear events data
+      await clearAllEventsData();
+
+      // Clear all state stores - these will persist the cleared state to AsyncStorage
+      setAccount(null);
+      clearToken();
+
+      // Clear all AsyncStorage data to ensure clean logout
+      await AsyncStorage.clear();
+
+      console.log('✅ Logout complete, navigating to WalletScreen');
+
+      // Reset navigation stack to WalletScreen
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Wallet' }],
+      });
+    } catch (error) {
+      console.error('❌ Logout error:', error);
+    }
+  };
 
   useEffect(() => {
     const fetchSettings = async () => {
@@ -1044,7 +1087,7 @@ const SettingsScreen = () => {
             <SettingRow
               title="About app"
               hasRightArrow={true}
-              onPress={() => {}}
+              onPress={() => navigation.navigate(Screen.AboutAppScreen)}
             />
           </View>
           <View style={[styles.card, { marginTop: spacing.xs }]}>
@@ -1054,8 +1097,24 @@ const SettingsScreen = () => {
               onPress={() => {}}
             />
           </View>
+          <View style={[styles.card, { marginTop: spacing.xs }]}>
+            <TouchableOpacity
+              style={styles.logoutRow}
+              onPress={handleLogout}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.logoutText}>Log out</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </ScrollView>
+
+      {/* Logout Confirmation Modal */}
+      <LogoutConfirmModal
+        visible={logoutModalVisible}
+        onCancel={() => setLogoutModalVisible(false)}
+        onConfirm={confirmLogout}
+      />
 
       <DaySelectionModal
         visible={showDayModal}
@@ -1433,6 +1492,20 @@ const styles = StyleSheet.create({
     color: Colors.white,
 
     textAlignVertical: 'center',
+  },
+
+  logoutRow: {
+    paddingVertical: scaleHeight(16),
+    paddingHorizontal: scaleWidth(20),
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+
+  logoutText: {
+    fontSize: fontSize.textSize16,
+    color: '#FF3B30', // Red color for logout
+    fontFamily: Fonts.regular,
+    fontWeight: '400',
   },
 });
 

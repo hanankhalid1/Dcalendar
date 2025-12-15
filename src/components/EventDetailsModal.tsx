@@ -210,9 +210,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     return (
       <View style={styles.detailRow}>
         <View style={styles.iconWrapper}>
-          <View style={styles.iconContainer}>
-            {getIconComponent()}
-          </View>
+          <View style={styles.iconContainer}>{getIconComponent()}</View>
         </View>
         <View style={styles.detailContent}>
           <Text style={styles.detailLabel}>
