@@ -1603,7 +1603,7 @@ const WeekScreen = () => {
             scrollEventThrottle={16}
             onMomentumScrollEnd={handleWeekScroll}
             showsHorizontalScrollIndicator={false}
-            scrollEnabled={true}
+            scrollEnabled={false}
             getItemLayout={(data, index) => ({
               length: Dimensions.get('window').width,
               offset: Dimensions.get('window').width * index,
