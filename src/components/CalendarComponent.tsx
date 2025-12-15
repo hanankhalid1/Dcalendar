@@ -1,5 +1,5 @@
 import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, memo } from 'react';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../stores/useSetting';
@@ -472,7 +472,7 @@ const CalendarComponent: React.FC<CalendarComponentProps> = ({
   );
 };
 
-export default CalendarComponent;
+export default memo(CalendarComponent);
 
 const styles = StyleSheet.create({
   container: {

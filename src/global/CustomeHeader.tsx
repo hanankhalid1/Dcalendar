@@ -5,18 +5,24 @@ import {
   StyleSheet,
   Text,
   TouchableOpacity,
-  View
+  View,
+  Modal,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import AntDesign from 'react-native-vector-icons/AntDesign';
 import Feather from 'react-native-vector-icons/Feather';
 import FontAwesome6 from 'react-native-vector-icons/FontAwesome6';
 import DIcon from '../assets/svgs/DIcon.svg';
-import SearchIcon from '../assets/svgs/search.svg';
 import CalendarIcon from '../assets/svgs/calendarBlack.svg';
+import CalendarComponent from '../components/CalendarComponent';
 import MenuIcon from '../assets/svgs/menu.svg';
 import { Fonts } from '../constants/Fonts';
-import { moderateScale, scaleHeight, scaleWidth, screenWidth } from '../utils/dimensions';
+import {
+  moderateScale,
+  scaleHeight,
+  scaleWidth,
+  screenWidth,
+} from '../utils/dimensions';
 import {
   borderRadius,
   colors,
@@ -42,6 +48,8 @@ interface HeaderProps {
   onViewPress?: () => void;
   onViewSelect?: (view: string) => void;
   filterType?: EventFilter; // Add this prop
+  onCalendarDateSelect?: (date: Date) => void;
+  currentDate?: Date;
 }
 
 const CustomeHeader: React.FC<HeaderProps> = ({
@@ -59,10 +67,13 @@ const CustomeHeader: React.FC<HeaderProps> = ({
   onViewPress,
   onViewSelect,
   filterType = 'All', // Default value
+  onCalendarDateSelect,
+  currentDate = new Date(),
 }) => {
   // Dropdown states
   const [isMonthDropdownVisible, setIsMonthDropdownVisible] = useState(false);
   const [isViewDropdownVisible, setIsViewDropdownVisible] = useState(false);
+  const [isCalendarModalVisible, setIsCalendarModalVisible] = useState(false);
 
   // Selected values - use props if available, otherwise fallback to state
   const [selectedMonth, setSelectedMonth] = useState(currentMonth);
@@ -74,8 +85,18 @@ const CustomeHeader: React.FC<HeaderProps> = ({
 
   // Dropdown data
   const months = [
-    'January', 'February', 'March', 'April', 'May', 'June',
-    'July', 'August', 'September', 'October', 'November', 'December',
+    'January',
+    'February',
+    'March',
+    'April',
+    'May',
+    'June',
+    'July',
+    'August',
+    'September',
+    'October',
+    'November',
+    'December',
   ];
   const views = ['Day', 'Week', 'Month'];
 
@@ -147,24 +168,17 @@ const CustomeHeader: React.FC<HeaderProps> = ({
           </View>
         </View>
 
-        {/* Right Section - Search and Calendar Icons */}
+        {/* Right Section - Calendar Icon */}
         <View style={styles.rightSection}>
           <TouchableOpacity
             style={styles.iconButton}
             activeOpacity={0.7}
             hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
-          >
-            <SearchIcon width={24} height={24} />
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.iconButton}
-            activeOpacity={0.7}
-            hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            onPress={() => setIsCalendarModalVisible(true)}
           >
             <CalendarIcon width={24} height={24} />
           </TouchableOpacity>
         </View>
-
       </View>
 
       {/* Backdrop for dropdown */}
@@ -176,6 +190,34 @@ const CustomeHeader: React.FC<HeaderProps> = ({
         />
       )}
 
+      {/* Calendar Modal */}
+      <Modal
+        visible={isCalendarModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setIsCalendarModalVisible(false)}
+      >
+        <View style={styles.calendarModalOverlay}>
+          <View style={styles.calendarModalContent}>
+            <View style={styles.calendarModalHeader}>
+              <Text style={styles.calendarModalTitle}>Select Date</Text>
+              <TouchableOpacity
+                onPress={() => setIsCalendarModalVisible(false)}
+                style={styles.calendarCloseButton}
+              >
+                <AntDesign name="close" size={24} color={colors.blackText} />
+              </TouchableOpacity>
+            </View>
+            <CalendarComponent
+              selectedDate={currentDate}
+              onDateSelect={(date: Date) => {
+                onCalendarDateSelect?.(date);
+                setIsCalendarModalVisible(false);
+              }}
+            />
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 };
@@ -356,7 +398,7 @@ const styles = StyleSheet.create({
   },
 
   // Dropdown Styles
-   dropdownArrow: {
+  dropdownArrow: {
     width: 12,
     height: 8,
     marginTop: 4,
@@ -409,6 +451,38 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: Fonts.latoBold,
     color: colors.primary || '#00AEEF',
+  },
+  calendarModalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  calendarModalContent: {
+    backgroundColor: colors.white,
+    borderRadius: borderRadius.lg,
+    padding: spacing.md,
+    width: '85%',
+    maxWidth: 400,
+    ...shadows.md,
+  },
+  calendarModalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.grey20,
+  },
+  calendarModalTitle: {
+    fontSize: fontSize.textSize18,
+    fontWeight: '600',
+    fontFamily: Fonts.latoBold,
+    color: colors.blackText,
+  },
+  calendarCloseButton: {
+    padding: spacing.xs,
   },
 });
 

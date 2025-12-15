@@ -21,6 +21,7 @@ import CalendarComponent from './CalendarComponent';
 import { ScrollView } from 'react-native';
 import MenuIcon from '../assets/svgs/menu.svg';
 import CalendarIconHeader from '../assets/svgs/calendarBlack.svg';
+import DIcon from '../assets/svgs/DIcon.svg';
 import Icon from 'react-native-vector-icons/AntDesign';
 import { Fonts } from '../constants/Fonts';
 // import CalendarIconHeader from '../assets/svgs/calendarHeader.svg';
@@ -33,6 +34,8 @@ interface WeekHeaderProps {
   onDateSelect?: (date: Date) => void;
   currentDate?: Date;
   selectedDate?: Date | null;
+  showBranding?: boolean; // Show DCalendar branding (only for Schedule screen)
+  showMonthSelector?: boolean; // Show month selector (hide in Schedule screen)
 }
 
 const WeekHeader: React.FC<WeekHeaderProps> = ({
@@ -43,11 +46,12 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
   onDateSelect,
   currentDate,
   selectedDate,
+  showBranding = false,
+  showMonthSelector = true,
 }) => {
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [isMonthDropdownVisible, setIsMonthDropdownVisible] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
-  const calendarKeyRef = useRef(0);
 
   const monthNames = [
     'January',
@@ -91,8 +95,6 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
           currentDate.getMonth() + 1
         }/${currentDate.getDate()}/${currentDate.getFullYear()}`,
       });
-      // Increment the key to force CalendarComponent to remount with latest date
-      calendarKeyRef.current += 1;
     }
     setIsCalendarVisible(!isCalendarVisible);
     onMonthPress();
@@ -165,13 +167,6 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
           currentDate.getMonth() + 1
         }/${currentDate.getDate()}/${currentDate.getFullYear()}`,
       });
-      // Increment key to force CalendarComponent remount if calendar is visible
-      if (isCalendarVisible) {
-        calendarKeyRef.current += 1;
-        console.log(
-          'WeekHeader: Updated calendar key because currentDate changed and calendar is visible',
-        );
-      }
     }
   }, [
     currentDate?.getFullYear(),
@@ -209,29 +204,38 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
           isMonthDropdownVisible && styles.headerNoBorder, // Remove shadow when dropdown is open
         ]}
       >
-        {/* Left Section - Menu Icon and Month Component */}
+        {/* Left Section - Logo and Month Component */}
         <View style={styles.leftSection}>
           {/* Hamburger Menu */}
           <TouchableOpacity style={styles.menuButton} onPress={onMenuPress}>
-            {/* <MenuIcon width={24} height={24} /> */}
             <MenuIcon width={24} height={24} />
           </TouchableOpacity>
 
-          {/* Month Selector */}
-          <View style={styles.monthSelectorContainer}>
-            <TouchableOpacity
-              style={styles.monthSelector}
-              onPress={handleMonthNamePress}
-            >
-              <Text style={styles.monthText}>{currentMonth}</Text>
-              <Icon
-                name={isMonthDropdownVisible ? 'caretup' : 'caretdown'}
-                size={12}
-                color="#181D27"
-                style={styles.dropdownArrow}
-              />
-            </TouchableOpacity>
-          </View>
+          {/* DCalendar Branding - Only show in Schedule screen */}
+          {showBranding && (
+            <View style={styles.logoContainer}>
+              <DIcon width={scaleWidth(24)} height={scaleHeight(24)} />
+              <Text style={styles.logoText}>DCalendar</Text>
+            </View>
+          )}
+
+          {/* Month Selector - Hidden in Schedule screen */}
+          {showMonthSelector && (
+            <View style={styles.monthSelectorContainer}>
+              <TouchableOpacity
+                style={styles.monthSelector}
+                onPress={handleMonthNamePress}
+              >
+                <Text style={styles.monthText}>{currentMonth}</Text>
+                <Icon
+                  name={isMonthDropdownVisible ? 'caretup' : 'caretdown'}
+                  size={12}
+                  color="#181D27"
+                  style={styles.dropdownArrow}
+                />
+              </TouchableOpacity>
+            </View>
+          )}
         </View>
 
         {/* Right Section - Calendar Icon */}
@@ -464,9 +468,7 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
       {isCalendarVisible && currentDate && (
         <View style={styles.calendarContainer}>
           <CalendarComponent
-            key={`calendar-${currentDate.getFullYear()}-${currentDate.getMonth()}-${currentDate.getDate()}-${
-              calendarKeyRef.current
-            }-${isCalendarVisible}`}
+            key={`calendar-${currentDate.getFullYear()}-${currentDate.getMonth()}`}
             onDateSelect={handleDateSelect}
             currentDate={currentDate}
             selectedDate={selectedDate}
@@ -515,6 +517,18 @@ const styles = StyleSheet.create({
   menuIcon: {
     width: 24,
     height: 24,
+  },
+  logoContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: spacing.md,
+  },
+  logoText: {
+    fontSize: fontSize.textSize18,
+    fontWeight: '600',
+    fontFamily: Fonts.latoBold,
+    color: colors.blackText,
+    marginLeft: spacing.xs,
   },
   monthSelectorContainer: {
     position: 'relative',

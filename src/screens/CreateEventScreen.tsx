@@ -2051,6 +2051,123 @@ const CreateEventScreen = () => {
         }
       }
 
+      // ✅ If Zoom is selected and user is connected to Zoom
+      if (eventData.locationType === 'zoom' && zoomIntegration?.isConnected) {
+        console.log('Updating Zoom meeting...');
+        console.log(
+          '🔍 Full Zoom Integration State:',
+          JSON.stringify(zoomIntegration, null, 2),
+        );
+
+        // Validate token exists
+        if (!zoomIntegration.accessToken) {
+          console.error('❌ Zoom access token is missing!');
+          Alert.alert(
+            'Error',
+            'Zoom access token is missing. Please reconnect your Zoom account.',
+          );
+          return; // Don't proceed with event update if token is missing
+        }
+
+        // ✅ Build Zoom update payload - same structure as create, but with meetingId
+        const startTime = new Date(selectedStartDate);
+        const endTime = new Date(selectedEndDate);
+        const durationMinutes = Math.round(
+          (endTime.getTime() - startTime.getTime()) / (1000 * 60),
+        );
+
+        const zoomMeetingUpdate = {
+          topic: eventData.title || 'Updated Meeting',
+          start_time: startTime.toISOString(),
+          duration: durationMinutes,
+          timezone: 'UTC',
+          userName: activeAccount.userName,
+          type: 'appointment',
+          meetingId: eventData.meetingEventId, // Use existing meeting ID for update
+        };
+
+        console.log(
+          '📤 Sending to /zoom/meetings with payload:',
+          zoomMeetingUpdate,
+        );
+        console.log(
+          '🔑 Zoom access token:',
+          zoomIntegration.accessToken.substring(0, 20) + '...',
+        );
+
+        try {
+          // ✅ Call backend API to update Zoom meeting (same endpoint as create)
+          const response = await api(
+            'POST',
+            '/zoom/meetings',
+            zoomMeetingUpdate,
+            undefined,
+            'api',
+          );
+
+          console.log('✅ Zoom API Update Response Status:', response.status);
+          console.log('✅ Zoom API Update Response Data:', response.data);
+
+          // Extract zoom meeting link from response
+          const data = response?.data?.data || response?.data;
+
+          if (data?.join_url || data?.joinUrl) {
+            const zoomLink = data.join_url || data.joinUrl;
+            console.log('✅ Zoom meeting updated via backend:', zoomLink);
+            eventData.location = zoomLink;
+            eventData.meetingEventId = data.id || eventData.meetingEventId;
+
+            // ✅ Rebuild metadata list to include the updated Zoom meeting link
+            console.log(
+              '🔄 Rebuilding metadata with updated Zoom meeting link',
+            );
+            const updatedMetadataList = buildEventMetadata(
+              eventData as any,
+              null,
+            );
+
+            // Replace location-related items in the list with updated ones
+            let updatedList = eventData.list.filter(
+              (item: any) =>
+                item.key !== 'location' &&
+                item.key !== 'locationType' &&
+                item.key !== 'meetingEventId',
+            );
+
+            // Add updated location items
+            updatedMetadataList.forEach((item: any) => {
+              if (
+                item.key === 'location' ||
+                item.key === 'locationType' ||
+                item.key === 'meetingEventId'
+              ) {
+                updatedList.push(item);
+              }
+            });
+
+            eventData.list = updatedList;
+            console.log(
+              '✅ Updated metadata with Zoom link:',
+              updatedList.filter(
+                (item: any) =>
+                  item.key === 'location' ||
+                  item.key === 'locationType' ||
+                  item.key === 'meetingEventId',
+              ),
+            );
+          } else {
+            console.error(
+              '❌ Failed to update Zoom meeting via backend:',
+              data,
+            );
+            Alert.alert('Error', 'Failed to update Zoom meeting');
+          }
+        } catch (err) {
+          console.error('❌ Zoom meeting update error via backend:', err);
+          Alert.alert('Error', 'Failed to update Zoom meeting');
+        }
+      }
+
       console.log('Editing event payload:', eventData);
 
       const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
@@ -3119,6 +3236,9 @@ const CreateEventScreen = () => {
                   ]}
                   onPress={() => {
                     if (!isLoading) {
+                      // Close all other dropdowns before toggling repeat dropdown
+                      setShowVideoConferencingOptions(false);
+                      setShowGuestDropdown(false);
                       setShowRecurrenceDropdown(!showRecurrenceDropdown);
                       setActiveField(showRecurrenceDropdown ? null : 'repeat');
                     }
@@ -3213,6 +3333,8 @@ const CreateEventScreen = () => {
                 onGuestSelect={handleGuestSelect}
                 onToggleDropdown={() => {
                   if (!isLoading) {
+                    // Close repeat dropdown when opening guest dropdown
+                    setShowRecurrenceDropdown(false);
                     setShowGuestDropdown(!showGuestDropdown);
                   }
                 }}
@@ -3239,6 +3361,8 @@ const CreateEventScreen = () => {
                 onPress={() => {
                   if (!isLoading) {
                     setActiveField('videoConferencing');
+                    // Close repeat dropdown when opening video conferencing
+                    setShowRecurrenceDropdown(false);
                     setShowVideoConferencingOptions(
                       !showVideoConferencingOptions,
                     );
@@ -3346,13 +3470,12 @@ const CreateEventScreen = () => {
                       if (!isLoading) {
                         setLocation(''); // Clear location when Zoom is selected
                         setLocationError('');
+                        // Always close dropdown first
                         setShowVideoConferencingOptions(false);
 
-                        // If Zoom is connected, create meeting link directly
+                        // If Zoom is connected, set selection
                         if (zoomIntegration.isConnected) {
                           setSelectedVideoConferencing('zoom');
-                          // Optionally create Zoom meeting link here
-                          // For now, just mark as selected and let the create event handler create it
                         } else {
                           // Show integration modal if not connected
                           setIntegrationType('zoom');
@@ -4923,6 +5046,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F2F4F7',
     minHeight: scaleHeight(38), // Reduced from 44 to make more compact
     backgroundColor: colors.white,
+    width: '100%',
   },
   repeatOptionSelected: {
     backgroundColor: '#F0FBFF', // Light blue background for selected option
@@ -4932,7 +5056,6 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     fontFamily: Fonts.latoMedium,
     flex: 1,
-    flexShrink: 1,
     marginRight: scaleWidth(8),
   },
   repeatOptionTextSelected: {
