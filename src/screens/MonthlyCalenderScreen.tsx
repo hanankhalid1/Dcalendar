@@ -925,14 +925,14 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const markedDates = useMemo(() => {
     // Deep clone to avoid mutating the base
     const marked: any = {};
-    
+
     // Copy base dates and REMOVE any existing selected flags
     Object.keys(markedDatesBase).forEach(dateKey => {
       marked[dateKey] = { ...markedDatesBase[dateKey] };
       delete marked[dateKey].selected;
       delete marked[dateKey].selectedColor;
     });
-    
+
     // Now mark ONLY the currently selected date
     if (marked[selectedDateString]) {
       marked[selectedDateString].selected = true;

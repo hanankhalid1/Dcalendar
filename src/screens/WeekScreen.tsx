@@ -794,7 +794,10 @@ const WeekScreen = () => {
   }, [selectedDate, selectedDay]);
 
   // Convert back to Date for use (but the dependency will only change when week actually changes)
-  const currentWeekStartDate = useMemo(() => new Date(currentWeekStart), [currentWeekStart]);
+  const currentWeekStartDate = useMemo(
+    () => new Date(currentWeekStart),
+    [currentWeekStart],
+  );
 
   // Process events for current week - use InteractionManager to defer heavy work
   const [markedDatesBase, setMarkedDatesBase] = useState<any>({});
@@ -829,7 +832,7 @@ const WeekScreen = () => {
     // ✅ OPTIMIZATION: Minimal debounce for instant navigation
     // Reduced to 50ms to batch rapid clicks while feeling instant
     const debounceTime = isInitialLoadRef.current ? 0 : 50;
-    
+
     processingTimeoutRef.current = setTimeout(() => {
       // Process immediately - cache should handle most cases, so no InteractionManager delay needed
       const result = processEventsForWeek(currentWeekStartDate);
@@ -850,10 +853,10 @@ const WeekScreen = () => {
   const markedDates = useMemo(() => {
     // ✅ OPTIMIZED: Don't loop through all dates, just create a shallow copy and update selected
     const marked = { ...markedDatesBase };
-    
+
     // Remove selected flag from previous selection if it exists in markedDatesBase
     // (but we don't know which date was previously selected, so we'll rely on the new object)
-    
+
     // Now mark ONLY the currently selected date
     if (marked[selectedDateString]) {
       marked[selectedDateString] = {
