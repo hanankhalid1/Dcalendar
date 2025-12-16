@@ -789,8 +789,12 @@ const WeekScreen = () => {
     if (diff < 0) diff += 7;
     weekStart.setDate(weekStart.getDate() - diff);
     weekStart.setHours(0, 0, 0, 0);
-    return weekStart;
+    // Return as string to ensure stable reference when week hasn't changed
+    return weekStart.getTime();
   }, [selectedDate, selectedDay]);
+
+  // Convert back to Date for use (but the dependency will only change when week actually changes)
+  const currentWeekStartDate = useMemo(() => new Date(currentWeekStart), [currentWeekStart]);
 
   // Process events for current week - use InteractionManager to defer heavy work
   const [markedDatesBase, setMarkedDatesBase] = useState<any>({});
@@ -798,6 +802,7 @@ const WeekScreen = () => {
     {},
   );
   const processingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isInitialLoadRef = useRef(true); // Track if this is the first load
 
   useEffect(() => {
     // Clear any pending processing
@@ -807,47 +812,67 @@ const WeekScreen = () => {
 
     // Update UI immediately with cached data if available
     const cacheKey = `${formatDate(
-      currentWeekStart,
+      currentWeekStartDate,
     )}-${selectedTimeZone}-${selectedDay}`;
     const cached = eventsCacheRef.current.get(cacheKey);
     if (cached) {
       setMarkedDatesBase(cached.markedDatesBase);
       setEventsByDate(cached.eventsByDate);
       setIsProcessingEvents(false);
+      isInitialLoadRef.current = false; // No longer initial load
       return;
     }
 
     // Show loading state immediately for better UX
     setIsProcessingEvents(true);
 
-    // Debounce processing - wait 100ms after last change before processing
-    // This prevents processing on every scroll/click
+    // ✅ OPTIMIZATION: Skip debounce on initial load for instant display
+    const debounceTime = isInitialLoadRef.current ? 0 : 300;
+    
     processingTimeoutRef.current = setTimeout(() => {
-      // Defer heavy processing until after interactions complete
-      const interaction = InteractionManager.runAfterInteractions(() => {
-        const result = processEventsForWeek(currentWeekStart);
+      // For initial load, process immediately without InteractionManager delay
+      if (isInitialLoadRef.current) {
+        const result = processEventsForWeek(currentWeekStartDate);
         setMarkedDatesBase(result.markedDatesBase);
         setEventsByDate(result.eventsByDate);
         setIsProcessingEvents(false);
-      });
+        isInitialLoadRef.current = false; // Mark initial load complete
+      } else {
+        // For subsequent loads, defer heavy processing until after interactions complete
+        const interaction = InteractionManager.runAfterInteractions(() => {
+          const result = processEventsForWeek(currentWeekStartDate);
+          setMarkedDatesBase(result.markedDatesBase);
+          setEventsByDate(result.eventsByDate);
+          setIsProcessingEvents(false);
+        });
 
-      // Cleanup on unmount
-      return () => {
-        interaction.cancel();
-      };
-    }, 100); // 100ms debounce - fast enough for good UX
+        // Cleanup on unmount
+        return () => {
+          interaction.cancel();
+        };
+      }
+    }, debounceTime);
 
     return () => {
       if (processingTimeoutRef.current) {
         clearTimeout(processingTimeoutRef.current);
       }
     };
-  }, [currentWeekStart, selectedTimeZone, selectedDay, processEventsForWeek]);
+  }, [currentWeekStart, selectedTimeZone, selectedDay]); // Removed processEventsForWeek - it's stable
 
   // Only update selected date marker - this is fast and doesn't require recalculating all events
   const markedDates = useMemo(() => {
-    const marked = { ...markedDatesBase };
+    // Deep clone to avoid mutating the base
+    const marked: any = {};
+    
+    // Copy base dates and REMOVE any existing selected flags
+    Object.keys(markedDatesBase).forEach(dateKey => {
+      marked[dateKey] = { ...markedDatesBase[dateKey] };
+      delete marked[dateKey].selected;
+      delete marked[dateKey].selectedColor;
+    });
 
+    // Now mark ONLY the currently selected date
     if (marked[selectedDateString]) {
       marked[selectedDateString] = {
         ...marked[selectedDateString],

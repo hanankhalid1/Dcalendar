@@ -986,65 +986,73 @@ export class BlockchainService {
 
   async deleteEventPermanent(eventId: string, activeAccount: any, token: string, api: any) {
     try {
-      const allEvents = await this.getAllEvents(activeAccount.userName);
+      if (!activeAccount?.userName) {
+        throw new Error('Active account missing');
+      }
+      if (!token) {
+        throw new Error('Auth token missing');
+      }
+      if (!api) {
+        throw new Error('API client missing');
+      }
 
-      const selected = (allEvents.events || []).find((event: any) =>
-        event && (event.uid === eventId)
-      );
+      const allEvents = await this.getAllEvents(activeAccount.userName);
+      const selected = (allEvents.events || []).find((event: any) => event && event.uid === eventId);
+      if (!selected) {
+        throw new Error(`Event not found for uid: ${eventId}`);
+      }
 
       const listValue = (selected.list || []).filter((data: any) =>
-        !(data.key === "isDeleted" || data.key === "deletedTime")
+        !(data.key === 'isDeleted' || data.key === 'deletedTime' || data.key === 'isPermanentDelete')
       );
 
       const updatedEvent = {
         ...selected,
         list: [
           ...listValue,
-          { key: "isDeleted", value: "true" },
-          { key: "isPermanentDelete", value: "true" },
-          { key: "deletedTime", value: moment.utc().format("YYYYMMDDTHHmmss") }
-        ]
+          { key: 'isDeleted', value: 'true' },
+          { key: 'isPermanentDelete', value: 'true' },
+          { key: 'deletedTime', value: moment.utc().format('YYYYMMDDTHHmmss') },
+        ],
       };
 
-      console.log("Event marked for deletion:", updatedEvent);
+      console.log('Event marked for permanent deletion:', updatedEvent);
 
       const uid = updatedEvent.uid;
       const uuid = selected.uuid;
-      // Reuse preparation logic
+
       const conferencingData = null;
       const metadata = buildEventMetadata(updatedEvent, conferencingData);
-
       const eventParams = prepareEventForBlockchain(updatedEvent, metadata, uid);
 
-      // 3. Encrypt the Modified Event Data (using the existing UUID to overwrite)
       const publicKey = await this.hostContract.methods
-        .getPublicKeyOfUser(activeAccount?.userName)
+        .getPublicKeyOfUser(activeAccount.userName)
         .call();
 
-      // FIXED: Use the existing UUID (like updateEvent does)
       const encryptedUUID = await encryptWithNECJS(
         JSON.stringify(eventParams),
         publicKey,
         token,
-        [uuid] // Use the existing UUID, not updatedEvent.uuid
+        [uuid]
       );
+      if (!encryptedUUID) {
+        throw new Error('Encryption failed');
+      }
 
       const updatePayload = {
-        events: [
-          updatedEvent
-        ],
-        active: activeAccount?.userName,
-        type: 'delete',
+        events: [updatedEvent],
+        active: activeAccount.userName,
+        type: 'delete', // backend uses delete to update flags
       };
 
-      if (encryptedUUID) {
-        apiResponse = await api('POST', '/updateevents', updatePayload);
+      const resp = await api('POST', '/updateevents', updatePayload);
+      if (!resp || (resp.status && resp.status >= 400)) {
+        throw new Error('Update events API failed');
       }
-      return;
-
+      return true;
     } catch (error) {
       console.log('Delete Event Failed:', error);
-
+      throw error;
     }
   }
 

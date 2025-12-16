@@ -171,9 +171,15 @@ const DeletedEventsScreen: React.FC = () => {
       // Store current deleted events for potential revert
       const currentDeletedEvents = [...deletedUserEvents];
 
+      if (currentDeletedEvents.length === 0) {
+        Alert.alert('Info', 'No events to clear');
+        return;
+      }
+
       // ✅ OPTIMISTIC UPDATE: Clear all deleted events from UI immediately
-      const { setDeletedUserEvents } = useEventsStore.getState();
-      setDeletedUserEvents([]);
+      currentDeletedEvents.forEach(event => {
+        optimisticallyPermanentDeleteEvent(event.uid);
+      });
 
       // Show success toast immediately
       toast.success('', 'Recycle bin cleared!');
@@ -181,14 +187,56 @@ const DeletedEventsScreen: React.FC = () => {
       // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background
       (async () => {
         try {
-          // Delete all events permanently on blockchain
+          // Delete ALL events permanently on blockchain (batch operation)
+          // Continue deleting all events even if some fail
+          const deleteResults: {
+            uid: string;
+            success: boolean;
+            error?: any;
+          }[] = [];
+
           for (const event of currentDeletedEvents) {
-            await blockchainService.deleteEventPermanent(
-              event.uid,
-              activeAccount,
-              token,
-              api,
-            );
+            try {
+              console.log(`Deleting event: ${event.uid}`);
+              await blockchainService.deleteEventPermanent(
+                event.uid,
+                activeAccount,
+                token,
+                api,
+              );
+              deleteResults.push({ uid: event.uid, success: true });
+              console.log(`✅ Successfully deleted event: ${event.uid}`);
+            } catch (eventError) {
+              console.error(
+                `❌ Failed to delete event ${event.uid}:`,
+                eventError,
+              );
+              deleteResults.push({
+                uid: event.uid,
+                success: false,
+                error: eventError,
+              });
+            }
+          }
+
+          // Check if all deletions succeeded
+          const allSucceeded = deleteResults.every(result => result.success);
+          const failedCount = deleteResults.filter(r => !r.success).length;
+          const successCount = deleteResults.filter(r => r.success).length;
+
+          console.log(
+            `Batch delete result: ${successCount} succeeded, ${failedCount} failed`,
+          );
+
+          if (!allSucceeded) {
+            // Some or all failed - revert optimistic update and show alert
+            revertOptimisticDeletedUpdate(currentDeletedEvents);
+            const message =
+              failedCount === currentDeletedEvents.length
+                ? 'Failed to delete all events. Please try again.'
+                : `${failedCount} of ${currentDeletedEvents.length} events failed to delete. Please try again.`;
+            Alert.alert('Warning', message);
+            return;
           }
 
           // Delayed refresh in background (non-blocking, skip loading screen)
@@ -197,13 +245,12 @@ const DeletedEventsScreen: React.FC = () => {
               skipLoading: true,
             }).catch(err => {
               console.error('Background event refresh failed:', err);
-              // If refresh fails, revert optimistic update
-              revertOptimisticDeletedUpdate(currentDeletedEvents);
+              // Even if refresh fails, deletions were successful
             });
           }, 2000);
         } catch (error) {
           console.error('Error clearing bin:', error);
-          // Revert optimistic update on error
+          // Revert optimistic update on unexpected error
           revertOptimisticDeletedUpdate(currentDeletedEvents);
           Alert.alert('Error', 'Failed to clear recycle bin');
         }

@@ -706,7 +706,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     return instances;
   };
 
-  const { markedDates, eventsByDate } = useMemo(() => {
+  const { markedDates: markedDatesBase, eventsByDate } = useMemo(() => {
     const marked: any = {};
     const byDate: { [key: string]: any[] } = {};
 
@@ -886,19 +886,8 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     today.setHours(12, 0, 0, 0);
     const todayString = formatDate(today);
 
-    // Mark selected date
-    if (marked[selectedDateString]) {
-      marked[selectedDateString].selected = true;
-      marked[selectedDateString].selectedColor = '#00AEEF';
-    } else {
-      marked[selectedDateString] = {
-        selected: true,
-        selectedColor: '#00AEEF',
-      };
-    }
-
     // Mark today's date with blue background if it's not the selected date
-    if (todayString !== selectedDateString) {
+    if (todayString) {
       if (marked[todayString]) {
         // If today already has events, add today styling without overriding periods
         marked[todayString].customStyles = {
@@ -927,25 +916,36 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
           },
         };
       }
-    } else {
-      // If today is selected, ensure it has the blue background
-      if (marked[todayString]) {
-        marked[todayString].customStyles = {
-          container: {
-            backgroundColor: '#00AEEF',
-            borderRadius: 18,
-            overflow: 'hidden',
-          },
-          text: {
-            color: '#ffffff',
-            fontWeight: '600',
-          },
-        };
-      }
     }
 
     return { markedDates: marked, eventsByDate: byDate };
-  }, [userEvents, selectedDateString, selectedDate]);
+  }, [userEvents, selectedTimeZone]);
+
+  // ✅ Separate useMemo for selected date marking (fast, runs when date changes)
+  const markedDates = useMemo(() => {
+    // Deep clone to avoid mutating the base
+    const marked: any = {};
+    
+    // Copy base dates and REMOVE any existing selected flags
+    Object.keys(markedDatesBase).forEach(dateKey => {
+      marked[dateKey] = { ...markedDatesBase[dateKey] };
+      delete marked[dateKey].selected;
+      delete marked[dateKey].selectedColor;
+    });
+    
+    // Now mark ONLY the currently selected date
+    if (marked[selectedDateString]) {
+      marked[selectedDateString].selected = true;
+      marked[selectedDateString].selectedColor = '#00AEEF';
+    } else {
+      marked[selectedDateString] = {
+        selected: true,
+        selectedColor: '#00AEEF',
+      };
+    }
+
+    return marked;
+  }, [markedDatesBase, selectedDateString]);
 
   // Fetch events when component mounts or userName changes (same flow as HomeScreen)
   useEffect(() => {
