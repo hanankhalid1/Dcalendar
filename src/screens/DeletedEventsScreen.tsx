@@ -36,6 +36,7 @@ import { useActiveAccount } from '../stores/useActiveAccount';
 import { BlockchainService } from '../services/BlockChainService';
 import { useToken } from '../stores/useTokenStore';
 import { useApiClient } from '../hooks/useApi';
+import { useToast } from '../hooks/useToast';
 import PlainHeader from '../components/PlainHeader';
 import {
   buildEventMetadata,
@@ -72,6 +73,7 @@ const DeletedEventsScreen: React.FC = () => {
   const blockchainService = React.useMemo(() => new BlockchainService(), []);
   const token = useToken.getState().token;
   const { api } = useApiClient();
+  const toast = useToast();
 
   // Debug: Log when modal state changes
   useEffect(() => {
@@ -165,14 +167,50 @@ const DeletedEventsScreen: React.FC = () => {
 
   const handleConfirmClearBin = async () => {
     setShowClearBinModal(false);
-    // Delete all events permanently
-    for (const event of deletedUserEvents) {
-      await blockchainService.deleteEventPermanent(
-        event.uid,
-        activeAccount,
-        token,
-        api,
-      );
+    try {
+      // Store current deleted events for potential revert
+      const currentDeletedEvents = [...deletedUserEvents];
+
+      // ✅ OPTIMISTIC UPDATE: Clear all deleted events from UI immediately
+      const { setDeletedUserEvents } = useEventsStore.getState();
+      setDeletedUserEvents([]);
+
+      // Show success toast immediately
+      toast.success('', 'Recycle bin cleared!');
+
+      // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background
+      (async () => {
+        try {
+          // Delete all events permanently on blockchain
+          for (const event of currentDeletedEvents) {
+            await blockchainService.deleteEventPermanent(
+              event.uid,
+              activeAccount,
+              token,
+              api,
+            );
+          }
+
+          // Delayed refresh in background (non-blocking, skip loading screen)
+          setTimeout(() => {
+            getUserEvents(activeAccount.userName, api, undefined, {
+              skipLoading: true,
+            }).catch(err => {
+              console.error('Background event refresh failed:', err);
+              // If refresh fails, revert optimistic update
+              revertOptimisticDeletedUpdate(currentDeletedEvents);
+            });
+          }, 2000);
+        } catch (error) {
+          console.error('Error clearing bin:', error);
+          // Revert optimistic update on error
+          revertOptimisticDeletedUpdate(currentDeletedEvents);
+          Alert.alert('Error', 'Failed to clear recycle bin');
+        }
+      })();
+    } catch (error) {
+      console.error('Error clearing bin:', error);
+      Alert.alert('Error', 'Failed to clear recycle bin');
     }
   };
 
@@ -250,14 +288,43 @@ const DeletedEventsScreen: React.FC = () => {
     if (eventToDelete) {
       setShowDeleteModal(false);
       try {
-        await blockchainService.deleteEventPermanent(
-          eventToDelete.uid,
-          activeAccount,
-          token,
-          api,
-        );
-        // Refresh events after deletion
-        await getUserEvents(activeAccount.userName, api);
+        // Store current deleted events for potential revert
+        const currentDeletedEvents = [...deletedUserEvents];
+
+        // ✅ OPTIMISTIC UPDATE: Remove event from UI immediately
+        optimisticallyPermanentDeleteEvent(eventToDelete.uid);
+
+        // Show success toast immediately
+        toast.success('', 'Event permanently deleted!');
+
+        // ✅ BACKGROUND OPERATIONS: Run blockchain/API calls in background
+        (async () => {
+          try {
+            // Delete on blockchain (this will take time, but UI already updated)
+            await blockchainService.deleteEventPermanent(
+              eventToDelete.uid,
+              activeAccount,
+              token,
+              api,
+            );
+
+            // Delayed refresh in background (non-blocking, skip loading screen)
+            setTimeout(() => {
+              getUserEvents(activeAccount.userName, api, undefined, {
+                skipLoading: true,
+              }).catch(err => {
+                console.error('Background event refresh failed:', err);
+                // If refresh fails, revert optimistic update
+                revertOptimisticDeletedUpdate(currentDeletedEvents);
+              });
+            }, 2000);
+          } catch (error) {
+            console.error('Error deleting event permanently:', error);
+            // Revert optimistic update on error
+            revertOptimisticDeletedUpdate(currentDeletedEvents);
+            Alert.alert('Error', 'Failed to permanently delete the event');
+          }
+        })();
       } catch (error) {
         console.error('Error deleting event permanently:', error);
         Alert.alert('Error', 'Failed to permanently delete the event');

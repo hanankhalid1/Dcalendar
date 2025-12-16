@@ -20,6 +20,7 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST, isEventInPast } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { useSettingsStore } from '../stores/useSetting';
 import EventDetailsModal from '../components/EventDetailsModal';
 import { useToast } from '../hooks/useToast';
@@ -106,6 +107,10 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const [alertType, setAlertType] = useState<
     'success' | 'error' | 'warning' | 'info'
   >('warning');
+
+  // Delete Confirmation Modal State
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [pendingDeleteEvent, setPendingDeleteEvent] = useState<any>(null);
 
   // Helper function to show custom alert
   const showAlert = (
@@ -1071,13 +1076,29 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         return false;
       }
 
+      // Show confirmation modal
+      setPendingDeleteEvent(event);
+      setDeleteConfirmVisible(true);
+    } catch (err) {
+      console.error('Delete Event Failed:', err);
+      Alert.alert('Error', 'Failed to move the event to the trash');
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      if (!pendingDeleteEvent || !account) {
+        return;
+      }
+
+      setDeleteConfirmVisible(false);
       handleCloseEventModal();
 
       // Store current events for potential revert
       const currentEvents = [...(userEvents || [])];
 
       // ✅ OPTIMISTIC UPDATE: Remove event from UI immediately
-      optimisticallyDeleteEvent(event.uid);
+      optimisticallyDeleteEvent(pendingDeleteEvent.uid);
 
       // Show success toast at the top
       toast.success('', 'Event moved to trash successfully!');
@@ -1087,7 +1108,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         try {
           // Delete on blockchain (this will take time, but UI already updated)
           await blockchainService.deleteEventSoft(
-            event.uid,
+            pendingDeleteEvent.uid,
             account,
             token,
             api,
@@ -1110,9 +1131,12 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
           Alert.alert('Error', 'Failed to move the event to the trash');
         }
       })();
+
+      setPendingDeleteEvent(null);
     } catch (err) {
       console.error('Delete Event Failed:', err);
       Alert.alert('Error', 'Failed to move the event to the trash');
+      setPendingDeleteEvent(null);
     }
   };
 
@@ -1521,6 +1545,20 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         message={alertMessage}
         type={alertType}
         onClose={() => setAlertVisible(false)}
+      />
+
+      <DeleteConfirmModal
+        visible={deleteConfirmVisible}
+        title="Delete Event"
+        message={`Are you sure you want to delete "${
+          pendingDeleteEvent?.title || 'Untitled'
+        }"?`}
+        onCancel={() => {
+          setDeleteConfirmVisible(false);
+          setPendingDeleteEvent(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        confirmText="Delete"
       />
 
       <CustomDrawer isOpen={isDrawerOpen} onClose={handleDrawerClose} />

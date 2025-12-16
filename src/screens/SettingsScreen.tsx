@@ -1091,13 +1091,6 @@ const SettingsScreen = () => {
             />
           </View>
           <View style={[styles.card, { marginTop: spacing.xs }]}>
-            <SettingRow
-              title="Contact us"
-              hasRightArrow={true}
-              onPress={() => {}}
-            />
-          </View>
-          <View style={[styles.card, { marginTop: spacing.xs }]}>
             <TouchableOpacity
               style={styles.logoutRow}
               onPress={handleLogout}

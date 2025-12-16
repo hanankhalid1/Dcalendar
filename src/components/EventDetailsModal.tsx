@@ -37,6 +37,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const [showGuestList, setShowGuestList] = useState(false);
   console.log('EventDetailsModal render:', { visible, event: event?.title });
 
   if (!event) {
@@ -238,13 +239,69 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
 
   const renderGuestAvatar = (email: string, index: number) => {
     const initial = email.charAt(0).toUpperCase();
+    // Calculate negative margin to create overlap effect
+    const marginLeft = index === 0 ? 0 : scaleWidth(-12);
+
     return (
-      <View key={index} style={styles.guestAvatar}>
+      <View
+        key={index}
+        style={[styles.overlapAvatar, { marginLeft, zIndex: -index }]}
+      >
         <View style={styles.avatarGradient}>
           <Text style={styles.avatarText}>{initial}</Text>
         </View>
-        <Text style={styles.guestEmail}>{email}</Text>
       </View>
+    );
+  };
+
+  const renderGuestListModal = () => {
+    const guestEmails = getGuestEmails();
+
+    return (
+      <Modal
+        visible={showGuestList}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowGuestList(false)}
+      >
+        <TouchableOpacity
+          style={styles.guestListOverlay}
+          activeOpacity={1}
+          onPress={() => setShowGuestList(false)}
+        >
+          <TouchableOpacity
+            activeOpacity={1}
+            onPress={e => e.stopPropagation()}
+            style={styles.guestListContainer}
+          >
+            <View style={styles.guestListHeader}>
+              <Text style={styles.guestListTitle}>
+                {guestEmails.length}{' '}
+                {guestEmails.length === 1 ? 'Guest' : 'Guests'}
+              </Text>
+              <TouchableOpacity onPress={() => setShowGuestList(false)}>
+                <Feather name="x" size={24} color={Colors.gray500} />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={styles.guestListContent}
+              showsVerticalScrollIndicator={false}
+            >
+              {guestEmails.map((email: string, index: number) => (
+                <View key={index} style={styles.guestListItem}>
+                  <View style={styles.guestListAvatar}>
+                    <Text style={styles.guestListAvatarText}>
+                      {email.charAt(0).toUpperCase()}
+                    </Text>
+                  </View>
+                  <Text style={styles.guestListEmail}>{email}</Text>
+                </View>
+              ))}
+            </ScrollView>
+          </TouchableOpacity>
+        </TouchableOpacity>
+      </Modal>
     );
   };
 
@@ -335,11 +392,14 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
                     {getGuestCount()}{' '}
                     {getGuestCount() === 1 ? 'guest' : 'guests'}
                   </Text>
-                  <View style={styles.guestsContainer}>
+                  <TouchableOpacity
+                    style={styles.guestsContainer}
+                    onPress={() => setShowGuestList(true)}
+                  >
                     {getGuestEmails().map((email: string, index: number) =>
                       renderGuestAvatar(email, index),
                     )}
-                  </View>
+                  </TouchableOpacity>
                 </View>
               </View>
             )}
@@ -354,6 +414,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
           </ScrollView>
         </View>
       </View>
+      {renderGuestListModal()}
     </Modal>
   );
 };
@@ -454,9 +515,11 @@ const styles = StyleSheet.create({
   },
   guestsContainer: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
     marginTop: scaleHeight(8),
-    gap: scaleWidth(12),
+  },
+  overlapAvatar: {
+    position: 'relative',
   },
   guestAvatar: {
     alignItems: 'center',
@@ -468,8 +531,9 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(20),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: scaleHeight(6),
     backgroundColor: '#00AEEF',
+    borderWidth: 2,
+    borderColor: Colors.white,
   },
   avatarText: {
     color: Colors.white,
@@ -498,6 +562,66 @@ const styles = StyleSheet.create({
   },
   copyButton: {
     padding: scaleWidth(4),
+  },
+  // Guest List Modal Styles
+  guestListOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: scaleWidth(20),
+  },
+  guestListContainer: {
+    width: '100%',
+    maxWidth: scaleWidth(300),
+    backgroundColor: Colors.white,
+    borderRadius: moderateScale(12),
+    maxHeight: '70%',
+  },
+  guestListHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  guestListTitle: {
+    fontSize: moderateScale(16),
+    fontFamily: Fonts.latoBold,
+    color: Colors.black,
+  },
+  guestListContent: {
+    paddingVertical: scaleHeight(8),
+  },
+  guestListItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(12),
+    borderBottomWidth: 1,
+    borderBottomColor: '#F5F5F5',
+  },
+  guestListAvatar: {
+    width: scaleWidth(32),
+    height: scaleHeight(32),
+    borderRadius: moderateScale(16),
+    backgroundColor: '#00AEEF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: scaleWidth(12),
+  },
+  guestListAvatarText: {
+    color: Colors.white,
+    fontSize: moderateScale(12),
+    fontFamily: Fonts.latoBold,
+  },
+  guestListEmail: {
+    fontSize: moderateScale(14),
+    fontFamily: Fonts.latoRegular,
+    color: '#252B37',
+    flex: 1,
   },
 });
 

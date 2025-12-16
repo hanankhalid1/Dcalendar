@@ -271,10 +271,21 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               </TouchableOpacity>
 
               <TouchableOpacity
-                style={styles.addButton}
+                style={[
+                  styles.addButton,
+                  isAddDisabled && styles.addButtonDisabled,
+                ]}
                 onPress={onToggleGuestModal}
+                disabled={isAddDisabled}
               >
-                <Text style={styles.addButtonText}>Add</Text>
+                <Text
+                  style={[
+                    styles.addButtonText,
+                    isAddDisabled && styles.addButtonTextDisabled,
+                  ]}
+                >
+                  Add
+                </Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -508,11 +519,18 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  addButtonDisabled: {
+    backgroundColor: '#D1D5DB',
+    opacity: 0.6,
+  },
   addButtonText: {
     fontSize: fontSize.textSize14,
     fontWeight: '600',
     color: colors.white,
     fontFamily: Fonts.latoSemiBold,
+  },
+  addButtonTextDisabled: {
+    color: '#9CA3AF',
   },
   emptyContainer: {
     flex: 1,

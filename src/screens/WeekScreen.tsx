@@ -28,6 +28,7 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST, isEventInPast } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
+import DeleteConfirmModal from '../components/DeleteConfirmModal';
 import { useSettingsStore } from '../stores/useSetting';
 import EventDetailsModal from '../components/EventDetailsModal';
 import { useToast } from '../hooks/useToast';
@@ -88,6 +89,10 @@ const WeekScreen = () => {
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertTitle, setAlertTitle] = useState('');
   const [alertMessage, setAlertMessage] = useState('');
+
+  // Delete Confirmation Modal State
+  const [deleteConfirmVisible, setDeleteConfirmVisible] = useState(false);
+  const [pendingDeleteEvent, setPendingDeleteEvent] = useState<any>(null);
 
   const showAlert = (
     title: string,
@@ -953,10 +958,26 @@ const WeekScreen = () => {
         return false;
       }
 
+      // Show confirmation modal
+      setPendingDeleteEvent(event);
+      setDeleteConfirmVisible(true);
+    } catch (err) {
+      console.error('Delete Event Failed:', err);
+      Alert.alert('Error', 'Failed to move the event to the trash');
+    }
+  };
+
+  const handleConfirmDelete = async () => {
+    try {
+      if (!pendingDeleteEvent || !account) {
+        return;
+      }
+
+      setDeleteConfirmVisible(false);
       handleCloseEventModal();
 
       const currentEvents = [...(userEvents || [])];
-      optimisticallyDeleteEvent(event.uid);
+      optimisticallyDeleteEvent(pendingDeleteEvent.uid);
 
       // Show success toast at the top
       toast.success('', 'Event moved to trash successfully!');
@@ -964,7 +985,7 @@ const WeekScreen = () => {
       (async () => {
         try {
           await blockchainService.deleteEventSoft(
-            event.uid,
+            pendingDeleteEvent.uid,
             account,
             token,
             api,
@@ -983,9 +1004,12 @@ const WeekScreen = () => {
           Alert.alert('Error', 'Failed to move the event to the trash');
         }
       })();
+
+      setPendingDeleteEvent(null);
     } catch (err) {
       console.error('Delete Event Failed:', err);
       Alert.alert('Error', 'Failed to move the event to the trash');
+      setPendingDeleteEvent(null);
     }
   };
 
@@ -1865,6 +1889,20 @@ const WeekScreen = () => {
         message={alertMessage}
         type="warning"
         onClose={() => setAlertVisible(false)}
+      />
+
+      <DeleteConfirmModal
+        visible={deleteConfirmVisible}
+        title="Delete Event"
+        message={`Are you sure you want to delete "${
+          pendingDeleteEvent?.title || 'Untitled'
+        }"?`}
+        onCancel={() => {
+          setDeleteConfirmVisible(false);
+          setPendingDeleteEvent(null);
+        }}
+        onConfirm={handleConfirmDelete}
+        confirmText="Delete"
       />
 
       <CustomDrawer isOpen={isDrawerOpen} onClose={handleDrawerClose} />

@@ -6,16 +6,22 @@ import * as DimensionsUtils from '../utils/dimensions';
 
 const { scaleWidth, scaleHeight, moderateScale } = DimensionsUtils;
 
-interface LogoutConfirmModalProps {
+interface DeleteConfirmModalProps {
   visible: boolean;
+  title?: string;
+  message: string;
   onCancel: () => void;
   onConfirm: () => void;
+  confirmText?: string;
 }
 
-const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
+const DeleteConfirmModal: React.FC<DeleteConfirmModalProps> = ({
   visible,
+  title = 'Delete Item',
+  message,
   onCancel,
   onConfirm,
+  confirmText = 'Delete',
 }) => {
   return (
     <Modal
@@ -26,8 +32,8 @@ const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
     >
       <View style={styles.overlay}>
         <View style={styles.container}>
-          <Text style={styles.title}>Log Out</Text>
-          <Text style={styles.message}>Are you sure you want to log out?</Text>
+          <Text style={styles.title}>{title}</Text>
+          <Text style={styles.message}>{message}</Text>
 
           <View style={styles.buttonRow}>
             {/* Cancel Button */}
@@ -39,13 +45,13 @@ const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
               <Text style={styles.cancelText}>Cancel</Text>
             </TouchableOpacity>
 
-            {/* Log Out Button */}
+            {/* Delete Button */}
             <TouchableOpacity
               onPress={onConfirm}
-              style={styles.logoutBtn}
+              style={styles.deleteBtn}
               activeOpacity={0.8}
             >
-              <Text style={styles.logoutText}>Log Out</Text>
+              <Text style={styles.deleteText}>{confirmText}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -54,7 +60,7 @@ const LogoutConfirmModal: React.FC<LogoutConfirmModalProps> = ({
   );
 };
 
-export default LogoutConfirmModal;
+export default DeleteConfirmModal;
 
 const styles = StyleSheet.create({
   overlay: {
@@ -113,15 +119,15 @@ const styles = StyleSheet.create({
     fontSize: moderateScale(14),
     color: Colors.black,
   },
-  logoutBtn: {
+  deleteBtn: {
     paddingVertical: scaleHeight(10),
     paddingHorizontal: scaleWidth(18),
     borderRadius: moderateScale(8),
-    backgroundColor: '#FF3B30', // Red for logout action
+    backgroundColor: '#FF3B30', // Red for delete action
     justifyContent: 'center',
     alignItems: 'center',
   },
-  logoutText: {
+  deleteText: {
     fontFamily: Fonts.latoSemiBold,
     fontSize: moderateScale(14),
     color: Colors.white,
