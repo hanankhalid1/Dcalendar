@@ -826,31 +826,17 @@ const WeekScreen = () => {
     // Show loading state immediately for better UX
     setIsProcessingEvents(true);
 
-    // ✅ OPTIMIZATION: Skip debounce on initial load for instant display
-    const debounceTime = isInitialLoadRef.current ? 0 : 300;
+    // ✅ OPTIMIZATION: Minimal debounce for instant navigation
+    // Reduced to 50ms to batch rapid clicks while feeling instant
+    const debounceTime = isInitialLoadRef.current ? 0 : 50;
     
     processingTimeoutRef.current = setTimeout(() => {
-      // For initial load, process immediately without InteractionManager delay
-      if (isInitialLoadRef.current) {
-        const result = processEventsForWeek(currentWeekStartDate);
-        setMarkedDatesBase(result.markedDatesBase);
-        setEventsByDate(result.eventsByDate);
-        setIsProcessingEvents(false);
-        isInitialLoadRef.current = false; // Mark initial load complete
-      } else {
-        // For subsequent loads, defer heavy processing until after interactions complete
-        const interaction = InteractionManager.runAfterInteractions(() => {
-          const result = processEventsForWeek(currentWeekStartDate);
-          setMarkedDatesBase(result.markedDatesBase);
-          setEventsByDate(result.eventsByDate);
-          setIsProcessingEvents(false);
-        });
-
-        // Cleanup on unmount
-        return () => {
-          interaction.cancel();
-        };
-      }
+      // Process immediately - cache should handle most cases, so no InteractionManager delay needed
+      const result = processEventsForWeek(currentWeekStartDate);
+      setMarkedDatesBase(result.markedDatesBase);
+      setEventsByDate(result.eventsByDate);
+      setIsProcessingEvents(false);
+      isInitialLoadRef.current = false; // Mark initial load complete
     }, debounceTime);
 
     return () => {
@@ -862,16 +848,12 @@ const WeekScreen = () => {
 
   // Only update selected date marker - this is fast and doesn't require recalculating all events
   const markedDates = useMemo(() => {
-    // Deep clone to avoid mutating the base
-    const marked: any = {};
+    // ✅ OPTIMIZED: Don't loop through all dates, just create a shallow copy and update selected
+    const marked = { ...markedDatesBase };
     
-    // Copy base dates and REMOVE any existing selected flags
-    Object.keys(markedDatesBase).forEach(dateKey => {
-      marked[dateKey] = { ...markedDatesBase[dateKey] };
-      delete marked[dateKey].selected;
-      delete marked[dateKey].selectedColor;
-    });
-
+    // Remove selected flag from previous selection if it exists in markedDatesBase
+    // (but we don't know which date was previously selected, so we'll rely on the new object)
+    
     // Now mark ONLY the currently selected date
     if (marked[selectedDateString]) {
       marked[selectedDateString] = {
