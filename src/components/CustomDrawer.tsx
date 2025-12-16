@@ -9,7 +9,7 @@ import {
   Image,
   ActivityIndicator,
   Easing,
-  Alert
+  Alert,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
@@ -22,7 +22,13 @@ import {
   scaleWidth,
   screenHeight,
 } from '../utils/dimensions';
-import { colors, fontSize, spacing, shadows, borderRadius } from '../utils/LightTheme';
+import {
+  colors,
+  fontSize,
+  spacing,
+  shadows,
+  borderRadius,
+} from '../utils/LightTheme';
 import { Fonts } from '../constants/Fonts';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -40,6 +46,7 @@ import CalendarIcon from '../assets/svgs/calendar.svg';
 import TrashIcon from '../assets/svgs/trash.svg';
 import SettingIcon from '../assets/svgs/setting.svg';
 import AddIcon from '../assets/svgs/add.svg';
+import AppointmentIcon from '../assets/svgs/appoitnmentIcon.svg';
 
 interface CustomDrawerProps {
   isOpen: boolean;
@@ -58,14 +65,11 @@ interface Account {
   ncogWalletAddress?: string;
 }
 
-const CustomDrawer: React.FC<CustomDrawerProps> = ({
-  isOpen,
-  onClose,
-}) => {
+const CustomDrawer: React.FC<CustomDrawerProps> = ({ isOpen, onClose }) => {
   const slideAnim = useRef(new Animated.Value(-scaleWidth(280))).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<any>();
-  
+
   // Helper to safely navigate
   const safeNavigate = (routeName: string) => {
     try {
@@ -80,12 +84,12 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     }
   };
   const route = useRoute();
-  
+
   // State to track current route name
   const [currentRouteName, setCurrentRouteName] = useState<string | undefined>(
-    route?.name === 'HomeScreen' ? 'MonthlyCalenderScreen' : route?.name
+    route?.name === 'HomeScreen' ? 'MonthlyCalenderScreen' : route?.name,
   );
-  
+
   // Update route name when navigation state changes
   useEffect(() => {
     const unsubscribe = navigation.addListener('state', () => {
@@ -93,16 +97,20 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
       const currentRoute = state?.routes[state?.index || 0];
       const routeName = currentRoute?.name;
       // Map HomeScreen to MonthlyCalenderScreen for highlighting
-      setCurrentRouteName(routeName === 'HomeScreen' ? 'MonthlyCalenderScreen' : routeName);
+      setCurrentRouteName(
+        routeName === 'HomeScreen' ? 'MonthlyCalenderScreen' : routeName,
+      );
     });
-    
+
     // Also set initial route name
     const state = navigation.getState();
     const currentRoute = state?.routes[state?.index || 0];
     const routeName = currentRoute?.name || route?.name;
     // Map HomeScreen to MonthlyCalenderScreen for highlighting
-    setCurrentRouteName(routeName === 'HomeScreen' ? 'MonthlyCalenderScreen' : routeName);
-    
+    setCurrentRouteName(
+      routeName === 'HomeScreen' ? 'MonthlyCalenderScreen' : routeName,
+    );
+
     return unsubscribe;
   }, [navigation, route?.name]);
 
@@ -119,10 +127,16 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
 
   // State for expandable sections
   const [isMyCalendarsExpanded, setIsMyCalendarsExpanded] = useState(true);
-  const [isOtherCalendarsExpanded, setIsOtherCalendarsExpanded] = useState(true);
+  const [isOtherCalendarsExpanded, setIsOtherCalendarsExpanded] =
+    useState(true);
   const { setAccount, account } = useActiveAccount();
   const [showCreateMenu, setShowCreateMenu] = useState(false);
-  const [createBtnWindowLayout, setCreateBtnWindowLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [createBtnWindowLayout, setCreateBtnWindowLayout] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const createBtnRef = useRef<View | null>(null);
   const menuComputedWidth = scaleWidth(190);
   const { api } = useApiClient();
@@ -130,7 +144,12 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   const [isAccountDropdownOpen, setIsAccountDropdownOpen] = useState(false);
   const [isLoadingAccount, setIsLoadingAccount] = useState(false);
   const [loadingAccountId, setLoadingAccountId] = useState<string | null>(null);
-  const [accountBtnLayout, setAccountBtnLayout] = useState<{ x: number; y: number; width: number; height: number } | null>(null);
+  const [accountBtnLayout, setAccountBtnLayout] = useState<{
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+  } | null>(null);
   const { token, setToken } = useToken();
   const doNavigate = (route: string) => {
     console.log('doNavigate called with route:', route);
@@ -197,7 +216,10 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   };
 
   // Add your fetchAccountTokenAndSave function
-  const fetchAccountTokenAndSave = async (selectedAccount: Account, userName: string) => {
+  const fetchAccountTokenAndSave = async (
+    selectedAccount: Account,
+    userName: string,
+  ) => {
     console.log('userName1234', userName);
 
     const stpra = await AsyncStorage.getItem('token');
@@ -234,12 +256,17 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             console.warn('⚠️ No token received from login API response');
             await AsyncStorage.removeItem('ac');
           }
-          
+
           // Close drawer immediately (non-blocking)
           onClose();
-          
+
           // Load events in background after closing (non-blocking, skip loading screen)
-          getUserEvents(selectedAccount.userName || account.userName, api, undefined, { skipLoading: true }).catch(err => {
+          getUserEvents(
+            selectedAccount.userName || account.userName,
+            api,
+            undefined,
+            { skipLoading: true },
+          ).catch(err => {
             console.error('Background event load failed:', err);
           });
         } else {
@@ -258,17 +285,18 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
       console.log('❌ Login API error:', error);
       await AsyncStorage.removeItem('ac');
     }
-
   };
 
   const handleAccountSelection = async (selectedAccount: Account) => {
-
-    console.log('handleAccountSelection called with:', selectedAccount.userName);
+    console.log(
+      'handleAccountSelection called with:',
+      selectedAccount.userName,
+    );
     console.log('Current active account:', account.userName);
     // Check if the selected account is already active
     if (
       selectedAccount.ncogWalletAddress === account?.ncogWalletAddress &&
-      (selectedAccount.userName === account?.userName)
+      selectedAccount.userName === account?.userName
     ) {
       console.log('Account is already active');
       setIsAccountDropdownOpen(false);
@@ -279,7 +307,10 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     // Call the function to fetch and save token for the selected account
     try {
       // Call the function to fetch and save token for the selected account
-      await fetchAccountTokenAndSave(selectedAccount, selectedAccount.userName || '');
+      await fetchAccountTokenAndSave(
+        selectedAccount,
+        selectedAccount.userName || '',
+      );
     } catch (error) {
       console.error('Error switching account:', error);
     } finally {
@@ -291,8 +322,6 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     // Close the dropdown after selection
     setIsAccountDropdownOpen(false);
   };
-
-
 
   useEffect(() => {
     fetchAccountDetails();
@@ -336,34 +365,33 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
     setIsAccountDropdownOpen(false); // Close dropdown when drawer closes
   }, [isOpen, slideAnim, backdropOpacity]);
 
- 
   const showLogoutConfirm = () => {
     Alert.alert(
-      "Log Out", // Alert Title
-      "Are you sure you want to log out?", // Alert Message
+      'Log Out', // Alert Title
+      'Are you sure you want to log out?', // Alert Message
       [
         // Cancel Button
         {
-          text: "Cancel",
-          onPress: () => console.log("Logout cancelled"),
-          style: "cancel"
+          text: 'Cancel',
+          onPress: () => console.log('Logout cancelled'),
+          style: 'cancel',
         },
         // OK/Confirm Button
         {
-          text: "Log Out",
+          text: 'Log Out',
           onPress: () => {
             handleLogout(); // Execute logout function
-            onClose();      // Close any open menu/modal
+            onClose(); // Close any open menu/modal
           },
-          style: "destructive" // Use 'destructive' style for actions that lose data/session
-        }
+          style: 'destructive', // Use 'destructive' style for actions that lose data/session
+        },
       ],
-      { cancelable: true } // Allows closing the alert by tapping outside
+      { cancelable: true }, // Allows closing the alert by tapping outside
     );
   };
   async function handleLogout() {
     try {
-      console.log("Logging out...");
+      console.log('Logging out...');
 
       // Clear all state
       setAccount(null);
@@ -375,15 +403,13 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
       // Clear AsyncStorage
       await AsyncStorage.clear();
 
-      console.log("Logout complete, navigating to WalletScreen");
+      console.log('Logout complete, navigating to WalletScreen');
 
       // Reset navigation stack to WalletScreen
       navigation.navigate('Wallet');
-
     } catch (error) {
-      console.error("Logout error:", error);
+      console.error('Logout error:', error);
       // Even if there's an error, try to navigate
-
     }
   }
 
@@ -464,182 +490,232 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 style={styles.createButtonGradient}
               >
                 <AddIcon width={20} height={20} fill={Colors.white} />
-                <Text style={[styles.createButtonText, { fontFamily: Fonts.latoMedium }]}>Create</Text>
+                <Text
+                  style={[
+                    styles.createButtonText,
+                    { fontFamily: Fonts.latoMedium },
+                  ]}
+                >
+                  Create
+                </Text>
                 <View style={styles.createButtonSpacer} />
                 <Icon name="chevron-down" size={20} color={Colors.white} />
               </LinearGradient>
             </TouchableOpacity>
           </View>
 
-        <ScrollView
-          style={styles.scrollView}
-          showsVerticalScrollIndicator={false}
-          contentContainerStyle={styles.scrollContent}
-        >
+          <ScrollView
+            style={styles.scrollView}
+            showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+          >
+            {/* Navigation Items Section */}
+            <View style={styles.section}>
+              {/* Daily Calendar */}
+              <View style={styles.navItemContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.navItem,
+                    currentRouteName === 'DailyCalendarScreen' &&
+                      styles.navItemActive,
+                  ]}
+                  onPress={() => {
+                    doNavigate('DailyCalendarScreen');
+                    onClose();
+                  }}
+                >
+                  <CalendarIcon
+                    width={22}
+                    height={22}
+                    fill={
+                      currentRouteName === 'DailyCalendarScreen'
+                        ? colors.primaryBlue
+                        : '#414651'
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.navText,
+                      currentRouteName === 'DailyCalendarScreen' &&
+                        styles.navTextActive,
+                    ]}
+                  >
+                    Daily calendar
+                  </Text>
+                </TouchableOpacity>
+              </View>
 
-          {/* Navigation Items Section */}
-          <View style={styles.section}>
-            {/* Daily Calendar */}
-            <View style={styles.navItemContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.navItem,
-                  currentRouteName === 'DailyCalendarScreen' && styles.navItemActive
-                ]}
-                onPress={() => {
-                  doNavigate('DailyCalendarScreen');
-                  onClose();
-                }}
-              >
-                <CalendarIcon 
-                  width={22} 
-                  height={22} 
-                  fill={currentRouteName === 'DailyCalendarScreen' ? colors.primaryBlue : '#414651'} 
-                />
-                <Text style={[
-                  styles.navText,
-                  currentRouteName === 'DailyCalendarScreen' && styles.navTextActive
-                ]}>
-                  Daily calendar
-                </Text>
-              </TouchableOpacity>
+              {/* Weekly Calendar */}
+              <View style={styles.navItemContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.navItem,
+                    currentRouteName === 'WeekScreen' && styles.navItemActive,
+                  ]}
+                  onPress={() => {
+                    doNavigate('WeekScreen');
+                    onClose();
+                  }}
+                >
+                  <CalendarIcon
+                    width={22}
+                    height={22}
+                    fill={
+                      currentRouteName === 'WeekScreen'
+                        ? colors.primaryBlue
+                        : '#414651'
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.navText,
+                      currentRouteName === 'WeekScreen' && styles.navTextActive,
+                    ]}
+                  >
+                    Weekly calendar
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Monthly Calendar */}
+              <View style={styles.navItemContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.navItem,
+                    currentRouteName === 'MonthlyCalenderScreen' &&
+                      styles.navItemActive,
+                  ]}
+                  onPress={() => {
+                    doNavigate('MonthlyCalenderScreen');
+                    onClose();
+                  }}
+                >
+                  <CalendarIcon
+                    width={22}
+                    height={22}
+                    fill={
+                      currentRouteName === 'MonthlyCalenderScreen'
+                        ? colors.primaryBlue
+                        : '#414651'
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.navText,
+                      currentRouteName === 'MonthlyCalenderScreen' &&
+                        styles.navTextActive,
+                    ]}
+                  >
+                    Monthly calendar
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Schedule */}
+              <View style={styles.navItemContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.navItem,
+                    currentRouteName === 'ScheduleScreen' &&
+                      styles.navItemActive,
+                  ]}
+                  onPress={() => {
+                    console.log('Schedule button pressed');
+                    doNavigate(Screen.ScheduleScreen);
+                    onClose();
+                  }}
+                >
+                  <CalendarIcon
+                    width={22}
+                    height={22}
+                    fill={
+                      currentRouteName === 'ScheduleScreen'
+                        ? colors.primaryBlue
+                        : '#414651'
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.navText,
+                      currentRouteName === 'ScheduleScreen' &&
+                        styles.navTextActive,
+                    ]}
+                  >
+                    Schedule
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Recycle bin / Trash */}
+              <View style={styles.navItemContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.navItem,
+                    currentRouteName === 'DeletedEventsScreen' &&
+                      styles.navItemActive,
+                  ]}
+                  onPress={() => {
+                    doNavigate('DeletedEventsScreen');
+                    onClose();
+                  }}
+                >
+                  <TrashIcon
+                    width={22}
+                    height={22}
+                    fill={
+                      currentRouteName === 'DeletedEventsScreen'
+                        ? colors.primaryBlue
+                        : '#414651'
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.navText,
+                      currentRouteName === 'DeletedEventsScreen' &&
+                        styles.navTextActive,
+                    ]}
+                  >
+                    Recycle bin
+                  </Text>
+                </TouchableOpacity>
+              </View>
+
+              {/* Settings */}
+              <View style={styles.navItemContainer}>
+                <TouchableOpacity
+                  style={[
+                    styles.navItem,
+                    currentRouteName === 'SettingsScreen' &&
+                      styles.navItemActive,
+                  ]}
+                  onPress={() => {
+                    doNavigate('SettingsScreen');
+                    onClose();
+                  }}
+                >
+                  <SettingIcon
+                    width={22}
+                    height={22}
+                    fill={
+                      currentRouteName === 'SettingsScreen'
+                        ? colors.primaryBlue
+                        : '#414651'
+                    }
+                  />
+                  <Text
+                    style={[
+                      styles.navText,
+                      currentRouteName === 'SettingsScreen' &&
+                        styles.navTextActive,
+                    ]}
+                  >
+                    Settings
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
 
-            {/* Weekly Calendar */}
-            <View style={styles.navItemContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.navItem,
-                  currentRouteName === 'WeekScreen' && styles.navItemActive
-                ]}
-                onPress={() => {
-                  doNavigate('WeekScreen');
-                  onClose();
-                }}
-              >
-                <CalendarIcon 
-                  width={22} 
-                  height={22} 
-                  fill={currentRouteName === 'WeekScreen' ? colors.primaryBlue : '#414651'} 
-                />
-                <Text style={[
-                  styles.navText,
-                  currentRouteName === 'WeekScreen' && styles.navTextActive
-                ]}>
-                  Weekly calendar
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Monthly Calendar */}
-            <View style={styles.navItemContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.navItem,
-                  currentRouteName === 'MonthlyCalenderScreen' && styles.navItemActive
-                ]}
-                onPress={() => {
-                  doNavigate('MonthlyCalenderScreen');
-                  onClose();
-                }}
-              >
-                <CalendarIcon 
-                  width={22} 
-                  height={22} 
-                  fill={currentRouteName === 'MonthlyCalenderScreen' ? colors.primaryBlue : '#414651'} 
-                />
-                <Text style={[
-                  styles.navText,
-                  currentRouteName === 'MonthlyCalenderScreen' && styles.navTextActive
-                ]}>
-                  Monthly calendar
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Schedule */}
-            <View style={styles.navItemContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.navItem,
-                  currentRouteName === 'ScheduleScreen' && styles.navItemActive
-                ]}
-                onPress={() => {
-                  console.log('Schedule button pressed');
-                  doNavigate(Screen.ScheduleScreen);
-                  onClose();
-                }}
-              >
-                <CalendarIcon 
-                  width={22} 
-                  height={22} 
-                  fill={currentRouteName === 'ScheduleScreen' ? colors.primaryBlue : '#414651'} 
-                />
-                <Text style={[
-                  styles.navText,
-                  currentRouteName === 'ScheduleScreen' && styles.navTextActive
-                ]}>
-                  Schedule
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Recycle bin / Trash */}
-            <View style={styles.navItemContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.navItem,
-                  currentRouteName === 'DeletedEventsScreen' && styles.navItemActive
-                ]}
-                onPress={() => {
-                  doNavigate('DeletedEventsScreen');
-                  onClose();
-                }}
-              >
-                <TrashIcon 
-                  width={22} 
-                  height={22} 
-                  fill={currentRouteName === 'DeletedEventsScreen' ? colors.primaryBlue : '#414651'} 
-                />
-                <Text style={[
-                  styles.navText,
-                  currentRouteName === 'DeletedEventsScreen' && styles.navTextActive
-                ]}>
-                  Recycle bin
-                </Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Settings */}
-            <View style={styles.navItemContainer}>
-              <TouchableOpacity
-                style={[
-                  styles.navItem,
-                  currentRouteName === 'SettingsScreen' && styles.navItemActive
-                ]}
-                onPress={() => {
-                  doNavigate('SettingsScreen');
-                  onClose();
-                }}
-              >
-                <SettingIcon 
-                  width={22} 
-                  height={22} 
-                  fill={currentRouteName === 'SettingsScreen' ? colors.primaryBlue : '#414651'} 
-                />
-                <Text style={[
-                  styles.navText,
-                  currentRouteName === 'SettingsScreen' && styles.navTextActive
-                ]}>
-                  Settings
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-
-
-
-          {/* <View style={styles.section}>
+            {/* <View style={styles.section}>
             <TouchableOpacity
               style={styles.expandableHeader}
               onPress={toggleMyCalendarsSection}
@@ -759,22 +835,35 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               </>
             )}
           </View> */}
-
-        </ScrollView>
+          </ScrollView>
         </View>
         {showCreateMenu && (
           <View
             style={[
               styles.createMenuContainer,
               {
-                top: (createBtnWindowLayout?.y || 0) + (createBtnWindowLayout?.height || 0) + scaleHeight(8),
+                top:
+                  (createBtnWindowLayout?.y || 0) +
+                  (createBtnWindowLayout?.height || 0) +
+                  scaleHeight(8),
                 left: spacing.md,
                 right: undefined,
-                width: scaleWidth(273) - (spacing.md * 2),
+                width: scaleWidth(273) - spacing.md * 2,
               },
             ]}
             pointerEvents="auto"
           >
+            <TouchableOpacity
+              style={styles.createMenuItem}
+              onPress={() => {
+                console.log('>>>>>>>>> Appointment');
+                setShowCreateMenu(false);
+                doNavigate('AppointmentScheduleScreen');
+                onClose();
+              }}
+            >
+              <Text style={styles.createMenuTextOnly}>Appointment</Text>
+            </TouchableOpacity>
             <TouchableOpacity
               style={styles.createMenuItem}
               onPress={() => {
@@ -1048,7 +1137,6 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: colors.grey20,
     maxHeight: scaleHeight(200),
-
   },
   accountDropdownItem: {
     flexDirection: 'row',
@@ -1112,7 +1200,7 @@ const styles = StyleSheet.create({
   accountDropdownItemLoading: {
     opacity: 0.6,
   },
-   buttonContainer: {
+  buttonContainer: {
     borderRadius: 26,
     overflow: 'hidden',
   },

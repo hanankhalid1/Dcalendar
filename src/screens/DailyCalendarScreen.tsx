@@ -20,6 +20,7 @@ import { Screen } from '../navigations/appNavigation.type';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST, isEventInPast } from '../utils';
+import { expandEventsForRange, formatYMD } from '../utils/recurrence';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
 import {
@@ -83,29 +84,31 @@ const DailyCalendarScreen = () => {
     return `${year}-${month}-${day}`;
   }, [selectedDate]);
 
-  // Group events by date
+  // Group events by date (using expanded instances, same logic as Monthly)
   const { eventsByDate } = useMemo(() => {
     const grouped: { [key: string]: any[] } = {};
+    // Build a one-day range for the selected day
+    const viewStart = new Date(selectedDate);
+    viewStart.setHours(0, 0, 0, 0);
+    const viewEnd = new Date(selectedDate);
+    viewEnd.setHours(23, 59, 59, 999);
 
-    userEvents.forEach(event => {
-      if (!event.fromTime) return;
-
-      const startDate = parseTimeToPST(event.fromTime);
-      if (!startDate || isNaN(startDate.getTime())) return;
-
-      const year = startDate.getFullYear();
-      const month = String(startDate.getMonth() + 1).padStart(2, '0');
-      const day = String(startDate.getDate()).padStart(2, '0');
-      const dateKey = `${year}-${month}-${day}`;
-
-      if (!grouped[dateKey]) {
-        grouped[dateKey] = [];
-      }
-      grouped[dateKey].push(event);
+    const expanded = expandEventsForRange(
+      userEvents || [],
+      viewStart,
+      viewEnd,
+      selectedTimeZone,
+    );
+    expanded.forEach(ev => {
+      const key =
+        ev.instanceDate ||
+        formatYMD(parseTimeToPST(ev.fromTime) || new Date(ev.fromTime));
+      if (!grouped[key]) grouped[key] = [];
+      grouped[key].push(ev);
     });
 
     return { eventsByDate: grouped };
-  }, [userEvents]);
+  }, [userEvents, selectedDate, selectedTimeZone]);
 
   // Get events for selected date and sort by time
   const selectedDateEvents = useMemo(() => {

@@ -19,6 +19,7 @@ import {
 import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import CrossIcon from '../assets/svgs/crossIcon.svg';
+import AppointmentIcon from '../assets/svgs/appoitnmentIcon.svg';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -31,7 +32,7 @@ interface MenuOptionsComponentProps {
 interface MenuOption {
   id: string;
   label: string;
-  iconType: 'calendar' | 'task';
+  iconType: 'calendar' | 'task' | 'appointment';
 }
 
 const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
@@ -43,6 +44,11 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
   const slideAnim = React.useRef(new Animated.Value(20)).current;
 
   const menuOptions: MenuOption[] = [
+    {
+      id: 'appointment',
+      label: 'Create appointment',
+      iconType: 'appointment',
+    },
     {
       id: 'event',
       label: 'Create event',
@@ -95,6 +101,12 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
     const iconColor = '#717680'; // Light gray color to match event and birthday icons
 
     switch (option.iconType) {
+      case 'appointment':
+        return (
+          <View style={styles.iconContainer}>
+            <AppointmentIcon width={iconSize} height={iconSize} />
+          </View>
+        );
       case 'calendar':
         return (
           <View style={styles.iconContainer}>
@@ -138,7 +150,9 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
         >
           {menuOptions.map((option, index) => {
             let itemStyle = styles.menuItem;
-            if (option.id === 'event') {
+            if (option.id === 'appointment') {
+              itemStyle = [styles.menuItem, styles.appointmentItem];
+            } else if (option.id === 'event') {
               itemStyle = [styles.menuItem, styles.eventItem];
             } else if (option.id === 'task') {
               itemStyle = [styles.menuItem, styles.taskItem];
@@ -205,6 +219,9 @@ const styles = StyleSheet.create({
     minWidth: scaleWidth(140),
     maxWidth: SCREEN_WIDTH * 0.5,
     ...shadows.sm,
+  },
+  appointmentItem: {
+    width: SCREEN_WIDTH > 380 ? scaleWidth(210) : scaleWidth(195),
   },
   eventItem: {
     width: SCREEN_WIDTH > 380 ? scaleWidth(160) : scaleWidth(145),

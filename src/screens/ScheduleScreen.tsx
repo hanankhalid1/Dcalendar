@@ -42,6 +42,7 @@ import WeekHeader from '../components/WeekHeader';
 import { useEventsStore } from '../stores/useEventsStore';
 import { useApiClient } from '../hooks/useApi';
 import { parseTimeToPST, isEventInPast } from '../utils';
+import { expandEventsForRange } from '../utils/recurrence';
 import { useSettingsStore } from '../stores/useSetting';
 import { s } from 'react-native-size-matters';
 import CustomAlert from '../components/CustomAlert';
@@ -130,146 +131,22 @@ const ScheduleScreen = () => {
     'All' | 'Upcoming' | 'Completed'
   >('All');
 
-  // Helper function to expand recurring events
+  // Helper function to expand recurring events using shared logic
   const expandRecurringEvents = (allEvents: any[]): any[] => {
-    const expandedEvents: any[] = [];
-
-    allEvents.forEach(event => {
-      // Check if event has recurring pattern
-      const repeatEvent = (event.list || []).find(
-        (item: any) => item.key === 'repeatEvent',
-      )?.value;
-      const customRepeatEvent = (event.list || []).find(
-        (item: any) => item.key === 'customRepeatEvent',
-      )?.value;
-
-      // If no recurring pattern, just add the event as-is
-      if (!repeatEvent && !customRepeatEvent) {
-        expandedEvents.push(event);
-        return;
-      }
-
-      // Get recurrence pattern
-      const pattern = repeatEvent || customRepeatEvent;
-
-      // If pattern exists, expand the event for the next 90 days
-      if (pattern && pattern !== 'Does not repeat') {
-        const baseEvent = event;
-        const baseFromTime = baseEvent.fromTime;
-        const baseDuration = baseEvent.toTime
-          ? new Date(
-              baseEvent.toTime.match(
-                /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?$/,
-              )
-                ? `${baseEvent.toTime.substring(
-                    0,
-                    4,
-                  )}-${baseEvent.toTime.substring(
-                    4,
-                    6,
-                  )}-${baseEvent.toTime.substring(
-                    6,
-                    8,
-                  )}T${baseEvent.toTime.substring(9)}`
-                : baseEvent.toTime,
-            ).getTime() -
-            new Date(
-              baseFromTime.match(
-                /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?$/,
-              )
-                ? `${baseFromTime.substring(0, 4)}-${baseFromTime.substring(
-                    4,
-                    6,
-                  )}-${baseFromTime.substring(6, 8)}T${baseFromTime.substring(
-                    9,
-                  )}`
-                : baseFromTime,
-            ).getTime()
-          : 0;
-
-        // Parse the base date
-        const [, baseYear, baseMonth, baseDay] =
-          baseFromTime.match(/^(\d{4})(\d{2})(\d{2})/) || [];
-        const baseDateObj = new Date(
-          Number(baseYear),
-          Number(baseMonth) - 1,
-          Number(baseDay),
-        );
-
-        // Expand based on pattern
-        const today = new Date();
-        const endDate = new Date(today);
-        endDate.setDate(endDate.getDate() + 90); // Expand for 90 days
-
-        let currentDate = new Date(baseDateObj);
-
-        while (currentDate <= endDate) {
-          if (currentDate >= baseDateObj) {
-            // Create new event instance for this date
-            const expandedFromTime = [
-              currentDate.getFullYear().toString().padStart(4, '0'),
-              (currentDate.getMonth() + 1).toString().padStart(2, '0'),
-              currentDate.getDate().toString().padStart(2, '0'),
-              baseFromTime.substring(9),
-            ].join('');
-
-            const expandedToTime =
-              baseDuration > 0
-                ? [
-                    new Date(currentDate.getTime() + baseDuration)
-                      .getFullYear()
-                      .toString()
-                      .padStart(4, '0'),
-                    (
-                      new Date(
-                        currentDate.getTime() + baseDuration,
-                      ).getMonth() + 1
-                    )
-                      .toString()
-                      .padStart(2, '0'),
-                    new Date(currentDate.getTime() + baseDuration)
-                      .getDate()
-                      .toString()
-                      .padStart(2, '0'),
-                    baseEvent.toTime.substring(9),
-                  ].join('')
-                : expandedFromTime;
-
-            expandedEvents.push({
-              ...baseEvent,
-              fromTime: expandedFromTime,
-              toTime: expandedToTime,
-            });
-          }
-
-          // Increment date based on pattern
-          if (pattern === 'Daily' || pattern.includes('daily')) {
-            currentDate.setDate(currentDate.getDate() + 1);
-          } else if (pattern === 'Weekly' || pattern.includes('weekly')) {
-            currentDate.setDate(currentDate.getDate() + 7);
-          } else if (pattern === 'Monthly' || pattern.includes('monthly')) {
-            currentDate.setMonth(currentDate.getMonth() + 1);
-          } else if (pattern === 'Yearly' || pattern.includes('yearly')) {
-            currentDate.setFullYear(currentDate.getFullYear() + 1);
-          } else {
-            // Default to daily if pattern not recognized
-            currentDate.setDate(currentDate.getDate() + 1);
-          }
-        }
-      } else {
-        // No recurring pattern, add as-is
-        expandedEvents.push(event);
-      }
-    });
-
-    return expandedEvents;
-  };
-
-  useEffect(() => {
-    // Set the initial current month dynamically based on today's date
     const today = new Date();
-    setCurrentMonth(today.toLocaleString('en-US', { month: 'long' }));
-  }, []);
+    const viewStart = new Date(today);
+    viewStart.setDate(viewStart.getDate() - 30);
+    viewStart.setHours(0, 0, 0, 0);
+    const viewEnd = new Date(today);
+    viewEnd.setDate(viewEnd.getDate() + 120);
+    viewEnd.setHours(23, 59, 59, 999);
+    return expandEventsForRange(
+      allEvents || [],
+      viewStart,
+      viewEnd,
+      selectedTimeZone,
+    );
+  };
 
   const transformEventsToCalendar = (
     allEvents: any[],
