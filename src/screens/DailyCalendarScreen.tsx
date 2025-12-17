@@ -89,9 +89,12 @@ const DailyCalendarScreen = () => {
   // Group events by date (using expanded instances, same logic as Monthly)
   const { eventsByDate } = useMemo(() => {
     const grouped: { [key: string]: any[] } = {};
-    const viewStart = new Date(selectedDate);
+
+    // Expand events for a wider range (current month) to catch all recurring instances
+    const today = new Date();
+    const viewStart = new Date(today.getFullYear(), today.getMonth(), 1);
     viewStart.setHours(0, 0, 0, 0);
-    const viewEnd = new Date(selectedDate);
+    const viewEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     viewEnd.setHours(23, 59, 59, 999);
 
     const expanded = expandEventsForRange(
@@ -100,16 +103,34 @@ const DailyCalendarScreen = () => {
       viewEnd,
       selectedTimeZone,
     );
+
     expanded.forEach(ev => {
-      const key =
-        ev.instanceDate ||
-        formatYMD(parseTimeToPST(ev.fromTime) || new Date(ev.fromTime));
+      let key: string;
+
+      // Use instanceDate if available (for recurring events)
+      if (ev.instanceDate) {
+        key = ev.instanceDate;
+      } else if (ev.fromTime) {
+        // Parse the fromTime format (YYYYMMDDTHHmmss) directly
+        const match = ev.fromTime.match(/^(\d{4})(\d{2})(\d{2})/);
+        if (match) {
+          const [, year, month, day] = match;
+          key = `${year}-${month}-${day}`;
+        } else {
+          // Fallback: try parseTimeToPST
+          const parsed = parseTimeToPST(ev.fromTime);
+          key = parsed ? formatYMD(parsed) : formatYMD(new Date());
+        }
+      } else {
+        key = formatYMD(new Date());
+      }
+
       if (!grouped[key]) grouped[key] = [];
       grouped[key].push(ev);
     });
 
     return { eventsByDate: grouped };
-  }, [userEvents, selectedDate, selectedTimeZone]);
+  }, [userEvents, selectedTimeZone]);
 
   // Get events for selected date and sort by time
   const selectedDateEvents = useMemo(() => {
