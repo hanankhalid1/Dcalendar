@@ -61,11 +61,70 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     const date = parseTimeToPST(dateString);
     if (!date) return '';
 
-    return date.toLocaleTimeString('en-US', {
-      hour: 'numeric',
-      minute: '2-digit',
-      hour12: true,
-    });
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const displayHour = hours % 12 || 12;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    return `${displayHour}:${String(minutes).padStart(2, '0')} ${ampm}`;
+  };
+
+  const extractEventTimezone = (): string | null => {
+    if (event?.timezone && typeof event.timezone === 'string') {
+      return event.timezone;
+    }
+
+    if (Array.isArray(event?.list)) {
+      const timezoneTag = event.list.find(
+        (tag: any) => tag && tag.key === 'timezone' && typeof tag.value === 'string',
+      );
+      if (timezoneTag?.value) {
+        return timezoneTag.value;
+      }
+    }
+
+    return null;
+  };
+
+  const formatTimezoneAbbreviation = (timezone: string): string => {
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        hour: 'numeric',
+        timeZoneName: 'short',
+      });
+      const tzName = formatter
+        .formatToParts(new Date())
+        .find(part => part.type === 'timeZoneName')?.value;
+
+      if (tzName) {
+        return tzName;
+      }
+    } catch (error) {
+      console.warn('Timezone formatting failed:', error);
+    }
+
+    return timezone;
+  };
+
+  const normalizeTimezone = (timezone?: string | null) =>
+    (timezone || '').trim().toLowerCase();
+
+  const getTimezoneLabel = (): string | null => {
+    const eventTimezone = extractEventTimezone();
+    if (!eventTimezone) return null;
+
+    let deviceTimezone: string | null = null;
+    try {
+      deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (error) {
+      console.warn('Unable to resolve device timezone:', error);
+    }
+
+    const shouldShowTimezone =
+      !deviceTimezone ||
+      normalizeTimezone(eventTimezone) !== normalizeTimezone(deviceTimezone);
+
+    return shouldShowTimezone ? formatTimezoneAbbreviation(eventTimezone) : null;
   };
 
   const formatEventDuration = () => {
@@ -76,18 +135,22 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
 
     const startTime = formatEventTime(event.fromTime);
     const endTime = formatEventTime(event.toTime);
+    const timezoneLabel = getTimezoneLabel();
 
     // Check if it's a multi-day event
     const startDay = startDate.toDateString();
     const endDay = endDate.toDateString();
 
+    let baseTime = '';
     if (startDay === endDay) {
-      return `${startTime} to ${endTime}`;
+      baseTime = `${startTime} to ${endTime}`;
     } else {
-      return `${formatEventDate(
+      baseTime = `${formatEventDate(
         event.fromTime,
       )}, ${startTime} to ${formatEventDate(event.toTime)}, ${endTime}`;
     }
+
+    return timezoneLabel ? `${baseTime} (${timezoneLabel})` : baseTime;
   };
 
   const getGuestCount = () => {

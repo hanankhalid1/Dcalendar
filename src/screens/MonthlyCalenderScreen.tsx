@@ -1232,6 +1232,27 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     return colorOptions[index];
   };
 
+  const formatTimeWithoutTimezone = (date?: Date | null) => {
+    if (!date || isNaN(date.getTime())) return '';
+    const hours = date.getHours();
+    const minutes = date.getMinutes();
+    const displayHour = hours % 12 || 12;
+    const ampm = hours >= 12 ? 'PM' : 'AM';
+    return `${displayHour}:${String(minutes).padStart(2, '0')} ${ampm}`;
+  };
+
+  const formatEventTimeRange = (event: any) => {
+    const start = parseTimeToPST(event.fromTime) || event.instanceStartTime;
+    const end = parseTimeToPST(event.toTime) || event.instanceEndTime;
+
+    const startText = formatTimeWithoutTimezone(start);
+    const endText = !event?.isTask && end
+      ? formatTimeWithoutTimezone(end)
+      : '';
+
+    return endText ? `${startText} - ${endText}` : startText;
+  };
+
   const selectedDateEvents = eventsByDate[selectedDateString] || [];
 
   console.log('Selected date:', selectedDateString);
@@ -1314,10 +1335,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                     }}
                   >
                     <Text style={[styles.eventTime]}>
-                      {event.instanceStartTime?.toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
+                      {formatTimeWithoutTimezone(event.instanceStartTime)}
                     </Text>
 
                     {/* Line */}
@@ -1342,24 +1360,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                         <View style={styles.badge}>
                           <ClockIcon height={14} width={14} />
                           <Text style={styles.eventTime}>
-                            {parseTimeToPST(event.fromTime)?.toLocaleTimeString(
-                              'en-US',
-                              {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              },
-                            )}
-                            {!event.isTask && (
-                              <>
-                                {' - '}
-                                {parseTimeToPST(
-                                  event.toTime,
-                                )?.toLocaleTimeString('en-US', {
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                })}
-                              </>
-                            )}
+                            {formatEventTimeRange(event)}
                           </Text>
                         </View>
 

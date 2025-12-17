@@ -230,6 +230,70 @@ const EventCard: React.FC<EventCardProps> = ({
   const recurrenceInfo = getRecurrenceInfo();
   const progress = getProgress();
 
+  const extractEventTimezone = (): string | null => {
+    if (eventData?.timezone && typeof eventData.timezone === 'string') {
+      return eventData.timezone;
+    }
+
+    if (Array.isArray(eventData?.list)) {
+      const timezoneTag = eventData.list.find(
+        (tag: any) =>
+          tag && tag.key === 'timezone' && typeof tag.value === 'string',
+      );
+      if (timezoneTag?.value) {
+        return timezoneTag.value;
+      }
+    }
+
+    return null;
+  };
+
+  const formatTimezoneAbbreviation = (timezone: string): string => {
+    try {
+      const formatter = new Intl.DateTimeFormat('en-US', {
+        timeZone: timezone,
+        hour: 'numeric',
+        timeZoneName: 'short',
+      });
+      const tzName = formatter
+        .formatToParts(new Date())
+        .find(part => part.type === 'timeZoneName')?.value;
+
+      if (tzName) {
+        return tzName;
+      }
+    } catch (error) {
+      console.warn('Timezone formatting failed:', error);
+    }
+
+    return timezone;
+  };
+
+  const normalizeTimezone = (timezone?: string | null) =>
+    (timezone || '').trim().toLowerCase();
+
+  const eventTimezone = extractEventTimezone();
+  const deviceTimezone = (() => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (error) {
+      console.warn('Unable to resolve device timezone:', error);
+      return null;
+    }
+  })();
+
+  const shouldShowTimezone =
+    !!eventTimezone &&
+    (!deviceTimezone ||
+      normalizeTimezone(eventTimezone) !== normalizeTimezone(deviceTimezone));
+
+  const timezoneLabel =
+    shouldShowTimezone && eventTimezone
+      ? formatTimezoneAbbreviation(eventTimezone)
+      : null;
+
+  const timeWithTimezone = timezoneLabel ? `${time} (${timezoneLabel})` : time;
+
   const handleDeleteEvent = async (eventId: string) => {
     try {
       if (!account) {
@@ -344,7 +408,7 @@ const EventCard: React.FC<EventCardProps> = ({
               {/* Time Badge */}
               <View style={styles.compactBadge}>
                 <ClockIcon height={14} width={14} />
-                <Text style={styles.compactBadgeText}>{time}</Text>
+                <Text style={styles.compactBadgeText}>{timeWithTimezone}</Text>
               </View>
 
               {/* Recurrence Badge */}
@@ -471,7 +535,7 @@ const EventCard: React.FC<EventCardProps> = ({
               <View style={styles.expandedContentContainer}>
                 {/* Time and Date Information */}
                 <Text style={styles.compactTimeDate}>
-                  {time}, {date}
+                  {timeWithTimezone}, {date}
                 </Text>
 
                 {/* Tags - Only show if event has tags */}
@@ -581,7 +645,7 @@ const EventCard: React.FC<EventCardProps> = ({
 
         {/* Time and Date */}
         <Text style={styles.timeDate}>
-          {time}, {date}
+          {timeWithTimezone}, {date}
         </Text>
 
         {/* Expanded Content - Now available for all events */}
