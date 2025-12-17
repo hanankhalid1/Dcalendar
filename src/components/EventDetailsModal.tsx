@@ -75,7 +75,8 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
 
     if (Array.isArray(event?.list)) {
       const timezoneTag = event.list.find(
-        (tag: any) => tag && tag.key === 'timezone' && typeof tag.value === 'string',
+        (tag: any) =>
+          tag && tag.key === 'timezone' && typeof tag.value === 'string',
       );
       if (timezoneTag?.value) {
         return timezoneTag.value;
@@ -124,7 +125,9 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
       !deviceTimezone ||
       normalizeTimezone(eventTimezone) !== normalizeTimezone(deviceTimezone);
 
-    return shouldShowTimezone ? formatTimezoneAbbreviation(eventTimezone) : null;
+    return shouldShowTimezone
+      ? formatTimezoneAbbreviation(eventTimezone)
+      : null;
   };
 
   const formatEventDuration = () => {

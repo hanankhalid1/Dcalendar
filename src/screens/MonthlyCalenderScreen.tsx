@@ -1246,9 +1246,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     const end = parseTimeToPST(event.toTime) || event.instanceEndTime;
 
     const startText = formatTimeWithoutTimezone(start);
-    const endText = !event?.isTask && end
-      ? formatTimeWithoutTimezone(end)
-      : '';
+    const endText = !event?.isTask && end ? formatTimeWithoutTimezone(end) : '';
 
     return endText ? `${startText} - ${endText}` : startText;
   };
