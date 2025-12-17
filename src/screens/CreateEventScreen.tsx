@@ -2964,6 +2964,17 @@ const CreateEventScreen = () => {
     selectedVideoConferencing,
   );
 
+  // Close any open inline dropdowns/modals when another is about to open
+  const closeInlineDropdowns = React.useCallback(() => {
+    setShowVideoConferencingOptions(false);
+    setShowRecurrenceDropdown(false);
+    setShowEventTypeDropdown(false);
+    setShowGuestDropdown(false);
+    setShowGuestModal(false);
+    setShowCalendarModal(false);
+    setShowTimezoneModal(false);
+  }, []);
+
   return (
     <View style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.white} />
@@ -3080,6 +3091,7 @@ const CreateEventScreen = () => {
                 style={styles.datePicker}
                 onPress={() => {
                   if (!isLoading) {
+                    closeInlineDropdowns();
                     setCalendarMode('from');
                     setShowCalendarModal(true);
                   }
@@ -3123,6 +3135,7 @@ const CreateEventScreen = () => {
                 style={styles.datePicker}
                 onPress={() => {
                   if (!isLoading) {
+                    closeInlineDropdowns();
                     setCalendarMode('to');
                     setShowCalendarModal(true);
                   }
@@ -3220,6 +3233,7 @@ const CreateEventScreen = () => {
               style={styles.timezoneTag}
               onPress={() => {
                 if (!isLoading) {
+                  closeInlineDropdowns();
                   setShowTimezoneModal(true);
                 }
               }}
@@ -3243,9 +3257,7 @@ const CreateEventScreen = () => {
                   ]}
                   onPress={() => {
                     if (!isLoading) {
-                      // Close all other dropdowns before toggling repeat dropdown
-                      setShowVideoConferencingOptions(false);
-                      setShowGuestDropdown(false);
+                      closeInlineDropdowns();
                       setShowRecurrenceDropdown(!showRecurrenceDropdown);
                       setActiveField(showRecurrenceDropdown ? null : 'repeat');
                     }
@@ -3340,14 +3352,14 @@ const CreateEventScreen = () => {
                 onGuestSelect={handleGuestSelect}
                 onToggleDropdown={() => {
                   if (!isLoading) {
-                    // Close repeat dropdown when opening guest dropdown
-                    setShowRecurrenceDropdown(false);
+                    closeInlineDropdowns();
                     setShowGuestDropdown(!showGuestDropdown);
                   }
                 }}
                 showGuestModal={showGuestModal}
                 onToggleGuestModal={() => {
                   if (!isLoading) {
+                    closeInlineDropdowns();
                     setShowGuestModal(!showGuestModal);
                   }
                 }}
@@ -3367,9 +3379,8 @@ const CreateEventScreen = () => {
                 ]}
                 onPress={() => {
                   if (!isLoading) {
+                    closeInlineDropdowns();
                     setActiveField('videoConferencing');
-                    // Close repeat dropdown when opening video conferencing
-                    setShowRecurrenceDropdown(false);
                     setShowVideoConferencingOptions(
                       !showVideoConferencingOptions,
                     );
@@ -3599,6 +3610,7 @@ const CreateEventScreen = () => {
                 }
                 selectedTimeUnit={selectedTimeUnit}
                 onTimeUnitChange={setSelectedTimeUnit}
+                onAnyDropdownOpen={closeInlineDropdowns}
                 selectedNotificationType={selectedNotificationType}
                 onNotificationTypeChange={setSelectedNotificationType}
                 onAddNotification={() => {

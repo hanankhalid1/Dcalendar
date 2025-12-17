@@ -105,8 +105,9 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
       guest.username.toLowerCase().includes(normalizedQuery),
   );
   const hasSearchTerm = normalizedQuery.length > 0;
+  // Show no-results state immediately while typing (not gated on contacts being loaded)
   const hasNoResults =
-    hasSearchTerm && filteredGuests.length === 0 && guests.length > 0;
+    hasSearchTerm && !isLoading && !error && filteredGuests.length === 0;
   // Allow adding if guests are selected, even if current search has no results
   const isAddDisabled = selectedGuests.length === 0 || disabled;
   return (
@@ -173,6 +174,17 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               />
             </View>
 
+            {/* Inline no-results helper under search input to avoid keyboard overlap */}
+            {hasNoResults && (
+              <View style={styles.inlineNoResultsContainer}>
+                <Text style={styles.inlineErrorTitle}>No such guest found</Text>
+                <Text style={styles.inlineErrorSubtext}>
+                  Please check the spelling or try searching by email or
+                  username.
+                </Text>
+              </View>
+            )}
+
             {/* Guest List */}
             {isLoading ? (
               <View style={styles.loadingContainer}>
@@ -190,15 +202,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               </View>
             ) : filteredGuests.length === 0 ? (
               <View style={styles.emptyContainer}>
-                {hasSearchTerm ? (
-                  <View style={styles.noResultsContainer}>
-                    <Text style={styles.errorText}>No such guest found</Text>
-                    <Text style={styles.errorSubtext}>
-                      Please check the spelling or try searching by \n email or
-                      username.
-                    </Text>
-                  </View>
-                ) : (
+                {!hasSearchTerm && (
                   <Text style={styles.emptyText}>No contacts available</Text>
                 )}
               </View>
@@ -389,6 +393,20 @@ const styles = StyleSheet.create({
     flex: 1,
     paddingHorizontal: spacing.lg,
     maxHeight: '100%',
+  },
+  inlineNoResultsContainer: {
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.sm,
+  },
+  inlineErrorTitle: {
+    fontSize: fontSize.textSize14,
+    color: '#EF4444',
+    fontFamily: Fonts.latoMedium,
+  },
+  inlineErrorSubtext: {
+    fontSize: fontSize.textSize12,
+    color: '#9CA3AF',
+    marginTop: 4,
   },
   guestItem: {
     flexDirection: 'row',

@@ -21,6 +21,10 @@ interface StatusVisibilitySelectorProps {
   visibility?: string;
   onStatusChange?: (value: string) => void;
   onVisibilityChange?: (value: string) => void;
+  // Notify parent when a specific dropdown is opening (status|visibility)
+  onAnyDropdownOpen?: (source: 'status' | 'visibility') => void;
+  // Register a closer for parent coordination
+  registerCloser?: (key: 'status' | 'visibility', closeFn: () => void) => void;
 }
 
 const StatusVisibilitySelector: React.FC<StatusVisibilitySelectorProps> = ({
@@ -28,6 +32,8 @@ const StatusVisibilitySelector: React.FC<StatusVisibilitySelectorProps> = ({
   visibility = 'Default visibility',
   onStatusChange,
   onVisibilityChange,
+  onAnyDropdownOpen,
+  registerCloser,
 }) => {
   const [showStatusOptions, setShowStatusOptions] = useState(false);
   const [showVisibilityOptions, setShowVisibilityOptions] = useState(false);
@@ -45,6 +51,12 @@ const StatusVisibilitySelector: React.FC<StatusVisibilitySelectorProps> = ({
     setShowVisibilityOptions(false);
   };
 
+  // Register closers so parent can close these menus
+  React.useEffect(() => {
+    registerCloser?.('status', () => setShowStatusOptions(false));
+    registerCloser?.('visibility', () => setShowVisibilityOptions(false));
+  }, [registerCloser]);
+
   return (
     <View style={styles.container}>
       {/* Availability */}
@@ -57,6 +69,8 @@ const StatusVisibilitySelector: React.FC<StatusVisibilitySelectorProps> = ({
           ]}
           activeOpacity={0.7}
           onPress={() => {
+            // Notify parent so other dropdowns/fields can close
+            onAnyDropdownOpen?.('status');
             setShowVisibilityOptions(false);
             setShowStatusOptions(prev => !prev);
           }}
@@ -107,6 +121,8 @@ const StatusVisibilitySelector: React.FC<StatusVisibilitySelectorProps> = ({
           ]}
           activeOpacity={0.7}
           onPress={() => {
+            // Notify parent so other dropdowns/fields can close
+            onAnyDropdownOpen?.('visibility');
             setShowStatusOptions(false);
             setShowVisibilityOptions(prev => !prev);
           }}

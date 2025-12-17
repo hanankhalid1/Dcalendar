@@ -23,6 +23,10 @@ interface NotificationSettingsProps {
   onNotificationMinutesChange: (minutes: number) => void;
   selectedTimeUnit?: string;
   onTimeUnitChange?: (unit: string) => void;
+  // Called when the time unit dropdown is about to open
+  onDropdownOpen?: () => void;
+  // Register a closer so parent can close this dropdown when others open
+  registerCloser?: (closeFn: () => void) => void;
 }
 
 const NotificationSettings: React.FC<NotificationSettingsProps> = ({
@@ -30,6 +34,8 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({
   onNotificationMinutesChange,
   selectedTimeUnit = 'Minutes',
   onTimeUnitChange,
+  onDropdownOpen,
+  registerCloser,
 }) => {
   const [showTimeUnitDropdown, setShowTimeUnitDropdown] = React.useState(false);
 
@@ -41,6 +47,19 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({
     }
     setShowTimeUnitDropdown(false);
   };
+
+  // Auto-close the dropdown whenever the selected unit changes
+  React.useEffect(() => {
+    if (showTimeUnitDropdown) {
+      setShowTimeUnitDropdown(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedTimeUnit]);
+
+  // Expose a closer to parent coordinator
+  React.useEffect(() => {
+    registerCloser?.(() => setShowTimeUnitDropdown(false));
+  }, [registerCloser]);
   return (
     <View style={styles.fieldContainer}>
       <Text style={styles.labelText}>Notification</Text>
@@ -87,11 +106,24 @@ const NotificationSettings: React.FC<NotificationSettingsProps> = ({
             styles.timeUnitDropdown,
             showTimeUnitDropdown && styles.timeUnitDropdownActive,
           ]}
-          onPress={() => setShowTimeUnitDropdown(!showTimeUnitDropdown)}
+          onPress={() => {
+            // Notify parent so other dropdowns close
+            onDropdownOpen?.();
+            setShowTimeUnitDropdown(!showTimeUnitDropdown);
+          }}
         >
           <Text style={styles.timeUnitText}>{selectedTimeUnit}</Text>
           <FeatherIcon name="chevron-down" size={14} color="#6C6C6C" />
         </TouchableOpacity>
+
+        {/* Outside tap overlay to close dropdown reliably */}
+        {showTimeUnitDropdown && (
+          <TouchableOpacity
+            style={styles.dropdownOverlay}
+            activeOpacity={1}
+            onPress={() => setShowTimeUnitDropdown(false)}
+          />
+        )}
 
         {/* Time Unit Dropdown Menu */}
         {showTimeUnitDropdown && (
@@ -222,6 +254,15 @@ const styles = StyleSheet.create({
         elevation: 4,
       },
     }),
+  },
+  dropdownOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'transparent',
+    zIndex: 999,
   },
   timeUnitOption: {
     paddingVertical: spacing.sm,
