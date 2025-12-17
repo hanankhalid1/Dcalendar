@@ -311,9 +311,13 @@ const ScheduleScreen = () => {
       .sort()
       .map(dateKey => {
         const dateObj = new Date(dateKey);
-        const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+        const weekday = dateObj
+          .toLocaleDateString('en-US', { weekday: 'short' })
+          .toUpperCase();
         const day = dateObj.getDate().toString().padStart(2, '0');
-        const month = dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
+        const month = dateObj
+          .toLocaleDateString('en-US', { month: 'short' })
+          .toUpperCase();
 
         return {
           day: weekday,
@@ -367,7 +371,11 @@ const ScheduleScreen = () => {
     today.setHours(0, 0, 0, 0);
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     firstDayOfMonth.setHours(0, 0, 0, 0);
-    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const lastDayOfMonth = new Date(
+      today.getFullYear(),
+      today.getMonth() + 1,
+      0,
+    );
     lastDayOfMonth.setHours(23, 59, 59, 999);
 
     const result: any[] = [];
@@ -534,20 +542,23 @@ const ScheduleScreen = () => {
   }, [events]);
 
   // Memoize event cards to prevent re-renders
-  const renderEventCard = useCallback((event: any, dateKey: string, index: number) => (
-    <EventCard
-      key={event.id || `${dateKey}-${index}`}
-      title={event.title}
-      eventId={event.id}
-      event={event}
-      time={event.time}
-      date={event.date}
-      color={event.color}
-      tags={event.tags}
-      compact={true}
-      onEdit={() => handleEditEvent(event)}
-    />
-  ), []);
+  const renderEventCard = useCallback(
+    (event: any, dateKey: string, index: number) => (
+      <EventCard
+        key={event.id || `${dateKey}-${index}`}
+        title={event.title}
+        eventId={event.id}
+        event={event}
+        time={event.time}
+        date={event.date}
+        color={event.color}
+        tags={event.tags}
+        compact={true}
+        onEdit={() => handleEditEvent(event)}
+      />
+    ),
+    [],
+  );
 
   // Fetch events on mount or when account changes
   useEffect(() => {
@@ -739,7 +750,7 @@ const ScheduleScreen = () => {
                   <View style={styles.dateDivider} />
                 </View>
                 {dateEvents.map((event: any, index: number) =>
-                  renderEventCard(event, dateKey, index)
+                  renderEventCard(event, dateKey, index),
                 )}
               </View>
             ),
