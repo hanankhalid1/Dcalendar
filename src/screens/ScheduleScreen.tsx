@@ -383,11 +383,16 @@ const ScheduleScreen = () => {
     const today = new Date();
     today.setHours(0, 0, 0, 0); // Start of today
 
-    const sevenDaysFromNow = new Date(today);
-    sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7); // 7 days from now
+    // Calculate first and last day of current month
+    const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+    firstDayOfMonth.setHours(0, 0, 0, 0);
 
-    const sevenDaysAgo = new Date(today);
-    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7); // 7 days ago
+    const lastDayOfMonth = new Date(
+      today.getFullYear(),
+      today.getMonth() + 1,
+      0,
+    );
+    lastDayOfMonth.setHours(23, 59, 59, 999);
 
     return allEvents
       .map(dayGroup => {
@@ -418,11 +423,11 @@ const ScheduleScreen = () => {
           eventDate.setHours(0, 0, 0, 0); // Normalize to start of day
 
           if (tab === 'Upcoming') {
-            // Show events from today onwards up to 7 days from now
-            return eventDate >= today && eventDate < sevenDaysFromNow;
+            // Show all upcoming events from today to end of month
+            return eventDate >= today && eventDate <= lastDayOfMonth;
           } else if (tab === 'Completed') {
-            // Show events from 7 days ago up to yesterday
-            return eventDate >= sevenDaysAgo && eventDate < today;
+            // Show all completed events from start of month to yesterday
+            return eventDate >= firstDayOfMonth && eventDate < today;
           }
           return true;
         });

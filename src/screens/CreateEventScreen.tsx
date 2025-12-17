@@ -743,6 +743,13 @@ const CreateEventScreen = () => {
     }
   };
 
+  // Ensure the video conferencing dropdown closes whenever a selection is made
+  useEffect(() => {
+    if (showVideoConferencingOptions && selectedVideoConferencing) {
+      setShowVideoConferencingOptions(false);
+    }
+  }, [selectedVideoConferencing]);
+
   useEffect(() => {
     if (selectedStartDate) {
       const weekday = selectedStartDate.toLocaleDateString('en-US', {
