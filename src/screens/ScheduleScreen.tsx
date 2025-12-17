@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
   StyleSheet,
   View,
@@ -6,6 +6,8 @@ import {
   TouchableOpacity,
   Text,
   Alert,
+  FlatList,
+  InteractionManager,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { AppNavigationProp, Screen } from '../navigations/appNavigation.type';
@@ -131,22 +133,23 @@ const ScheduleScreen = () => {
     'All' | 'Upcoming' | 'Completed'
   >('All');
 
-  // Helper function to expand recurring events using shared logic
-  const expandRecurringEvents = (allEvents: any[]): any[] => {
+  // Memoize expanded recurring events separately with reduced range
+  const expandedRecurringEvents = useMemo(() => {
+    if (!userEvents || userEvents.length === 0) return [];
     const today = new Date();
     const viewStart = new Date(today);
     viewStart.setDate(viewStart.getDate() - 30);
     viewStart.setHours(0, 0, 0, 0);
     const viewEnd = new Date(today);
-    viewEnd.setDate(viewEnd.getDate() + 120);
+    viewEnd.setDate(viewEnd.getDate() + 30); // Reduced from 120 to 30 days
     viewEnd.setHours(23, 59, 59, 999);
     return expandEventsForRange(
-      allEvents || [],
+      userEvents,
       viewStart,
       viewEnd,
       selectedTimeZone,
     );
-  };
+  }, [userEvents, selectedTimeZone]);
 
   const transformEventsToCalendar = (
     allEvents: any[],
@@ -155,9 +158,7 @@ const ScheduleScreen = () => {
     const groupedEvents: Record<string, any[]> = {};
 
     allEvents.forEach(event => {
-      console.log('event in transform func', event.title);
       if (!event.fromTime) {
-        console.warn('Missing fromTime:', event);
         return;
       }
 
@@ -210,7 +211,6 @@ const ScheduleScreen = () => {
           : null;
 
         if (!startTimeDate || isNaN(startTimeDate.getTime())) {
-          console.warn('Invalid fromTime after parsing:', event);
           return;
         }
 
@@ -248,9 +248,6 @@ const ScheduleScreen = () => {
                 },
               }
             : null;
-
-        console.log('startTimeData in transform func', startTimeData);
-        console.log('endTimeData in transform func', endTimeData);
       }
 
       const isTask = (event.list || []).some(
@@ -284,8 +281,6 @@ const ScheduleScreen = () => {
               endTimeData.displayValues.minute,
             )
           : '';
-        console.log('startTime in transform func', startTime);
-        console.log('endTime in transform func', endTime);
         eventTime = `${startTime} - ${endTime}`;
       } else {
         // Fallback if time data is missing
@@ -316,15 +311,14 @@ const ScheduleScreen = () => {
       .sort()
       .map(dateKey => {
         const dateObj = new Date(dateKey);
+        const weekday = dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase();
+        const day = dateObj.getDate().toString().padStart(2, '0');
+        const month = dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase();
 
         return {
-          day: dateObj
-            .toLocaleDateString('en-US', { weekday: 'short' })
-            .toUpperCase(),
-          date: dateObj.getDate().toString().padStart(2, '0'),
-          month: dateObj
-            .toLocaleDateString('en-US', { month: 'short' })
-            .toUpperCase(),
+          day: weekday,
+          date: day,
+          month: month,
           events: groupedEvents[dateKey].sort(
             (a, b) => a.sortDate.getTime() - b.sortDate.getTime(),
           ),
@@ -343,31 +337,20 @@ const ScheduleScreen = () => {
       return allEvents;
     }
 
-    return allEvents
-      .map(dayGroup => {
-        // Filter the events within each day group
-        const filteredEvents = dayGroup.events.filter((event: any) => {
-          const isTask = (event.tags || []).some(
-            (item: any) => item.key === 'task',
-          );
+    const result: any[] = [];
+    for (const dayGroup of allEvents) {
+      const filteredEvents = dayGroup.events.filter((event: any) => {
+        const isTask = (event.tags || []).some(
+          (item: any) => item.key === 'task',
+        );
+        return filter === 'EventsOnly' ? !isTask : isTask;
+      });
 
-          if (filter === 'EventsOnly') {
-            // Action 1: Show only non-tasks (Events)
-            return !isTask;
-          } else if (filter === 'TasksOnly') {
-            // Action 2: Show only tasks
-            return isTask;
-          }
-          return true;
-        });
-
-        // Return the day group only if it still has events after filtering
-        if (filteredEvents.length > 0) {
-          return { ...dayGroup, events: filteredEvents };
-        }
-        return null;
-      })
-      .filter(dayGroup => dayGroup !== null); // Remove null entries
+      if (filteredEvents.length > 0) {
+        result.push({ ...dayGroup, events: filteredEvents });
+      }
+    }
+    return result;
   };
   // ------------------------------------------------
 
@@ -381,63 +364,41 @@ const ScheduleScreen = () => {
     }
 
     const today = new Date();
-    today.setHours(0, 0, 0, 0); // Start of today
-
-    // Calculate first and last day of current month
+    today.setHours(0, 0, 0, 0);
     const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
     firstDayOfMonth.setHours(0, 0, 0, 0);
-
-    const lastDayOfMonth = new Date(
-      today.getFullYear(),
-      today.getMonth() + 1,
-      0,
-    );
+    const lastDayOfMonth = new Date(today.getFullYear(), today.getMonth() + 1, 0);
     lastDayOfMonth.setHours(23, 59, 59, 999);
 
-    return allEvents
-      .map(dayGroup => {
-        const filteredEvents = dayGroup.events.filter((event: any) => {
-          const eventData = event.originalRawEventData || event;
-
-          // Get event date from sortDate or parse fromTime
-          let eventDate: Date;
-          if (event.sortDate) {
-            eventDate = new Date(event.sortDate);
-          } else if (eventData.fromTime) {
-            // Parse the fromTime format (YYYYMMDDTHHmmss)
-            const match = eventData.fromTime.match(/^(\d{4})(\d{2})(\d{2})/);
-            if (match) {
-              const [, year, month, day] = match;
-              eventDate = new Date(
-                Number(year),
-                Number(month) - 1,
-                Number(day),
-              );
-            } else {
-              return false;
-            }
+    const result: any[] = [];
+    for (const dayGroup of allEvents) {
+      const filteredEvents = dayGroup.events.filter((event: any) => {
+        const eventData = event.originalRawEventData || event;
+        let eventDate: Date;
+        if (event.sortDate) {
+          eventDate = new Date(event.sortDate);
+        } else if (eventData.fromTime) {
+          const match = eventData.fromTime.match(/^(\d{4})(\d{2})(\d{2})/);
+          if (match) {
+            const [, year, month, day] = match;
+            eventDate = new Date(Number(year), Number(month) - 1, Number(day));
           } else {
             return false;
           }
-
-          eventDate.setHours(0, 0, 0, 0); // Normalize to start of day
-
-          if (tab === 'Upcoming') {
-            // Show all upcoming events from today to end of month
-            return eventDate >= today && eventDate <= lastDayOfMonth;
-          } else if (tab === 'Completed') {
-            // Show all completed events from start of month to yesterday
-            return eventDate >= firstDayOfMonth && eventDate < today;
-          }
-          return true;
-        });
-
-        if (filteredEvents.length > 0) {
-          return { ...dayGroup, events: filteredEvents };
+        } else {
+          return false;
         }
-        return null;
-      })
-      .filter(dayGroup => dayGroup !== null);
+        eventDate.setHours(0, 0, 0, 0);
+        return tab === 'Upcoming'
+          ? eventDate >= today && eventDate <= lastDayOfMonth
+          : eventDate >= firstDayOfMonth && eventDate < today;
+      });
+
+      if (filteredEvents.length > 0) {
+        result.push({ ...dayGroup, events: filteredEvents });
+      }
+    }
+    return result;
   };
 
   // Format date header like DeletedEventsScreen
@@ -489,121 +450,6 @@ const ScheduleScreen = () => {
     return grouped;
   };
 
-  useFocusEffect(
-    useCallback(() => {
-      console.log('User Events in HomeScreen:', userEvents);
-
-      // Expand recurring events first
-      const expandedEvents = expandRecurringEvents(userEvents);
-      console.log(
-        'Expanded events count:',
-        expandedEvents.length,
-        'Original count:',
-        userEvents.length,
-      );
-
-      let transformedData = transformEventsToCalendar(
-        expandedEvents,
-        selectedTimeZone,
-      );
-
-      // --- APPLY TASK/EVENT FILTER FIRST ---
-      transformedData = filterEventsByTaskType(transformedData, filterType);
-      // -------------------------------------
-
-      // --- APPLY TAB FILTER (All, Upcoming, Completed) ---
-      transformedData = filterEventsByTab(transformedData, selectedTab);
-      // -------------------------------------
-
-      // Only apply filterEventsByView if we're on the "All" tab
-      // For Upcoming and Completed, we want to see the full 7-day range regardless of Week/Month view
-      if (selectedTab === 'All') {
-        // For "All" tab, always show full month regardless of currentView selection
-        const filteredData = filterEventsByView(transformedData, 'Month');
-        setEvents(filteredData);
-      } else {
-        // For Upcoming and Completed tabs, don't apply week/month filter
-        setEvents(transformedData);
-      }
-    }, [userEvents, currentView, selectedTimeZone, filterType, selectedTab]), // Added selectedTab dependency
-  );
-
-  // console.log('All Events',allEvents);
-  useEffect(() => {
-    const fetchEvents = async () => {
-      try {
-        setLoading(true);
-        console.log('Fetching events for user:', account[3]);
-
-        const events = await getUserEvents(account[3], api);
-        console.log('events fetched in 179', events);
-      } catch (error) {
-        console.error('Error fetching events:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchEvents();
-  }, [userName]);
-
-  const handleMenuPress = () => {
-    setIsDrawerOpen(true);
-  };
-
-  const handleDrawerClose = () => {
-    setIsDrawerOpen(false);
-  };
-
-  const handleMonthSelect = (monthIndex: number) => {
-    setCurrentMonthByIndex(monthIndex);
-  };
-
-  const handleViewSelect = (view: string) => {
-    console.log('View selected:', view);
-    setCurrentView(view as 'Day' | 'Week' | 'Month');
-
-    // The filtering will be handled by the useEffect that depends on currentView
-    // No need to navigate to different screens, just filter the current view
-  };
-  // Replace your current handleAction1Press and handleAction2Press with these:
-
-  const handleAction1Press = (isSelected: boolean) => {
-    if (isSelected) {
-      console.log('Action 1 pressed: Showing only Events (non-tasks)');
-      setFilterType('EventsOnly');
-    } else {
-      console.log('Action 1 pressed: Resetting to All Events/Tasks');
-      // Only reset if we're currently showing EventsOnly
-      setFilterType(prev => (prev === 'EventsOnly' ? 'All' : prev));
-    }
-  };
-
-  const handleAction2Press = (isSelected: boolean) => {
-    if (isSelected) {
-      console.log('Action 2 pressed: Showing only Tasks');
-      setFilterType('TasksOnly');
-    } else {
-      console.log('Action 2 pressed: Resetting to All Events/Tasks');
-      // Only reset if we're currently showing TasksOnly
-      setFilterType(prev => (prev === 'TasksOnly' ? 'All' : prev));
-    }
-  };
-  const handleFABPress = () => {};
-
-  // When the month text is pressed
-  const handleMonthPress = () => {
-    const today = new Date();
-
-    // Example: Toggle between current and next month for now
-    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-    setCurrentMonth(prev =>
-      prev === today.toLocaleString('en-US', { month: 'long' })
-        ? nextMonth.toLocaleString('en-US', { month: 'long' })
-        : today.toLocaleString('en-US', { month: 'long' }),
-    );
-  };
-  // Removed handleViewPress to prevent automatic value change
-  // Values should only change when selecting from dropdown options
   const filterEventsByView = (
     allEvents: any[],
     view: 'Day' | 'Week' | 'Month',
@@ -654,6 +500,114 @@ const ScheduleScreen = () => {
     }
 
     return allEvents; // fallback - show all events
+  };
+
+  useFocusEffect(useCallback(() => {}, []));
+
+  // Memoized event transformation (expansion already memoized separately)
+  const processedEvents = useMemo(() => {
+    if (expandedRecurringEvents.length === 0) return [];
+    let transformedData = transformEventsToCalendar(
+      expandedRecurringEvents,
+      selectedTimeZone,
+    );
+    transformedData = filterEventsByTaskType(transformedData, filterType);
+    transformedData = filterEventsByTab(transformedData, selectedTab);
+    if (selectedTab === 'All') {
+      return filterEventsByView(transformedData, 'Month');
+    }
+    return transformedData;
+  }, [expandedRecurringEvents, selectedTimeZone, filterType, selectedTab]);
+
+  // Defer setting state to after navigation frame completes
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setEvents(processedEvents);
+    });
+    return () => task.cancel();
+  }, [processedEvents]);
+
+  // Memoize grouped events for rendering performance
+  const groupedEventsData = useMemo(() => {
+    if (events.length === 0) return {};
+    return groupEventsByDate(events);
+  }, [events]);
+
+  // Memoize event cards to prevent re-renders
+  const renderEventCard = useCallback((event: any, dateKey: string, index: number) => (
+    <EventCard
+      key={event.id || `${dateKey}-${index}`}
+      title={event.title}
+      eventId={event.id}
+      event={event}
+      time={event.time}
+      date={event.date}
+      color={event.color}
+      tags={event.tags}
+      compact={true}
+      onEdit={() => handleEditEvent(event)}
+    />
+  ), []);
+
+  // Fetch events on mount or when account changes
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        await getUserEvents(account[3], api);
+      } catch (error: any) {
+        console.error('Error fetching events:', error);
+
+        // Handle 401 Unauthorized specifically
+        if (error.response?.status === 401) {
+          showAlert(
+            'Session Expired',
+            'Your session has expired. Please log out and log in again.',
+            'warning',
+          );
+        } else {
+          const errorMsg =
+            error.response?.data?.message ||
+            error.message ||
+            'Failed to fetch events';
+          showAlert('Error', errorMsg, 'error');
+        }
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    if (account && account[3]) {
+      fetchEvents();
+    }
+  }, [account]);
+
+  const handleMenuPress = () => setIsDrawerOpen(true);
+  const handleDrawerClose = () => setIsDrawerOpen(false);
+  const handleMonthSelect = (monthIndex: number) =>
+    setCurrentMonthByIndex(monthIndex);
+  const handleViewSelect = (view: string) => {
+    setCurrentView(view as 'Day' | 'Week' | 'Month');
+  };
+  // Replace your current handleAction1Press and handleAction2Press with these:
+  const handleAction1Press = (isSelected: boolean) => {
+    setFilterType(isSelected ? 'EventsOnly' : 'All');
+  };
+
+  const handleAction2Press = (isSelected: boolean) => {
+    setFilterType(isSelected ? 'TasksOnly' : 'All');
+  };
+  const handleFABPress = () => {};
+
+  // When the month text is pressed
+  const handleMonthPress = () => {
+    const today = new Date();
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    setCurrentMonth(prev =>
+      prev === today.toLocaleString('en-US', { month: 'long' })
+        ? nextMonth.toLocaleString('en-US', { month: 'long' })
+        : today.toLocaleString('en-US', { month: 'long' }),
+    );
   };
 
   return (
@@ -775,46 +729,29 @@ const ScheduleScreen = () => {
             </View>
           </View>
         ) : (
-          (() => {
-            const groupedEvents = groupEventsByDate(events);
-            return Object.entries(groupedEvents).map(
-              ([dateKey, dateEvents]) => (
-                <View key={dateKey} style={styles.dateGroup}>
-                  <View style={styles.dateHeader}>
-                    <Text style={styles.dateHeaderText} numberOfLines={1}>
-                      {dateKey}
-                    </Text>
-                    <View style={styles.dateDivider} />
-                  </View>
-                  {dateEvents.map((event, index) => (
-                    <EventCard
-                      key={event.id || index}
-                      title={event.title}
-                      eventId={event.id}
-                      event={event}
-                      time={event.time}
-                      date={event.date}
-                      color={event.color}
-                      tags={event.tags}
-                      compact={true}
-                      onEdit={() => handleEditEvent(event)}
-                    />
-                  ))}
+          Object.entries(groupedEventsData).map(
+            ([dateKey, dateEvents]: [string, any]) => (
+              <View key={dateKey} style={styles.dateGroup}>
+                <View style={styles.dateHeader}>
+                  <Text style={styles.dateHeaderText} numberOfLines={1}>
+                    {dateKey}
+                  </Text>
+                  <View style={styles.dateDivider} />
                 </View>
-              ),
-            );
-          })()
+                {dateEvents.map((event: any, index: number) =>
+                  renderEventCard(event, dateKey, index)
+                )}
+              </View>
+            ),
+          )
         )}
       </ScrollView>
 
       <FloatingActionButton
         onPress={handleFABPress}
         onOptionSelect={option => {
-          console.log('Selected option:', option);
-          // Handle different menu options
           switch (option) {
             case 'goal':
-              console.log('Create Goal');
               break;
             case 'reminder':
               navigation.navigate(Screen.RemindersScreen);

@@ -8,6 +8,7 @@ import {
   ScrollView,
   Image,
   Modal,
+  InteractionManager,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useNavigation } from '@react-navigation/native';
@@ -48,6 +49,7 @@ const DailyCalendarScreen = () => {
   const [isEventModalVisible, setIsEventModalVisible] = useState(false);
   const [isDatePickerVisible, setIsDatePickerVisible] = useState(false);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [showEventsList, setShowEventsList] = useState(false);
   const { account } = useActiveAccount();
   const { api } = useApiClient();
   const { selectedTimeZone } = useSettingsStore();
@@ -87,7 +89,6 @@ const DailyCalendarScreen = () => {
   // Group events by date (using expanded instances, same logic as Monthly)
   const { eventsByDate } = useMemo(() => {
     const grouped: { [key: string]: any[] } = {};
-    // Build a one-day range for the selected day
     const viewStart = new Date(selectedDate);
     viewStart.setHours(0, 0, 0, 0);
     const viewEnd = new Date(selectedDate);
@@ -250,20 +251,24 @@ const DailyCalendarScreen = () => {
     return event.list?.some((item: any) => item.key === 'task') || false;
   };
 
+  // Defer rendering of events list to after navigation frame
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setShowEventsList(true);
+    });
+    return () => task.cancel();
+  }, [selectedDateString]);
+
   useEffect(() => {
     if (account && account[3]) {
-      getUserEvents(account[3], api);
+      getUserEvents(account[3], api).catch((error: any) => {
+        console.error('Error fetching events:', error);
+      });
     }
   }, [account]);
 
-  const handleMenuPress = () => {
-    setIsDrawerOpen(true);
-  };
-
-  const handleDrawerClose = () => {
-    setIsDrawerOpen(false);
-  };
-
+  const handleMenuPress = () => setIsDrawerOpen(true);
+  const handleDrawerClose = () => setIsDrawerOpen(false);
   const handleEventPress = (event: any) => {
     setSelectedEvent(event);
     setIsEventModalVisible(true);
@@ -409,74 +414,84 @@ const DailyCalendarScreen = () => {
       >
         <Text style={styles.sectionTitle}>Today's schedule</Text>
 
-        {selectedDateEvents.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Text style={styles.emptyText}>No events scheduled for today</Text>
-          </View>
-        ) : (
-          (() => {
-            // Group events by time (hour) for display
-            const groupedByTime: { [key: string]: any[] } = {};
-            selectedDateEvents.forEach(event => {
-              const startTime = parseTimeToPST(event.fromTime);
-              const timeLabel =
-                startTime
-                  ?.toLocaleTimeString('en-US', {
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true,
-                  })
-                  .toLowerCase()
-                  .replace(' ', '') || '';
+        {showEventsList ? (
+          selectedDateEvents.length === 0 ? (
+            <View style={styles.emptyState}>
+              <Text style={styles.emptyText}>
+                No events scheduled for today
+              </Text>
+            </View>
+          ) : (
+            (() => {
+              // Group events by time (hour) for display
+              const groupedByTime: { [key: string]: any[] } = {};
+              selectedDateEvents.forEach(event => {
+                const startTime = parseTimeToPST(event.fromTime);
+                const timeLabel =
+                  startTime
+                    ?.toLocaleTimeString('en-US', {
+                      hour: 'numeric',
+                      minute: '2-digit',
+                      hour12: true,
+                    })
+                    .toLowerCase()
+                    .replace(' ', '') || '';
 
-              if (!groupedByTime[timeLabel]) {
-                groupedByTime[timeLabel] = [];
-              }
-              groupedByTime[timeLabel].push(event);
-            });
+                if (!groupedByTime[timeLabel]) {
+                  groupedByTime[timeLabel] = [];
+                }
+                groupedByTime[timeLabel].push(event);
+              });
 
-            return Object.entries(groupedByTime).map(([timeLabel, events]) => (
-              <View key={timeLabel} style={styles.timeGroup}>
-                <View style={styles.timeHeader}>
-                  <Text style={styles.timeLabelText} numberOfLines={1}>
-                    {timeLabel}
-                  </Text>
-                  <View style={styles.timeDivider} />
-                </View>
-                {events.map((event, index) => {
-                  const duration = calculateDuration(
-                    event.fromTime,
-                    event.toTime,
-                  );
-                  const startTimeStr = formatTime(event.fromTime);
-                  const endTimeStr = formatTime(event.toTime);
-                  const timeRange = `${startTimeStr}-${endTimeStr}`;
-                  const timeDisplay = `${duration} (${timeRange})`;
-
-                  const isTaskEvent = isTask(event);
-
-                  return (
-                    <View
-                      key={`${event.uid}-${index}`}
-                      style={styles.eventCardWrapper}
-                    >
-                      <EventCard
-                        title={event.title}
-                        eventId={event.uid}
-                        event={transformEventForCard(event)}
-                        time={timeDisplay}
-                        date={formatDateDisplay(selectedDate)}
-                        color={isTaskEvent ? '#8DC63F' : '#00AEEF'}
-                        tags={event.list || []}
-                        compact={true}
-                        onEdit={() => handleEditEvent(event)}
-                      />
+              return Object.entries(groupedByTime).map(
+                ([timeLabel, events]) => (
+                  <View key={timeLabel} style={styles.timeGroup}>
+                    <View style={styles.timeHeader}>
+                      <Text style={styles.timeLabelText} numberOfLines={1}>
+                        {timeLabel}
+                      </Text>
+                      <View style={styles.timeDivider} />
                     </View>
-                  );
-                })}
-              </View>
-            ));
-          })()
+                    {events.map((event, index) => {
+                      const duration = calculateDuration(
+                        event.fromTime,
+                        event.toTime,
+                      );
+                      const startTimeStr = formatTime(event.fromTime);
+                      const endTimeStr = formatTime(event.toTime);
+                      const timeRange = `${startTimeStr}-${endTimeStr}`;
+                      const timeDisplay = `${duration} (${timeRange})`;
+
+                      const isTaskEvent = isTask(event);
+
+                      return (
+                        <View
+                          key={`${event.uid}-${index}`}
+                          style={styles.eventCardWrapper}
+                        >
+                          <EventCard
+                            title={event.title}
+                            eventId={event.uid}
+                            event={transformEventForCard(event)}
+                            time={timeDisplay}
+                            date={formatDateDisplay(selectedDate)}
+                            color={isTaskEvent ? '#8DC63F' : '#00AEEF'}
+                            tags={event.list || []}
+                            compact={true}
+                            onEdit={() => handleEditEvent(event)}
+                          />
+                        </View>
+                      );
+                    })}
+                  </View>
+                ),
+              );
+            })()
+          )
+        ) : (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyText}>Loading...</Text>
+          </View>
         )}
       </ScrollView>
 

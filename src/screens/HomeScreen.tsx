@@ -1,29 +1,30 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState, useMemo } from 'react';
 import {
-    StyleSheet,
-    View,
-    ScrollView,
-    TouchableOpacity,
-    Text,
-    Alert,
+  StyleSheet,
+  View,
+  ScrollView,
+  TouchableOpacity,
+  Text,
+  Alert,
+  InteractionManager,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { AppNavigationProp, Screen } from '../navigations/appNavigation.type';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import {
-    moderateScale,
-    scaledSize,
-    scaleHeight,
-    scaleWidth,
-    screenHeight,
-    screenWidth,
+  moderateScale,
+  scaledSize,
+  scaleHeight,
+  scaleWidth,
+  screenHeight,
+  screenWidth,
 } from '../utils/dimensions';
 import {
-    colors,
-    fontSize,
-    spacing,
-    borderRadius,
-    shadows,
+  colors,
+  fontSize,
+  spacing,
+  borderRadius,
+  shadows,
 } from '../utils/LightTheme';
 
 import RNFS from 'react-native-fs';
@@ -49,846 +50,843 @@ import { Fonts } from '../constants/Fonts';
 import CalendarIcon from '../assets/svgs/calendar.svg';
 import TaskCompleteIcon from '../assets/svgs/taskComplete.svg';
 
-
 const HomeScreen = () => {
-    const navigation = useNavigation<AppNavigationProp>();
-    const { setCurrentMonthByIndex } = useCalendarStore();
-    const { selectedTimeZone, selectedDay } = useSettingsStore();
-    // const [currentView, setCurrentView] = useState('Week');
-    const [isDrawerOpen, setIsDrawerOpen] = useState(false);
-    const { api } = useApiClient();
-    const { getUserEvents, events: allEvents, userEvents } = useEventsStore();
-    const account = useActiveAccount(state => state.account);
-    const userName = account?.username || '';
-    const [exitModal, setExitModal] = useState(false);
-    const [navigationAction, setNavigationAction] = useState(null);
+  const navigation = useNavigation<AppNavigationProp>();
+  const { setCurrentMonthByIndex } = useCalendarStore();
+  const { selectedTimeZone, selectedDay } = useSettingsStore();
+  // const [currentView, setCurrentView] = useState('Week');
+  const [isDrawerOpen, setIsDrawerOpen] = useState(false);
+  const { api } = useApiClient();
+  const { getUserEvents, events: allEvents, userEvents } = useEventsStore();
+  const account = useActiveAccount(state => state.account);
+  const userName = account?.username || '';
+  const [exitModal, setExitModal] = useState(false);
+  const [navigationAction, setNavigationAction] = useState(null);
 
-    // Custom Alert State
-    const [alertVisible, setAlertVisible] = useState(false);
-    const [alertTitle, setAlertTitle] = useState('');
-    const [alertMessage, setAlertMessage] = useState('');
-    const [alertType, setAlertType] = useState<'success' | 'error' | 'warning' | 'info'>('error');
+  // Custom Alert State
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertTitle, setAlertTitle] = useState('');
+  const [alertMessage, setAlertMessage] = useState('');
+  const [alertType, setAlertType] = useState<
+    'success' | 'error' | 'warning' | 'info'
+  >('error');
+  const [showEventsList, setShowEventsList] = useState(false);
 
-    // Helper function to show custom alert
-    const showAlert = (
-        title: string,
-        message: string,
-        type: 'success' | 'error' | 'warning' | 'info' = 'error'
-    ) => {
-        setAlertTitle(title);
-        setAlertMessage(message);
-        setAlertType(type);
-        setAlertVisible(true);
-    };
+  // Helper function to show custom alert
+  const showAlert = (
+    title: string,
+    message: string,
+    type: 'success' | 'error' | 'warning' | 'info' = 'error',
+  ) => {
+    setAlertTitle(title);
+    setAlertMessage(message);
+    setAlertType(type);
+    setAlertVisible(true);
+  };
 
-    const handleEditEvent = (event: any) => {
-        console.log('Edit event Uid in home:', event);
+  const handleEditEvent = (event: any) => {
+    const eventToPass = event.originalRawEventData || event;
+    const list =
+      eventToPass.list || eventToPass.tags || event.list || event.tags || [];
+    const isTask = list.some((item: any) => item.key === 'task');
 
-        // 1. Extract the raw data. This contains the original fromTime and toTime strings.
-        const eventToPass = event.originalRawEventData || event;
+    if (isEventInPast(eventToPass)) {
+      showAlert(
+        isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
+        '',
+        'warning',
+      );
+      return;
+    }
 
-        // Check if it's a task first (needed for conditional alert message)
-        const list = eventToPass.list || eventToPass.tags || event.list || event.tags || [];
-        const isTask = list.some(
-            (item: any) => item.key === 'task'
+    const targetScreen = isTask
+      ? Screen.CreateTaskScreen
+      : Screen.CreateEventScreen;
+
+    (navigation as any).navigate(targetScreen, {
+      mode: 'edit',
+      eventData: eventToPass,
+    });
+  };
+
+  const [events, setEvents] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+
+  const [currentMonth, setCurrentMonth] = useState<string>('');
+  const [currentView, setCurrentView] = useState<'Day' | 'Week' | 'Month'>(
+    'Week',
+  );
+  type EventFilter = 'All' | 'EventsOnly' | 'TasksOnly';
+  const [filterType, setFilterType] = useState<EventFilter>('All');
+  const [selectedTab, setSelectedTab] = useState<
+    'All' | 'Upcoming' | 'Completed'
+  >('All');
+
+  useEffect(() => {
+    // Set the initial current month dynamically based on today's date
+    const today = new Date();
+    setCurrentMonth(today.toLocaleString('en-US', { month: 'long' }));
+  }, []);
+
+  const transformEventsToCalendar = (
+    allEvents: any[],
+    selectedTimeZone: string,
+  ) => {
+    const groupedEvents: Record<string, any[]> = {};
+
+    allEvents.forEach(event => {
+      if (!event.fromTime) {
+        console.warn('Missing fromTime:', event);
+        return;
+      }
+
+      const fromTimeOnly = event.fromTime.split('T')[1];
+      const toTimeOnly = event.toTime?.split('T')[1];
+
+      const isAllDay =
+        fromTimeOnly?.startsWith('000000') && toTimeOnly?.startsWith('000000');
+
+      const parseAllDayDate = (dateStr: string) => {
+        const year = parseInt(dateStr.substring(0, 4), 10);
+        const month = parseInt(dateStr.substring(4, 6), 10) - 1;
+        const day = parseInt(dateStr.substring(6, 8), 10);
+        return new Date(year, month, day);
+      };
+
+      // Parse times directly from the string format to avoid timezone conversion issues
+      const parseTimeFromString = (dateStr: string): Date | null => {
+        if (!dateStr) return null;
+        // Format: YYYYMMDDTHHmmss
+        const match = dateStr.match(
+          /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?$/,
         );
+        if (!match) return null;
 
-        // Check if event is in the past
-        if (isEventInPast(eventToPass)) {
-            showAlert(
-                isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
-                '',
-                'warning'
-            );
-            return;
+        const [, year, month, day, hour, minute, second] = match;
+        return new Date(
+          Number(year),
+          Number(month) - 1, // JS months are 0-indexed
+          Number(day),
+          Number(hour),
+          Number(minute),
+          Number(second) || 0,
+        );
+      };
+
+      let startTimeData, endTimeData;
+      let eventDateKey: string;
+
+      if (isAllDay) {
+        const startDate = parseAllDayDate(event.fromTime);
+        eventDateKey = startDate.toDateString();
+        startTimeData = { displayValues: null };
+        endTimeData = { displayValues: null };
+      } else {
+        // Parse times directly from the string format to avoid timezone conversion issues
+        const startTimeDate = parseTimeFromString(event.fromTime);
+        const endTimeDate = event.toTime
+          ? parseTimeFromString(event.toTime)
+          : null;
+
+        if (!startTimeDate || isNaN(startTimeDate.getTime())) {
+          console.warn('Invalid fromTime after parsing:', event);
+          return;
         }
 
-        console.log('Is Task check:', { isTask, list, eventToPass, event });
+        // Extract date components for grouping
+        const year = startTimeDate.getFullYear();
+        const month = startTimeDate.getMonth() + 1; // getMonth() returns 0-11
+        const day = startTimeDate.getDate();
+        eventDateKey = `${year}-${String(month).padStart(2, '0')}-${String(
+          day,
+        ).padStart(2, '0')}`;
 
-        // 2. Determine the target screen
-        const targetScreen = isTask
-            ? Screen.CreateTaskScreen
-            : Screen.CreateEventScreen;
-
-        // 3. Navigate to the appropriate screen
-        (navigation as any).navigate(targetScreen, {
-            mode: 'edit', // Pass the mode for editing
-            eventData: eventToPass, // ✅ Pass the full, raw event object
-        });
-    };
-
-    const [events, setEvents] = useState<any[]>([]);
-    const [loading, setLoading] = useState(false);
-
-    const [currentMonth, setCurrentMonth] = useState<string>('');
-    const [currentView, setCurrentView] = useState<'Day' | 'Week' | 'Month'>(
-        'Week',
-    );
-    type EventFilter = 'All' | 'EventsOnly' | 'TasksOnly';
-    const [filterType, setFilterType] = useState<EventFilter>('All');
-    const [selectedTab, setSelectedTab] = useState<'All' | 'Upcoming' | 'Completed'>('All');
-
-    useEffect(() => {
-        // Set the initial current month dynamically based on today's date
-        const today = new Date();
-        setCurrentMonth(today.toLocaleString('en-US', { month: 'long' }));
-    }, []);
-
-
-    const transformEventsToCalendar = (allEvents: any[], selectedTimeZone: string) => {
-        const groupedEvents: Record<string, any[]> = {};
-
-        allEvents.forEach(event => {
-            console.log("event in transform func", event.title);
-            if (!event.fromTime) {
-                console.warn('Missing fromTime:', event);
-                return;
-            }
-
-            const fromTimeOnly = event.fromTime.split('T')[1];
-            const toTimeOnly = event.toTime?.split('T')[1];
-
-            const isAllDay =
-                fromTimeOnly?.startsWith('000000') &&
-                toTimeOnly?.startsWith('000000');
-
-            const parseAllDayDate = (dateStr: string) => {
-                const year = parseInt(dateStr.substring(0, 4), 10);
-                const month = parseInt(dateStr.substring(4, 6), 10) - 1;
-                const day = parseInt(dateStr.substring(6, 8), 10);
-                return new Date(year, month, day);
-            };
-
-            // Parse times directly from the string format to avoid timezone conversion issues
-            const parseTimeFromString = (dateStr: string): Date | null => {
-                if (!dateStr) return null;
-                // Format: YYYYMMDDTHHmmss
-                const match = dateStr.match(/^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})?$/);
-                if (!match) return null;
-                
-                const [, year, month, day, hour, minute, second] = match;
-                return new Date(
-                    Number(year),
-                    Number(month) - 1, // JS months are 0-indexed
-                    Number(day),
-                    Number(hour),
-                    Number(minute),
-                    Number(second) || 0
-                );
-            };
-
-            let startTimeData, endTimeData;
-            let eventDateKey: string;
-
-            if (isAllDay) {
-                const startDate = parseAllDayDate(event.fromTime);
-                eventDateKey = startDate.toDateString();
-                startTimeData = { displayValues: null };
-                endTimeData = { displayValues: null };
-            } else {
-                // Parse times directly from the string format to avoid timezone conversion issues
-                const startTimeDate = parseTimeFromString(event.fromTime);
-                const endTimeDate = event.toTime ? parseTimeFromString(event.toTime) : null;
-
-                if (!startTimeDate || isNaN(startTimeDate.getTime())) {
-                    console.warn('Invalid fromTime after parsing:', event);
-                    return;
-                }
-
-                // Extract date components for grouping
-                const year = startTimeDate.getFullYear();
-                const month = startTimeDate.getMonth() + 1; // getMonth() returns 0-11
-                const day = startTimeDate.getDate();
-                eventDateKey = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-
-                // Create display values object for time formatting
-                startTimeData = {
-                    date: startTimeDate, // Store the Date object for sorting
-                    displayValues: {
-                        year: year,
-                        month: month,
-                        day: day,
-                        hour: startTimeDate.getHours(),
-                        minute: startTimeDate.getMinutes(),
-                        second: startTimeDate.getSeconds()
-                    }
-                };
-                endTimeData = endTimeDate && !isNaN(endTimeDate.getTime())
-                    ? {
-                        date: endTimeDate, // Store the Date object for sorting
-                        displayValues: {
-                            year: endTimeDate.getFullYear(),
-                            month: endTimeDate.getMonth() + 1,
-                            day: endTimeDate.getDate(),
-                            hour: endTimeDate.getHours(),
-                            minute: endTimeDate.getMinutes(),
-                            second: endTimeDate.getSeconds()
-                        }
-                    }
-                    : null;
-
-                console.log("startTimeData in transform func", startTimeData);
-                console.log("endTimeData in transform func", endTimeData);
-            }
-
-            const isTask = (event.list || []).some((item: any) => item.key === 'task');
-            const eventColor = isTask ? colors.figmaPurple : colors.figmaOrange;
-
-            // Format time for display
-            const formatTime12Hour = (hour: number, minute: number) => {
-                const ampm = hour >= 12 ? 'PM' : 'AM';
-                const displayHour = hour % 12 || 12;
-                return `${displayHour}:${String(minute).padStart(2, '0')} ${ampm}`;
-            };
-
-            let eventTime: string = '';
-            if (isAllDay) {
-                eventTime = 'All Day';
-            } else if (isTask && startTimeData?.displayValues) {
-                eventTime = formatTime12Hour(
-                    startTimeData.displayValues.hour,
-                    startTimeData.displayValues.minute
-                );
-            } else if (startTimeData?.displayValues) {
-                const startTime = formatTime12Hour(
-                    startTimeData.displayValues.hour,
-                    startTimeData.displayValues.minute
-                );
-                const endTime = endTimeData?.displayValues
-                    ? formatTime12Hour(
-                        endTimeData.displayValues.hour,
-                        endTimeData.displayValues.minute
-                    )
-                    : '';
-                console.log("startTime in transform func", startTime);
-                console.log("endTime in transform func", endTime);
-                eventTime = `${startTime} - ${endTime}`;
-            } else {
-                // Fallback if time data is missing
-                eventTime = 'Time not available';
-            }
-
-            if (!groupedEvents[eventDateKey]) {
-                groupedEvents[eventDateKey] = [];
-            }
-
-            groupedEvents[eventDateKey].push({
-                id: event.uid,
-                title: event.title || 'Untitled Event',
-                time: eventTime,
-                description: event.description || '',
-                date: eventDateKey,
-                color: eventColor,
-                tags: event.list || [],
-                isExpandable: true,
-                hasActions: true,
-                originalRawEventData: event,
-                // Store the UTC date for sorting
-                sortDate: startTimeData?.date || parseAllDayDate(event.fromTime),
-            });
-        });
-
-        return Object.keys(groupedEvents)
-            .sort()
-            .map(dateKey => {
-                const dateObj = new Date(dateKey);
-
-                return {
-                    day: dateObj.toLocaleDateString('en-US', { weekday: 'short' }).toUpperCase(),
-                    date: dateObj.getDate().toString().padStart(2, '0'),
-                    month: dateObj.toLocaleDateString('en-US', { month: 'short' }).toUpperCase(),
-                    events: groupedEvents[dateKey].sort((a, b) =>
-                        a.sortDate.getTime() - b.sortDate.getTime()
-                    ),
-                };
-            });
-    };
-    // useEffect(() => {
-    //         console.log('Selected Timezone in HomeScreen:', selectedTimeZone);
-    //         const transformedData = transformEventsToCalendar(allEvents, selectedTimeZone);
-    //         const filteredData = filterEventsByView(transformedData, currentView);
-    //         console.log('Filtered Events:', filteredData);
-    //         setEvents(filteredData);
-    //     }, [selectedTimeZone]);
-    const filterEventsByTaskType = (allEvents: any[], filter: EventFilter) => {
-        if (filter === 'All') {
-            return allEvents;
-        }
-
-        return allEvents
-            .map(dayGroup => {
-                // Filter the events within each day group
-                const filteredEvents = dayGroup.events.filter((event: any) => {
-                    const isTask = (event.tags || []).some(
-                        (item: any) => item.key === 'task'
-                    );
-
-                    if (filter === 'EventsOnly') {
-                        // Action 1: Show only non-tasks (Events)
-                        return !isTask;
-                    } else if (filter === 'TasksOnly') {
-                        // Action 2: Show only tasks
-                        return isTask;
-                    }
-                    return true;
-                });
-
-                // Return the day group only if it still has events after filtering
-                if (filteredEvents.length > 0) {
-                    return { ...dayGroup, events: filteredEvents };
-                }
-                return null;
-            })
-            .filter(dayGroup => dayGroup !== null); // Remove null entries
-    };
-    // ------------------------------------------------
-
-    // Filter events by selectedTab (All, Upcoming, Completed)
-    const filterEventsByTab = (allEvents: any[], tab: 'All' | 'Upcoming' | 'Completed') => {
-        if (tab === 'All') {
-            return allEvents;
-        }
-        
-        return allEvents
-            .map(dayGroup => {
-                const filteredEvents = dayGroup.events.filter((event: any) => {
-                    const isPast = isEventInPast(event.originalRawEventData || event);
-                    if (tab === 'Upcoming') {
-                        return !isPast; // Show only future events
-                    } else if (tab === 'Completed') {
-                        return isPast; // Show only past events
-                    }
-                    return true;
-                });
-                
-                if (filteredEvents.length > 0) {
-                    return { ...dayGroup, events: filteredEvents };
-                }
-                return null;
-            })
-            .filter(dayGroup => dayGroup !== null);
-    };
-
-    // Format date header like DeletedEventsScreen
-    const formatDateHeader = (dateString: string) => {
-        const date = parseTimeToPST(dateString);
-        if (!date) return 'Invalid Date';
-
-        return date.toLocaleDateString('en-US', {
-            day: 'numeric',
-            month: 'long',
-            year: 'numeric',
-        });
-    };
-
-    // Group events by date for display
-    const groupEventsByDate = (eventsData: any[]) => {
-        const grouped: { [key: string]: any[] } = {};
-        
-        eventsData.forEach((dayData) => {
-            dayData.events.forEach((event: any) => {
-                const eventData = event.originalRawEventData || event;
-                // Try to get fromTime from the original event data
-                let fromTime = eventData.fromTime;
-                
-                // If fromTime is not available, try to construct from date string
-                if (!fromTime && eventData.date) {
-                    // eventData.date might be in format "YYYY-MM-DD"
-                    const dateParts = eventData.date.split('-');
-                    if (dateParts.length === 3) {
-                        // Create a date string in the format expected by parseTimeToPST
-                        fromTime = `${dateParts[0]}${dateParts[1]}${dateParts[2]}T000000`;
-                    }
-                }
-                
-                if (!fromTime) {
-                    // Fallback: use the dayData date
-                    const dayDate = new Date(dayData.events[0]?.date || dayData.date);
-                    fromTime = dayDate.toISOString().replace(/[-:]/g, '').split('.')[0];
-                }
-                
-                const dateKey = formatDateHeader(fromTime);
-                if (!grouped[dateKey]) {
-                    grouped[dateKey] = [];
-                }
-                grouped[dateKey].push(event);
-            });
-        });
-        
-        return grouped;
-    };
-
-    useFocusEffect(
-        useCallback(() => {
-            console.log('User Events in HomeScreen:', userEvents);
-            let transformedData = transformEventsToCalendar(userEvents, selectedTimeZone);
-
-            // --- APPLY TASK/EVENT FILTER FIRST ---
-            transformedData = filterEventsByTaskType(transformedData, filterType);
-            // -------------------------------------
-
-            // --- APPLY TAB FILTER (All, Upcoming, Completed) ---
-            transformedData = filterEventsByTab(transformedData, selectedTab);
-            // -------------------------------------
-
-            const filteredData = filterEventsByView(transformedData, currentView);
-            setEvents(filteredData);
-        }, [userEvents, currentView, selectedTimeZone, filterType, selectedTab]) // Added selectedTab dependency
-    );
-
-    // console.log('All Events',allEvents);
-    useEffect(() => {
-        const fetchEvents = async () => {
-            try {
-                setLoading(true);
-                console.log('Fetching events for user:', account[3]);
-
-                const events = await getUserEvents(account[3], api);
-                console.log("events fetched in 179", events);
-            } catch (error) {
-                console.error('Error fetching events:', error);
-            } finally {
-                setLoading(false);
-            }
+        // Create display values object for time formatting
+        startTimeData = {
+          date: startTimeDate, // Store the Date object for sorting
+          displayValues: {
+            year: year,
+            month: month,
+            day: day,
+            hour: startTimeDate.getHours(),
+            minute: startTimeDate.getMinutes(),
+            second: startTimeDate.getSeconds(),
+          },
         };
-        fetchEvents();
-    }, [userName]);
+        endTimeData =
+          endTimeDate && !isNaN(endTimeDate.getTime())
+            ? {
+                date: endTimeDate,
+                displayValues: {
+                  year: endTimeDate.getFullYear(),
+                  month: endTimeDate.getMonth() + 1,
+                  day: endTimeDate.getDate(),
+                  hour: endTimeDate.getHours(),
+                  minute: endTimeDate.getMinutes(),
+                  second: endTimeDate.getSeconds(),
+                },
+              }
+            : null;
+      }
 
-    const handleMenuPress = () => {
-        setIsDrawerOpen(true);
-    };
+      const isTask = (event.list || []).some(
+        (item: any) => item.key === 'task',
+      );
+      const eventColor = isTask ? colors.figmaPurple : colors.figmaOrange;
 
-    const handleDrawerClose = () => {
-        setIsDrawerOpen(false);
-    };
+      // Format time for display
+      const formatTime12Hour = (hour: number, minute: number) => {
+        const ampm = hour >= 12 ? 'PM' : 'AM';
+        const displayHour = hour % 12 || 12;
+        return `${displayHour}:${String(minute).padStart(2, '0')} ${ampm}`;
+      };
 
-
-
-    const handleMonthSelect = (monthIndex: number) => {
-        setCurrentMonthByIndex(monthIndex);
-    };
-
-    const handleViewSelect = (view: string) => {
-        console.log('View selected:', view);
-        setCurrentView(view as 'Day' | 'Week' | 'Month');
-
-        // The filtering will be handled by the useEffect that depends on currentView
-        // No need to navigate to different screens, just filter the current view
-    };
-    // Replace your current handleAction1Press and handleAction2Press with these:
-
-    const handleAction1Press = (isSelected: boolean) => {
-        if (isSelected) {
-            console.log('Action 1 pressed: Showing only Events (non-tasks)');
-            setFilterType('EventsOnly');
-        } else {
-            console.log('Action 1 pressed: Resetting to All Events/Tasks');
-            // Only reset if we're currently showing EventsOnly
-            setFilterType(prev => prev === 'EventsOnly' ? 'All' : prev);
-        }
-    };
-
-    const handleAction2Press = (isSelected: boolean) => {
-        if (isSelected) {
-            console.log('Action 2 pressed: Showing only Tasks');
-            setFilterType('TasksOnly');
-        } else {
-            console.log('Action 2 pressed: Resetting to All Events/Tasks');
-            // Only reset if we're currently showing TasksOnly
-            setFilterType(prev => prev === 'TasksOnly' ? 'All' : prev);
-        }
-    };
-    const handleFABPress = () => { };
-
-
-    // When the month text is pressed
-    const handleMonthPress = () => {
-        const today = new Date();
-
-        // Example: Toggle between current and next month for now
-        const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
-        setCurrentMonth(prev =>
-            prev === today.toLocaleString('en-US', { month: 'long' })
-                ? nextMonth.toLocaleString('en-US', { month: 'long' })
-                : today.toLocaleString('en-US', { month: 'long' }),
+      let eventTime: string = '';
+      if (isAllDay) {
+        eventTime = 'All Day';
+      } else if (isTask && startTimeData?.displayValues) {
+        eventTime = formatTime12Hour(
+          startTimeData.displayValues.hour,
+          startTimeData.displayValues.minute,
         );
-    };
-    // Removed handleViewPress to prevent automatic value change
-    // Values should only change when selecting from dropdown options
-    const filterEventsByView = (
-        allEvents: any[],
-        view: 'Day' | 'Week' | 'Month',
-    ) => {
-        const today = new Date();
+      } else if (startTimeData?.displayValues) {
+        const startTime = formatTime12Hour(
+          startTimeData.displayValues.hour,
+          startTimeData.displayValues.minute,
+        );
+        const endTime = endTimeData?.displayValues
+          ? formatTime12Hour(
+              endTimeData.displayValues.hour,
+              endTimeData.displayValues.minute,
+            )
+          : '';
+        eventTime = `${startTime} - ${endTime}`;
+      } else {
+        // Fallback if time data is missing
+        eventTime = 'Time not available';
+      }
 
-        if (view === 'Day') {
-            // Show only today's events
-            return allEvents.filter(dayGroup => {
-                const dayDate = new Date(dayGroup.events[0]?.date);
-                return dayDate.toDateString() === today.toDateString();
-            });
+      if (!groupedEvents[eventDateKey]) {
+        groupedEvents[eventDateKey] = [];
+      }
+
+      groupedEvents[eventDateKey].push({
+        id: event.uid,
+        title: event.title || 'Untitled Event',
+        time: eventTime,
+        description: event.description || '',
+        date: eventDateKey,
+        color: eventColor,
+        tags: event.list || [],
+        isExpandable: true,
+        hasActions: true,
+        originalRawEventData: event,
+        // Store the UTC date for sorting
+        sortDate: startTimeData?.date || parseAllDayDate(event.fromTime),
+      });
+    });
+
+    return Object.keys(groupedEvents)
+      .sort()
+      .map(dateKey => {
+        const dateObj = new Date(dateKey);
+
+        return {
+          day: dateObj
+            .toLocaleDateString('en-US', { weekday: 'short' })
+            .toUpperCase(),
+          date: dateObj.getDate().toString().padStart(2, '0'),
+          month: dateObj
+            .toLocaleDateString('en-US', { month: 'short' })
+            .toUpperCase(),
+          events: groupedEvents[dateKey].sort(
+            (a, b) => a.sortDate.getTime() - b.sortDate.getTime(),
+          ),
+        };
+      });
+  };
+  // useEffect(() => {
+  //         console.log('Selected Timezone in HomeScreen:', selectedTimeZone);
+  //         const transformedData = transformEventsToCalendar(allEvents, selectedTimeZone);
+  //         const filteredData = filterEventsByView(transformedData, currentView);
+  //         console.log('Filtered Events:', filteredData);
+  //         setEvents(filteredData);
+  //     }, [selectedTimeZone]);
+  const filterEventsByTaskType = (allEvents: any[], filter: EventFilter) => {
+    if (filter === 'All') {
+      return allEvents;
+    }
+
+    return allEvents
+      .map(dayGroup => {
+        // Filter the events within each day group
+        const filteredEvents = dayGroup.events.filter((event: any) => {
+          const isTask = (event.tags || []).some(
+            (item: any) => item.key === 'task',
+          );
+
+          if (filter === 'EventsOnly') {
+            // Action 1: Show only non-tasks (Events)
+            return !isTask;
+          } else if (filter === 'TasksOnly') {
+            // Action 2: Show only tasks
+            return isTask;
+          }
+          return true;
+        });
+
+        // Return the day group only if it still has events after filtering
+        if (filteredEvents.length > 0) {
+          return { ...dayGroup, events: filteredEvents };
+        }
+        return null;
+      })
+      .filter(dayGroup => dayGroup !== null); // Remove null entries
+  };
+  // ------------------------------------------------
+
+  // Filter events by selectedTab (All, Upcoming, Completed)
+  const filterEventsByTab = (
+    allEvents: any[],
+    tab: 'All' | 'Upcoming' | 'Completed',
+  ) => {
+    if (tab === 'All') {
+      return allEvents;
+    }
+
+    return allEvents
+      .map(dayGroup => {
+        const filteredEvents = dayGroup.events.filter((event: any) => {
+          const isPast = isEventInPast(event.originalRawEventData || event);
+          if (tab === 'Upcoming') {
+            return !isPast; // Show only future events
+          } else if (tab === 'Completed') {
+            return isPast; // Show only past events
+          }
+          return true;
+        });
+
+        if (filteredEvents.length > 0) {
+          return { ...dayGroup, events: filteredEvents };
+        }
+        return null;
+      })
+      .filter(dayGroup => dayGroup !== null);
+  };
+
+  // Format date header like DeletedEventsScreen
+  const formatDateHeader = (dateString: string) => {
+    const date = parseTimeToPST(dateString);
+    if (!date) return 'Invalid Date';
+
+    return date.toLocaleDateString('en-US', {
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+  };
+
+  // Group events by date for display
+  const groupEventsByDate = (eventsData: any[]) => {
+    const grouped: { [key: string]: any[] } = {};
+
+    eventsData.forEach(dayData => {
+      dayData.events.forEach((event: any) => {
+        const eventData = event.originalRawEventData || event;
+        // Try to get fromTime from the original event data
+        let fromTime = eventData.fromTime;
+
+        // If fromTime is not available, try to construct from date string
+        if (!fromTime && eventData.date) {
+          // eventData.date might be in format "YYYY-MM-DD"
+          const dateParts = eventData.date.split('-');
+          if (dateParts.length === 3) {
+            // Create a date string in the format expected by parseTimeToPST
+            fromTime = `${dateParts[0]}${dateParts[1]}${dateParts[2]}T000000`;
+          }
         }
 
-        if (view === 'Week') {
-            // ✅ Helper function to convert day name to numeric value (0=Sunday, 1=Monday, etc.)
-            const getDayNumber = (dayName: string): number => {
-                const dayMap: { [key: string]: number } = {
-                    'Sunday': 0,
-                    'Monday': 1,
-                    'Tuesday': 2,
-                    'Wednesday': 3,
-                    'Thursday': 4,
-                    'Friday': 5,
-                    'Saturday': 6,
-                };
-                return dayMap[dayName] || 0;
-            };
-            
-            const startDayNumber = getDayNumber(selectedDay);
-            
-            // Get start and end of current week based on setting
-            const startOfWeek = new Date(today);
-            const todayDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
-            let diff = todayDay - startDayNumber;
-            if (diff < 0) diff += 7; // If negative, add 7 to go back to previous week
-            startOfWeek.setDate(today.getDate() - diff);
-
-            const endOfWeek = new Date(startOfWeek);
-            endOfWeek.setDate(startOfWeek.getDate() + 6); // 6 days after start
-
-            return allEvents.filter(dayGroup => {
-                const dayDate = new Date(dayGroup.events[0]?.date);
-                return dayDate >= startOfWeek && dayDate <= endOfWeek;
-            });
+        if (!fromTime) {
+          // Fallback: use the dayData date
+          const dayDate = new Date(dayData.events[0]?.date || dayData.date);
+          fromTime = dayDate.toISOString().replace(/[-:]/g, '').split('.')[0];
         }
 
-        if (view === 'Month') {
-            // Show events for current month
-            return allEvents.filter(dayGroup => {
-                const dayDate = new Date(dayGroup.events[0]?.date);
-                return (
-                    dayDate.getMonth() === today.getMonth() &&
-                    dayDate.getFullYear() === today.getFullYear()
-                );
-            });
+        const dateKey = formatDateHeader(fromTime);
+        if (!grouped[dateKey]) {
+          grouped[dateKey] = [];
         }
+        grouped[dateKey].push(event);
+      });
+    });
 
-        return allEvents; // fallback - show all events
-    };
+    return grouped;
+  };
 
+  const filterEventsByView = (
+    allEvents: any[],
+    view: 'Day' | 'Week' | 'Month',
+  ) => {
+    const today = new Date();
 
-    return (
-        <View style={styles.container}>
-            <CustomeHeader
-                onMenuPress={handleMenuPress}
-                title="Calendar"
-                currentMonth={currentMonth}
-                currentView={currentView}
-                onMonthPress={handleMonthPress}
-                onMonthSelect={handleMonthSelect}
-                onViewSelect={handleViewSelect}
-                onAction1Press={() => handleAction1Press(filterType === 'EventsOnly')}
-                onAction2Press={() => handleAction2Press(filterType === 'TasksOnly')}
-            />
+    if (view === 'Day') {
+      // Show only today's events
+      return allEvents.filter(dayGroup => {
+        const dayDate = new Date(dayGroup.events[0]?.date);
+        return dayDate.toDateString() === today.toDateString();
+      });
+    }
 
-            {/* Segmented Control Navigation */}
-            <View style={styles.segmentedControlContainer}>
-                <View style={styles.segmentedControl}>
-                    <TouchableOpacity
-                        style={[
-                            styles.segmentButton,
-                            selectedTab === 'All' && styles.segmentButtonActive,
-                        ]}
-                        onPress={() => setSelectedTab('All')}
-                    >
-                        <Text
-                            style={[
-                                styles.segmentText,
-                                selectedTab === 'All' && styles.segmentTextActive,
-                            ]}
-                        >
-                            All
-                        </Text>
-                    </TouchableOpacity>
+    if (view === 'Week') {
+      // ✅ Helper function to convert day name to numeric value (0=Sunday, 1=Monday, etc.)
+      const getDayNumber = (dayName: string): number => {
+        const dayMap: { [key: string]: number } = {
+          Sunday: 0,
+          Monday: 1,
+          Tuesday: 2,
+          Wednesday: 3,
+          Thursday: 4,
+          Friday: 5,
+          Saturday: 6,
+        };
+        return dayMap[dayName] || 0;
+      };
 
-                    <TouchableOpacity
-                        style={[
-                            styles.segmentButton,
-                            selectedTab === 'Upcoming' && styles.segmentButtonActive,
-                        ]}
-                        onPress={() => setSelectedTab('Upcoming')}
-                    >
-                        <Text
-                            style={[
-                                styles.segmentText,
-                                selectedTab === 'Upcoming' && styles.segmentTextActive,
-                            ]}
-                        >
-                            Upcoming
-                        </Text>
-                    </TouchableOpacity>
+      const startDayNumber = getDayNumber(selectedDay);
 
-                    <TouchableOpacity
-                        style={[
-                            styles.segmentButton,
-                            selectedTab === 'Completed' && styles.segmentButtonActive,
-                        ]}
-                        onPress={() => setSelectedTab('Completed')}
-                    >
-                        <Text
-                            style={[
-                                styles.segmentText,
-                                selectedTab === 'Completed' && styles.segmentTextActive,
-                            ]}
-                        >
-                            Completed
-                        </Text>
-                    </TouchableOpacity>
-                </View>
-            </View>
+      // Get start and end of current week based on setting
+      const startOfWeek = new Date(today);
+      const todayDay = today.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      let diff = todayDay - startDayNumber;
+      if (diff < 0) diff += 7; // If negative, add 7 to go back to previous week
+      startOfWeek.setDate(today.getDate() - diff);
 
-            {/* Left edge touch area for drawer */}
-            <TouchableOpacity
-                style={styles.leftEdgeTouchArea}
-                onPress={handleMenuPress}
-                activeOpacity={0.1}
-            />
+      const endOfWeek = new Date(startOfWeek);
+      endOfWeek.setDate(startOfWeek.getDate() + 6); // 6 days after start
 
-            <ScrollView 
-                style={styles.content} 
-                contentContainerStyle={styles.scrollContent}
-                showsVerticalScrollIndicator={false}
-            >
-                {loading ? (
-                    <CustomLoader />
-                ) : events.length === 0 ? (
-                    <View style={styles.emptyStateContainer}>
-                        <View style={styles.emptyStateIllustration}>
-                            {/* Icon based on selected tab */}
-                            <View style={styles.emptyStateIcon}>
-                                {selectedTab === 'Completed' ? (
-                                    <TaskCompleteIcon width={scaleWidth(54)} height={scaleHeight(54)} fill={colors.primaryBlue} />
-                                ) : (
-                                    <CalendarIcon width={scaleWidth(54)} height={scaleHeight(54)} fill={colors.primaryBlue} />
-                                )}
-                            </View>
-                            <Text style={styles.emptyStateTitle}>
-                                {selectedTab === 'All' 
-                                    ? 'No Activity Available'
-                                    : selectedTab === 'Upcoming'
-                                    ? 'No Upcoming Activity'
-                                    : 'No Completed Activity'}
-                            </Text>
-                            <Text style={styles.emptyStateDescription}>
-                                {selectedTab === 'All'
-                                    ? "You haven't added any Activity yet. Tap the 'create button' below to quickly set up your first task, event, or activity."
-                                    : selectedTab === 'Upcoming'
-                                    ? "You don't have any upcoming activity right now. New scheduled events will automatically appear here as soon as they are created."
-                                    : "There are no completed activity to show. After you finish or mark activity as completed, they will be listed here."}
-                            </Text>
-                        </View>
-                    </View>
-                ) : (
-                    (() => {
-                        const groupedEvents = groupEventsByDate(events);
-                        return Object.entries(groupedEvents).map(([dateKey, dateEvents]) => (
-                            <View key={dateKey} style={styles.dateGroup}>
-                                <View style={styles.dateHeader}>
-                                    <Text style={styles.dateHeaderText} numberOfLines={1}>
-                                        {dateKey}
-                                    </Text>
-                                    <View style={styles.dateDivider} />
-                                </View>
-                                {dateEvents.map((event, index) => (
-                                    <EventCard
-                                        key={event.id || index}
-                                        title={event.title}
-                                        eventId={event.id}
-                                        event={event}
-                                        time={event.time}
-                                        date={event.date}
-                                        color={event.color}
-                                        tags={event.tags}
-                                        compact={true}
-                                        onEdit={() => handleEditEvent(event)}
-                                    />
-                                ))}
-                            </View>
-                        ));
-                    })()
-                )}
-            </ScrollView>
+      return allEvents.filter(dayGroup => {
+        const dayDate = new Date(dayGroup.events[0]?.date);
+        return dayDate >= startOfWeek && dayDate <= endOfWeek;
+      });
+    }
 
-            <FloatingActionButton
-                onPress={handleFABPress}
-                onOptionSelect={option => {
-                    console.log('Selected option:', option);
-                    // Handle different menu options
-                    switch (option) {
-                        case 'goal':
-                            console.log('Create Goal');
-                            break;
-                        case 'reminder':
-                            navigation.navigate(Screen.RemindersScreen);
-                            break;
-                        case 'task':
-                            navigation.navigate(Screen.CreateTaskScreen);
-                            break;
-                        case 'event':
-                            navigation.navigate(Screen.CreateEventScreen);
-                            break;
-                        default:
-                            break;
-                    }
-                }}
-            />
+    if (view === 'Month') {
+      // Show events for current month
+      return allEvents.filter(dayGroup => {
+        const dayDate = new Date(dayGroup.events[0]?.date);
+        return (
+          dayDate.getMonth() === today.getMonth() &&
+          dayDate.getFullYear() === today.getFullYear()
+        );
+      });
+    }
 
-            {/* Custom Alert */}
-            <CustomAlert
-                visible={alertVisible}
-                title={alertTitle}
-                message={alertMessage}
-                type={alertType}
-                onClose={() => setAlertVisible(false)}
-            />
+    return allEvents; // fallback - show all events
+  };
 
-            {/* Custom Drawer */}
-            <CustomDrawer
-                isOpen={isDrawerOpen}
-                onClose={handleDrawerClose}
-            />
-
-
-        </View>
+  // Memoize processed events to avoid recomputing on every focus
+  const processedEvents = useMemo(() => {
+    if (!userEvents || userEvents.length === 0) return [];
+    let transformedData = transformEventsToCalendar(
+      userEvents,
+      selectedTimeZone,
     );
+    transformedData = filterEventsByTaskType(transformedData, filterType);
+    transformedData = filterEventsByTab(transformedData, selectedTab);
+    const filteredData = filterEventsByView(transformedData, currentView);
+    return filteredData;
+  }, [userEvents, currentView, selectedTimeZone, filterType, selectedTab]);
+
+  // Defer state update to after navigation frame completes
+  useEffect(() => {
+    const task = InteractionManager.runAfterInteractions(() => {
+      setEvents(processedEvents);
+      setShowEventsList(true);
+    });
+    return () => task.cancel();
+  }, [processedEvents]);
+
+  // Fetch events on mount or when account changes
+  useEffect(() => {
+    const fetchEvents = async () => {
+      try {
+        setLoading(true);
+        setShowEventsList(false); // Reset list state during fetch
+        await getUserEvents(account[3], api);
+        setShowEventsList(true); // Show list after successful fetch
+      } catch (error: any) {
+        console.error('Error fetching events:', error);
+
+        // Handle 401 Unauthorized specifically
+        if (error.response?.status === 401) {
+          showAlert(
+            'Session Expired',
+            'Your session has expired. Please log out and log in again.',
+            'warning',
+          );
+        } else {
+          const errorMsg =
+            error.response?.data?.message ||
+            error.message ||
+            'Failed to fetch events';
+          showAlert('Error', errorMsg, 'error');
+        }
+        setLoading(false);
+      }
+    };
+
+    if (account && account[3]) {
+      fetchEvents();
+    }
+  }, [account]);
+
+  const handleMenuPress = () => setIsDrawerOpen(true);
+
+  const handleDrawerClose = () => setIsDrawerOpen(false);
+
+  const handleMonthSelect = (monthIndex: number) =>
+    setCurrentMonthByIndex(monthIndex);
+
+  const handleViewSelect = (view: string) =>
+    setCurrentView(view as 'Day' | 'Week' | 'Month');
+
+  const handleAction1Press = (isSelected: boolean) => {
+    setFilterType(isSelected ? 'EventsOnly' : 'All');
+  };
+
+  const handleAction2Press = (isSelected: boolean) => {
+    setFilterType(isSelected ? 'TasksOnly' : 'All');
+  };
+
+  const handleFABPress = () => {};
+
+  const handleMonthPress = () => {
+    const today = new Date();
+    const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+    setCurrentMonth(prev =>
+      prev === today.toLocaleString('en-US', { month: 'long' })
+        ? nextMonth.toLocaleString('en-US', { month: 'long' })
+        : today.toLocaleString('en-US', { month: 'long' }),
+    );
+  };
+
+  return (
+    <View style={styles.container}>
+      <CustomeHeader
+        onMenuPress={handleMenuPress}
+        title="Calendar"
+        currentMonth={currentMonth}
+        currentView={currentView}
+        onMonthPress={handleMonthPress}
+        onMonthSelect={handleMonthSelect}
+        onViewSelect={handleViewSelect}
+        onAction1Press={() => handleAction1Press(filterType === 'EventsOnly')}
+        onAction2Press={() => handleAction2Press(filterType === 'TasksOnly')}
+      />
+
+      {/* Segmented Control Navigation */}
+      <View style={styles.segmentedControlContainer}>
+        <View style={styles.segmentedControl}>
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              selectedTab === 'All' && styles.segmentButtonActive,
+            ]}
+            onPress={() => setSelectedTab('All')}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                selectedTab === 'All' && styles.segmentTextActive,
+              ]}
+            >
+              All
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              selectedTab === 'Upcoming' && styles.segmentButtonActive,
+            ]}
+            onPress={() => setSelectedTab('Upcoming')}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                selectedTab === 'Upcoming' && styles.segmentTextActive,
+              ]}
+            >
+              Upcoming
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            style={[
+              styles.segmentButton,
+              selectedTab === 'Completed' && styles.segmentButtonActive,
+            ]}
+            onPress={() => setSelectedTab('Completed')}
+          >
+            <Text
+              style={[
+                styles.segmentText,
+                selectedTab === 'Completed' && styles.segmentTextActive,
+              ]}
+            >
+              Completed
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+
+      {/* Left edge touch area for drawer */}
+      <TouchableOpacity
+        style={styles.leftEdgeTouchArea}
+        onPress={handleMenuPress}
+        activeOpacity={0.1}
+      />
+
+      <ScrollView
+        style={styles.content}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        {loading ? (
+          <CustomLoader />
+        ) : !showEventsList ? (
+          <View style={styles.emptyStateContainer}>
+            <Text style={styles.emptyStateDescription}>Loading...</Text>
+          </View>
+        ) : events.length === 0 ? (
+          <View style={styles.emptyStateContainer}>
+            <View style={styles.emptyStateIllustration}>
+              <View style={styles.emptyStateIcon}>
+                {selectedTab === 'Completed' ? (
+                  <TaskCompleteIcon
+                    width={scaleWidth(54)}
+                    height={scaleHeight(54)}
+                    fill={colors.primaryBlue}
+                  />
+                ) : (
+                  <CalendarIcon
+                    width={scaleWidth(54)}
+                    height={scaleHeight(54)}
+                    fill={colors.primaryBlue}
+                  />
+                )}
+              </View>
+              <Text style={styles.emptyStateTitle}>
+                {selectedTab === 'All'
+                  ? 'No Activity Available'
+                  : selectedTab === 'Upcoming'
+                  ? 'No Upcoming Activity'
+                  : 'No Completed Activity'}
+              </Text>
+              <Text style={styles.emptyStateDescription}>
+                {selectedTab === 'All'
+                  ? "You haven't added any Activity yet. Tap the 'create button' below to quickly set up your first task, event, or activity."
+                  : selectedTab === 'Upcoming'
+                  ? "You don't have any upcoming activity right now. New scheduled events will automatically appear here as soon as they are created."
+                  : 'There are no completed activity to show. After you finish or mark activity as completed, they will be listed here.'}
+              </Text>
+            </View>
+          </View>
+        ) : (
+          (() => {
+            const groupedEvents = groupEventsByDate(events);
+            return Object.entries(groupedEvents).map(
+              ([dateKey, dateEvents]) => (
+                <View key={dateKey} style={styles.dateGroup}>
+                  <View style={styles.dateHeader}>
+                    <Text style={styles.dateHeaderText} numberOfLines={1}>
+                      {dateKey}
+                    </Text>
+                    <View style={styles.dateDivider} />
+                  </View>
+                  {dateEvents.map((event, index) => (
+                    <EventCard
+                      key={event.id || index}
+                      title={event.title}
+                      eventId={event.id}
+                      event={event}
+                      time={event.time}
+                      date={event.date}
+                      color={event.color}
+                      tags={event.tags}
+                      compact={true}
+                      onEdit={() => handleEditEvent(event)}
+                    />
+                  ))}
+                </View>
+              ),
+            );
+          })()
+        )}
+      </ScrollView>
+
+      <FloatingActionButton
+        onPress={handleFABPress}
+        onOptionSelect={option => {
+          switch (option) {
+            case 'goal':
+              break;
+            case 'reminder':
+              navigation.navigate(Screen.RemindersScreen);
+              break;
+            case 'task':
+              navigation.navigate(Screen.CreateTaskScreen);
+              break;
+            case 'event':
+              navigation.navigate(Screen.CreateEventScreen);
+              break;
+            default:
+              break;
+          }
+        }}
+      />
+
+      {/* Custom Alert */}
+      <CustomAlert
+        visible={alertVisible}
+        title={alertTitle}
+        message={alertMessage}
+        type={alertType}
+        onClose={() => setAlertVisible(false)}
+      />
+
+      {/* Custom Drawer */}
+      <CustomDrawer isOpen={isDrawerOpen} onClose={handleDrawerClose} />
+    </View>
+  );
 };
 
 const styles = StyleSheet.create({
-    container: {
-        flex: 1,
-        backgroundColor: '#F5F5F5', // Gray background matching DeletedEventsScreen
-    },
-    content: {
-        flex: 1,
-    },
-    leftEdgeTouchArea: {
-        position: 'absolute',
-        left: 0,
-        top: scaleHeight(80),
-        width: scaleWidth(20),
-        height: screenHeight - scaleHeight(80),
-        zIndex: 1,
-    },
-    // Segmented Control Navigation
-    segmentedControlContainer: {
-        width: screenWidth,
-        alignItems: 'center',
-        paddingHorizontal: scaleWidth(18),
-        paddingTop: scaleHeight(12),
-        paddingBottom: scaleHeight(12),
-        marginTop: scaleHeight(8), // Gap between header and navigation
-        // No background color - transparent to show gray home screen background
-    },
-    segmentedControl: {
-        width: scaleWidth(339),
-        height: scaleHeight(48),
-        flexDirection: 'row',
-        backgroundColor: colors.white, // White navigation container
-        borderRadius: 10,
-        padding: 4,
-        gap: 3,
-    },
-    segmentButton: {
-        flex: 1,
-        height: '100%',
-        justifyContent: 'center',
-        alignItems: 'center',
-        borderRadius: 8,
-    },
-    segmentButtonActive: {
-        backgroundColor: colors.primaryBlue, // Using the same blue as calendar icon
-    },
-    segmentText: {
-        fontSize: fontSize.textSize16,
-        fontWeight: '500',
-        fontFamily: Fonts.latoMedium,
-        color: colors.grey400,
-    },
-    segmentTextActive: {
-        color: colors.white,
-        fontWeight: '600',
-        fontFamily: Fonts.latoBold,
-    },
-    // Empty State
-    emptyStateContainer: {
-        width: scaleWidth(375),
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingTop: scaleHeight(80),
-        paddingBottom: scaleHeight(80),
-    },
-    emptyStateIllustration: {
-        width: scaleWidth(331),
-        height: scaleHeight(456),
-        alignItems: 'center',
-        justifyContent: 'center',
-        gap: scaleHeight(20),
-    },
-    emptyStateIcon: {
-        width: scaleWidth(134),
-        height: scaleHeight(134),
-        borderRadius: scaleWidth(150),
-        backgroundColor: '#E5F1FF',
-        justifyContent: 'center',
-        alignItems: 'center',
-        marginBottom: scaleHeight(8), // Reduced gap
-    },
-    emptyStateIconText: {
-        fontSize: scaleWidth(60),
-    },
-    emptyStateTitle: {
-        fontSize: fontSize.textSize20,
-        fontWeight: '700',
-        fontFamily: Fonts.latoBold,
-        color: colors.blackText,
-        marginTop: scaleHeight(8), // Reduced gap
-        textAlign: 'center',
-    },
-    emptyStateDescription: {
-        fontSize: fontSize.textSize14,
-        fontFamily: Fonts.latoRegular,
-        color: colors.grey400,
-        textAlign: 'center',
-        paddingHorizontal: scaleWidth(40),
-        lineHeight: fontSize.textSize20,
-        marginTop: scaleHeight(4), // Reduced gap
-    },
-    // Date Group Styles (matching DeletedEventsScreen)
-    dateGroup: {
-        marginBottom: scaleHeight(24),
-        paddingHorizontal: scaleWidth(20),
-    },
-    dateHeader: {
-        fontSize: moderateScale(16),
-        fontWeight: '600',
-        color: '#000',
-        marginBottom: scaleHeight(12),
-        fontFamily: Fonts.latoBold,
-        flexDirection: 'row',
-        alignItems: 'center',
-    },
-    dateHeaderText: {
-        fontSize: moderateScale(16),
-        fontWeight: '600',
-        color: '#000',
-        fontFamily: Fonts.latoBold,
-        marginRight: scaleWidth(12),
-    },
-    dateDivider: {
-        flex: 1,
-        height: 1,
-        backgroundColor: '#E0E0E0',
-    },
+  container: {
+    flex: 1,
+    backgroundColor: '#F5F5F5', // Gray background matching DeletedEventsScreen
+  },
+  content: {
+    flex: 1,
+  },
+  leftEdgeTouchArea: {
+    position: 'absolute',
+    left: 0,
+    top: scaleHeight(80),
+    width: scaleWidth(20),
+    height: screenHeight - scaleHeight(80),
+    zIndex: 1,
+  },
+  // Segmented Control Navigation
+  segmentedControlContainer: {
+    width: screenWidth,
+    alignItems: 'center',
+    paddingHorizontal: scaleWidth(18),
+    paddingTop: scaleHeight(12),
+    paddingBottom: scaleHeight(12),
+    marginTop: scaleHeight(8), // Gap between header and navigation
+    // No background color - transparent to show gray home screen background
+  },
+  segmentedControl: {
+    width: scaleWidth(339),
+    height: scaleHeight(48),
+    flexDirection: 'row',
+    backgroundColor: colors.white, // White navigation container
+    borderRadius: 10,
+    padding: 4,
+    gap: 3,
+  },
+  segmentButton: {
+    flex: 1,
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 8,
+  },
+  segmentButtonActive: {
+    backgroundColor: colors.primaryBlue, // Using the same blue as calendar icon
+  },
+  segmentText: {
+    fontSize: fontSize.textSize16,
+    fontWeight: '500',
+    fontFamily: Fonts.latoMedium,
+    color: colors.grey400,
+  },
+  segmentTextActive: {
+    color: colors.white,
+    fontWeight: '600',
+    fontFamily: Fonts.latoBold,
+  },
+  // Empty State
+  emptyStateContainer: {
+    width: scaleWidth(375),
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: scaleHeight(80),
+    paddingBottom: scaleHeight(80),
+  },
+  emptyStateIllustration: {
+    width: scaleWidth(331),
+    height: scaleHeight(456),
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: scaleHeight(20),
+  },
+  emptyStateIcon: {
+    width: scaleWidth(134),
+    height: scaleHeight(134),
+    borderRadius: scaleWidth(150),
+    backgroundColor: '#E5F1FF',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: scaleHeight(8), // Reduced gap
+  },
+  emptyStateIconText: {
+    fontSize: scaleWidth(60),
+  },
+  emptyStateTitle: {
+    fontSize: fontSize.textSize20,
+    fontWeight: '700',
+    fontFamily: Fonts.latoBold,
+    color: colors.blackText,
+    marginTop: scaleHeight(8), // Reduced gap
+    textAlign: 'center',
+  },
+  emptyStateDescription: {
+    fontSize: fontSize.textSize14,
+    fontFamily: Fonts.latoRegular,
+    color: colors.grey400,
+    textAlign: 'center',
+    paddingHorizontal: scaleWidth(40),
+    lineHeight: fontSize.textSize20,
+    marginTop: scaleHeight(4), // Reduced gap
+  },
+  // Date Group Styles (matching DeletedEventsScreen)
+  dateGroup: {
+    marginBottom: scaleHeight(24),
+    paddingHorizontal: scaleWidth(20),
+  },
+  dateHeader: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: scaleHeight(12),
+    fontFamily: Fonts.latoBold,
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  dateHeaderText: {
+    fontSize: moderateScale(16),
+    fontWeight: '600',
+    color: '#000',
+    fontFamily: Fonts.latoBold,
+    marginRight: scaleWidth(12),
+  },
+  dateDivider: {
+    flex: 1,
+    height: 1,
+    backgroundColor: '#E0E0E0',
+  },
 });
 
 export default HomeScreen;
