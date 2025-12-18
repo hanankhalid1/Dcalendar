@@ -9,6 +9,10 @@ export class ImportService {
             let eventsDetails: { uid: any; title: any; description: any; fromTime: any; toTime: any; done: boolean; list: { key: string; value: any; }[]; }[] = [];
             calendarBlocks.forEach((block: any) => {
                 if (!block.trim()) return;
+                
+                // Clean up malformed RRULE frequencies before parsing
+                block = this.cleanRRuleFrequency(block);
+                
                 const jcalData = ICAL.parse(block);
                 const comp = new ICAL.Component(jcalData);
                 comp.getAllSubcomponents("vevent").forEach((event: any) => {
@@ -147,8 +151,13 @@ export class ImportService {
             });
 
             return response;
-        } catch (error) {
+        } catch (error: any) {
             console.error("Error parsing ICS data:", error);
+            console.error("Error details:", {
+                message: error?.message,
+                stack: error?.stack,
+                name: error?.name
+            });
             return null;
         }
     };
@@ -230,5 +239,62 @@ export class ImportService {
                 return icalString.split('T')[0];
             }
         }
+    }
+
+    /**
+     * Cleans up malformed RRULE frequency values in ICS data
+     * Fixes cases like:
+     * - "FREQ=WEEKLY ON SATURDAY" → "FREQ=WEEKLY;BYDAY=SA"
+     * - "FREQ=MONTHLY THIRD FRIDAY" → "FREQ=MONTHLY;BYDAY=3FR"
+     */
+    public cleanRRuleFrequency(icsBlock: string): string {
+        // Pattern 1: Match "WEEKLY ON SATURDAY", "DAILY ON MONDAY", etc.
+        const weeklyPattern = /FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY)\s+ON\s+(\w+)/gi;
+        
+        // Pattern 2: Match "MONTHLY FIRST MONDAY", "MONTHLY THIRD FRIDAY", etc.
+        const monthlyOrdinalPattern = /FREQ=MONTHLY\s+(FIRST|SECOND|THIRD|FOURTH|FIFTH|LAST)\s+(\w+)/gi;
+        
+        // Day name to abbreviation mapping
+        const dayMap: { [key: string]: string } = {
+            'SUNDAY': 'SU',
+            'MONDAY': 'MO',
+            'TUESDAY': 'TU',
+            'WEDNESDAY': 'WE',
+            'THURSDAY': 'TH',
+            'FRIDAY': 'FR',
+            'SATURDAY': 'SA'
+        };
+        
+        // Ordinal to number mapping
+        const ordinalMap: { [key: string]: string } = {
+            'FIRST': '1',
+            'SECOND': '2',
+            'THIRD': '3',
+            'FOURTH': '4',
+            'FIFTH': '5',
+            'LAST': '-1'
+        };
+        
+        // First, handle weekly/daily patterns with "ON"
+        let cleaned = icsBlock.replace(weeklyPattern, (match, freq, day) => {
+            const dayAbbr = dayMap[day.toUpperCase()];
+            if (dayAbbr) {
+                return `FREQ=${freq.toUpperCase()};BYDAY=${dayAbbr}`;
+            }
+            return `FREQ=${freq.toUpperCase()}`;
+        });
+        
+        // Then, handle monthly ordinal patterns
+        cleaned = cleaned.replace(monthlyOrdinalPattern, (match, ordinal, day) => {
+            const dayAbbr = dayMap[day.toUpperCase()];
+            const ordinalNum = ordinalMap[ordinal.toUpperCase()];
+            
+            if (dayAbbr && ordinalNum) {
+                return `FREQ=MONTHLY;BYDAY=${ordinalNum}${dayAbbr}`;
+            }
+            return `FREQ=MONTHLY`;
+        });
+        
+        return cleaned;
     }
 }

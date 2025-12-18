@@ -872,6 +872,8 @@ const SettingsScreen = () => {
 
         const parsed = importService.parseIcal(icalDataString, account, events);
 
+        console.log('Imported events are here:', parsed);
+
         // Determine the scenario
 
         const totalEventsInFile =
