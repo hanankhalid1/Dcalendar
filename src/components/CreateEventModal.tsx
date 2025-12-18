@@ -57,6 +57,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
   const [title, setTitle] = React.useState('');
   const [description, setDescription] = React.useState('');
   const [location, setLocation] = React.useState('');
+  const [videoConferencing, setVideoConferencing] = React.useState('');
   const [showAdvanced, setShowAdvanced] = React.useState(true); // Set to true to show the toolbar
   const [notificationMinutes, setNotificationMinutes] = React.useState(10);
   const [guestPermissions, setGuestPermissions] = React.useState({
@@ -81,6 +82,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
     setTitle('');
     setDescription('');
     setLocation('');
+    setVideoConferencing('');
     setSelectedDate(null);
     setSelectedStartTime('');
     setSelectedEndTime('');
@@ -99,6 +101,7 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
       setTitle(eventData.title || '');
       setDescription(eventData.description || '');
       setLocation(eventData.location || '');
+      setVideoConferencing(eventData.videoConferencing || '');
       setSelectedDate(
         eventData.selectedDate ? new Date(eventData.selectedDate) : null,
       );

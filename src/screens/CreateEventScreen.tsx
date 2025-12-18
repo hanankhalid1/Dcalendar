@@ -538,9 +538,21 @@ const CreateEventScreen = () => {
 
       setTitle(editEventData.title || '');
       setDescription(editEventData.description || '');
-      setLocation(parsedData.location || '');
 
-      // ✅ CHECK IF IT'S AN ALL-DAY EVENT FIRST
+      // Only set location if it's NOT a video conferencing meeting link
+      // Video conferencing links should not be shown in the location field
+      const shouldSetLocation = !(
+        parsedData.locationType === 'google' ||
+        parsedData.locationType === 'zoom'
+      );
+
+      if (shouldSetLocation) {
+        setLocation(parsedData.location || '');
+      } else {
+        setLocation(''); // Clear location for video conferencing events
+      }
+
+      // CHECK IF IT'S AN ALL-DAY EVENT FIRST
       if (editEventData.fromTime && editEventData.toTime) {
         const isAllDay = isAllDayEventCheck(
           editEventData.fromTime,
@@ -2039,6 +2051,45 @@ const CreateEventScreen = () => {
             );
             eventData.location = data.hangoutLink;
             eventData.meetingEventId = data.id;
+
+            // ✅ Rebuild metadata list to include the updated Google Meet meeting link
+            console.log(
+              '🔄 Rebuilding metadata with updated Google Meet meeting link',
+            );
+            const updatedMetadataList = buildEventMetadata(
+              eventData as any,
+              null,
+            );
+
+            // Replace location-related items in the list with updated ones
+            let updatedList = eventData.list.filter(
+              (item: any) =>
+                item.key !== 'location' &&
+                item.key !== 'locationType' &&
+                item.key !== 'meetingEventId',
+            );
+
+            // Add updated location items
+            updatedMetadataList.forEach((item: any) => {
+              if (
+                item.key === 'location' ||
+                item.key === 'locationType' ||
+                item.key === 'meetingEventId'
+              ) {
+                updatedList.push(item);
+              }
+            });
+
+            eventData.list = updatedList;
+            console.log(
+              '✅ Updated metadata with Google Meet link:',
+              updatedList.filter(
+                (item: any) =>
+                  item.key === 'location' ||
+                  item.key === 'locationType' ||
+                  item.key === 'meetingEventId',
+              ),
+            );
           } else {
             console.error('❌ Failed to update Google Meet via backend:', data);
           }
@@ -2316,6 +2367,43 @@ const CreateEventScreen = () => {
             );
             eventData.location = data.hangoutLink;
             eventData.meetingEventId = data.id;
+
+            // ✅ Rebuild metadata list to include the Google Meet meeting link
+            console.log('🔄 Rebuilding metadata with Google Meet meeting link');
+            const updatedMetadataList = buildEventMetadata(
+              eventData as any,
+              null,
+            );
+
+            // Replace location-related items in the list with updated ones
+            let updatedList = eventData.list.filter(
+              (item: any) =>
+                item.key !== 'location' &&
+                item.key !== 'locationType' &&
+                item.key !== 'meetingEventId',
+            );
+
+            // Add updated location items
+            updatedMetadataList.forEach((item: any) => {
+              if (
+                item.key === 'location' ||
+                item.key === 'locationType' ||
+                item.key === 'meetingEventId'
+              ) {
+                updatedList.push(item);
+              }
+            });
+
+            eventData.list = updatedList;
+            console.log(
+              '✅ Updated metadata with Google Meet link:',
+              updatedList.filter(
+                (item: any) =>
+                  item.key === 'location' ||
+                  item.key === 'locationType' ||
+                  item.key === 'meetingEventId',
+              ),
+            );
           } else {
             console.error('❌ Failed to create Google Meet via backend:', data);
           }
@@ -3370,6 +3458,8 @@ const CreateEventScreen = () => {
                     onPress={() => {
                       if (!isLoading) {
                         setSelectedVideoConferencing('inperson');
+                        setLocation(''); // Clear location when switching to in-person
+                        setLocationError('');
                         setShowVideoConferencingOptions(false);
                       }
                     }}
