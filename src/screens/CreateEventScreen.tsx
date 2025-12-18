@@ -2046,15 +2046,11 @@ const CreateEventScreen = () => {
             );
             eventData.location = data.hangoutLink;
             eventData.meetingEventId = data.id;
-            setMeetingLink(data.hangoutLink);
-            setMeetingEventId(data.id);
           } else {
             console.error('❌ Failed to update Google Meet via backend:', data);
-            Alert.alert('Error', 'Failed to update Google Meet');
           }
         } catch (err) {
           console.error('❌ Google Meet update error via backend:', err);
-          Alert.alert('Error', 'Failed to update Google Meet');
         }
       }
 
@@ -2327,50 +2323,11 @@ const CreateEventScreen = () => {
             );
             eventData.location = data.hangoutLink;
             eventData.meetingEventId = data.id;
-
-            // ✅ Rebuild metadata list to include the Google Meet link
-            console.log('🔄 Rebuilding metadata with Google Meet link');
-            const updatedMetadataList = buildEventMetadata(
-              eventData as any,
-              null,
-            );
-
-            // Replace location-related items in the list with updated ones
-            let updatedList = eventData.list.filter(
-              (item: any) =>
-                item.key !== 'location' &&
-                item.key !== 'locationType' &&
-                item.key !== 'meetingEventId',
-            );
-
-            // Add updated location items
-            updatedMetadataList.forEach((item: any) => {
-              if (
-                item.key === 'location' ||
-                item.key === 'locationType' ||
-                item.key === 'meetingEventId'
-              ) {
-                updatedList.push(item);
-              }
-            });
-
-            eventData.list = updatedList;
-            console.log(
-              '✅ Updated metadata with Google Meet link:',
-              updatedList.filter(
-                (item: any) =>
-                  item.key === 'location' ||
-                  item.key === 'locationType' ||
-                  item.key === 'meetingEventId',
-              ),
-            );
           } else {
             console.error('❌ Failed to create Google Meet via backend:', data);
-            Alert.alert('Error', 'Failed to create Google Meet');
           }
         } catch (err) {
           console.error('❌ Google Meet creation error via backend:', err);
-          Alert.alert('Error', 'Failed to create Google Meet');
         }
       }
 
