@@ -1718,8 +1718,8 @@ const CreateEventScreen = () => {
       selectedVideoConferencing !== 'zoom'
     ) {
       // Check for invalid characters that could cause issues
-      // Blocked: < > { } [ ] | \ ` ~ ^ / @ # $ % & * + = ?
-      const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
+      // Blocked: < > { } [ ] ( ) | \ ` ~ ^ / @ # $ % & * + = ? ! ; " _ -
+      const invalidChars = /[<>{}[\]()|\\`~^\/@#$%&*+=?!;"_-]/;
       if (invalidChars.test(location)) {
         setLocationError('Enter valid location');
         isValid = false;
@@ -4242,8 +4242,8 @@ const CreateEventScreen = () => {
                 value={location}
                 onChangeText={text => {
                   // Check for invalid characters
-                  // Blocked: < > { } [ ] | \ ` ~ ^ / @ # $ % & * + = ?
-                  const invalidChars = /[<>{}[\]|\\`~^\/@#$%&*+=?]/;
+                  // Blocked: < > { } [ ] ( ) | \ ` ~ ^ / @ # $ % & * + = ? ! ; " _ -
+                  const invalidChars = /[<>{}[\]()|\\`~^\/@#$%&*+=?!;"_-]/;
                   if (invalidChars.test(text)) {
                     // Show error message and don't update the location
                     setLocationError('Enter valid location');

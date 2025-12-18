@@ -119,7 +119,11 @@ const CreateOutOfOfficeScreen: React.FC = () => {
   };
 
   const handleClose = () => {
-    navigation.goBack();
+    if (navigation?.canGoBack && navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.reset({ index: 0, routes: [{ name: 'MonthlyCalenderScreen' }] });
   };
 
   // Form validation
@@ -192,8 +196,6 @@ const CreateOutOfOfficeScreen: React.FC = () => {
       };
 
       console.log('Creating out of office event with data:', eventData);
-
-     
     } catch (error: any) {
       console.error('Error creating event:', error);
       Alert.alert(

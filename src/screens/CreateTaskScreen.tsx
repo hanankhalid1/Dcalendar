@@ -806,7 +806,11 @@ const CreateTaskScreen = () => {
     }, 0);
   };
   const handleClose = () => {
-    navigation.goBack();
+    if (navigation?.canGoBack && navigation.canGoBack()) {
+      navigation.goBack();
+      return;
+    }
+    navigation.reset({ index: 0, routes: [{ name: 'MonthlyCalenderScreen' }] });
   };
 
   const validateForm = () => {

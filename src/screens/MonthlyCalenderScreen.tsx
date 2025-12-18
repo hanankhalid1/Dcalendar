@@ -31,6 +31,7 @@ import { useToken } from '../stores/useTokenStore';
 import { NECJSPRIVATE_KEY } from '../constants/Config';
 import { useApiClient } from '../hooks/useApi';
 import ExitConfirmModal from '../components/ExitConfirmModal';
+import { useFocusEffect } from '@react-navigation/native';
 import ClockIcon from '../assets/svgs/clock.svg';
 import CalendarIcon from '../assets/svgs/calendar.svg';
 import EventIcon from '../assets/svgs/eventIcon.svg';
@@ -1001,24 +1002,26 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     }
   }, [token, account]);
 
-  // Handle Android back button to show exit modal
-  useEffect(() => {
-    const backHandler = BackHandler.addEventListener(
-      'hardwareBackPress',
-      () => {
-        // Skip if logging out or user not logged in
-        if (isLoggingOut || !token || !account) return false;
+  // Handle Android back button ONLY when this screen is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      const backHandler = BackHandler.addEventListener(
+        'hardwareBackPress',
+        () => {
+          // Skip if logging out or user not logged in
+          if (isLoggingOut || !token || !account) return false;
 
-        // Show exit modal instead of exiting
-        if (!exitModal) {
-          setExitModal(true);
-        }
-        return true; // Prevent default back behavior
-      },
-    );
+          // Show exit modal instead of exiting
+          if (!exitModal) {
+            setExitModal(true);
+          }
+          return true; // Prevent default back behavior
+        },
+      );
 
-    return () => backHandler.remove();
-  }, [exitModal, isLoggingOut, token, account]);
+      return () => backHandler.remove();
+    }, [exitModal, isLoggingOut, token, account]),
+  );
 
   const handleMenuPress = () => {
     setIsDrawerOpen(true);
