@@ -8,6 +8,7 @@ import {
   ScrollView,
   ActivityIndicator,
   Image,
+  BackHandler,
 } from 'react-native';
 import { Calendar } from 'react-native-calendars';
 import { useNavigation } from '@react-navigation/native';
@@ -98,6 +99,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   const [exitModal, setExitModal] = useState(false);
   const [navigationAction, setNavigationAction] = useState(null);
   const [failedImages, setFailedImages] = useState<Set<string>>(new Set());
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
   const [loading, setLoading] = useState(false);
 
   // Custom Alert State
@@ -976,7 +978,11 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     });
 
     const unsub = navigation.addListener('beforeRemove', e => {
-      if (exitModal) return;
+      // Skip exit modal if already showing or if user is logging out
+      if (exitModal || isLoggingOut) return;
+
+      // Skip exit modal if user has already been logged out (no token or account)
+      if (!token || !account) return;
 
       e.preventDefault();
       setExitModal(true);
@@ -985,7 +991,34 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     });
 
     return unsub;
-  }, [navigation, exitModal]);
+  }, [navigation, exitModal, isLoggingOut, token, account]);
+
+  // Clear exit modal state when user logs out (token/account cleared)
+  useEffect(() => {
+    if (!token || !account) {
+      setExitModal(false);
+      setNavigationAction(null);
+    }
+  }, [token, account]);
+
+  // Handle Android back button to show exit modal
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      () => {
+        // Skip if logging out or user not logged in
+        if (isLoggingOut || !token || !account) return false;
+
+        // Show exit modal instead of exiting
+        if (!exitModal) {
+          setExitModal(true);
+        }
+        return true; // Prevent default back behavior
+      },
+    );
+
+    return () => backHandler.remove();
+  }, [exitModal, isLoggingOut, token, account]);
 
   const handleMenuPress = () => {
     setIsDrawerOpen(true);
@@ -1560,7 +1593,11 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         confirmText="Delete"
       />
 
-      <CustomDrawer isOpen={isDrawerOpen} onClose={handleDrawerClose} />
+      <CustomDrawer
+        isOpen={isDrawerOpen}
+        onClose={handleDrawerClose}
+        onLogout={() => setIsLoggingOut(true)}
+      />
       <ExitConfirmModal
         visible={exitModal}
         onCancel={() => {
@@ -1569,6 +1606,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         }}
         onConfirm={() => {
           setExitModal(false);
+          setNavigationAction(null);
           if (navigationAction) {
             navigation.dispatch(navigationAction);
           } else {

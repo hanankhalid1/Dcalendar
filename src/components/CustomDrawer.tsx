@@ -51,6 +51,7 @@ import AppointmentIcon from '../assets/svgs/appoitnmentIcon.svg';
 interface CustomDrawerProps {
   isOpen: boolean;
   onClose: () => void;
+  onLogout?: () => void;
 }
 
 interface Account {
@@ -65,7 +66,11 @@ interface Account {
   ncogWalletAddress?: string;
 }
 
-const CustomDrawer: React.FC<CustomDrawerProps> = ({ isOpen, onClose }) => {
+const CustomDrawer: React.FC<CustomDrawerProps> = ({
+  isOpen,
+  onClose,
+  onLogout,
+}) => {
   const slideAnim = useRef(new Animated.Value(-scaleWidth(280))).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<any>();
@@ -393,6 +398,11 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({ isOpen, onClose }) => {
     try {
       console.log('Logging out...');
 
+      // Notify parent component that logout is in progress
+      if (onLogout) {
+        onLogout();
+      }
+
       // Clear all state
       setAccount(null);
       setToken(null); // FIX: Use setToken instead of token.clearToken()
@@ -405,8 +415,11 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({ isOpen, onClose }) => {
 
       console.log('Logout complete, navigating to WalletScreen');
 
-      // Reset navigation stack to WalletScreen
-      navigation.navigate('Wallet');
+      // Use reset() instead of navigate() to bypass beforeRemove listener and exit confirmation modal
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Wallet' }],
+      });
     } catch (error) {
       console.error('Logout error:', error);
       // Even if there's an error, try to navigate
@@ -1071,14 +1084,14 @@ const styles = StyleSheet.create({
     color: '#414651', // Default black color
     fontWeight: '400', // Regular
     fontFamily: Fonts.latoRegular,
-    lineHeight: 14, // 100% of font size
+    lineHeight: 18, // Increased from 14 to prevent text cutoff
     letterSpacing: 0, // 0%
   },
   navTextActive: {
     color: colors.primaryBlue, // Blue when selected
     fontWeight: '400', // Keep Regular
     fontFamily: Fonts.latoRegular,
-    lineHeight: 14,
+    lineHeight: 18, // Increased from 14 to prevent text cutoff
     letterSpacing: 0,
   },
   profileSection: {
