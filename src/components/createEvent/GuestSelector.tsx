@@ -140,6 +140,12 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
         >
+          <TouchableOpacity
+            style={styles.backdrop}
+            activeOpacity={1}
+            onPress={onToggleGuestModal}
+            accessible={false}
+          />
           <View style={styles.guestModalContainer}>
             {/* Modal Handle */}
             <View style={styles.modalHandle} />
@@ -337,6 +343,9 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
+  },
+  backdrop: {
+    ...StyleSheet.absoluteFillObject,
   },
   guestModalContainer: {
     backgroundColor: colors.white,
