@@ -856,17 +856,6 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({ isOpen, onClose }) => {
             <TouchableOpacity
               style={styles.createMenuItem}
               onPress={() => {
-                console.log('>>>>>>>>> Appointment');
-                setShowCreateMenu(false);
-                doNavigate('AppointmentScheduleScreen');
-                onClose();
-              }}
-            >
-              <Text style={styles.createMenuTextOnly}>Appointment</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={styles.createMenuItem}
-              onPress={() => {
                 console.log('>>>>>>>>> Event');
                 setShowCreateMenu(false);
                 doNavigate('CreateEventScreen');

@@ -743,13 +743,6 @@ const CreateEventScreen = () => {
     }
   };
 
-  // Ensure the video conferencing dropdown closes whenever a selection is made
-  useEffect(() => {
-    if (showVideoConferencingOptions && selectedVideoConferencing) {
-      setShowVideoConferencingOptions(false);
-    }
-  }, [selectedVideoConferencing, showVideoConferencingOptions]);
-
   useEffect(() => {
     if (selectedStartDate) {
       const weekday = selectedStartDate.toLocaleDateString('en-US', {
@@ -3376,11 +3369,8 @@ const CreateEventScreen = () => {
                     ]}
                     onPress={() => {
                       if (!isLoading) {
-                        setSelectedVideoConferencing(
-                          selectedVideoConferencing === 'inperson'
-                            ? null
-                            : 'inperson',
-                        );
+                        setSelectedVideoConferencing('inperson');
+                        setShowVideoConferencingOptions(false);
                       }
                     }}
                     disabled={isLoading}
@@ -3409,10 +3399,11 @@ const CreateEventScreen = () => {
                     ]}
                     onPress={() => {
                       if (!isLoading) {
-                        handleGoogleMeetClick();
                         setSelectedVideoConferencing('google');
                         setLocation(''); // Clear location when Google Meet is selected
                         setLocationError('');
+                        setShowVideoConferencingOptions(false);
+                        handleGoogleMeetClick();
                       }
                     }}
                     disabled={isLoading}
@@ -3443,12 +3434,11 @@ const CreateEventScreen = () => {
                       if (!isLoading) {
                         setLocation(''); // Clear location when Zoom is selected
                         setLocationError('');
+                        setSelectedVideoConferencing('zoom');
+                        setShowVideoConferencingOptions(false);
 
-                        // If Zoom is connected, set selection
-                        if (zoomIntegration.isConnected) {
-                          setSelectedVideoConferencing('zoom');
-                        } else {
-                          // Show integration modal if not connected
+                        // If Zoom is not connected, prompt integration but keep selection
+                        if (!zoomIntegration.isConnected) {
                           setIntegrationType('zoom');
                           setShowIntegrationModal(true);
                         }
