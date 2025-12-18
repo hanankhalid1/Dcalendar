@@ -748,7 +748,7 @@ const CreateEventScreen = () => {
     if (showVideoConferencingOptions && selectedVideoConferencing) {
       setShowVideoConferencingOptions(false);
     }
-  }, [selectedVideoConferencing]);
+  }, [selectedVideoConferencing, showVideoConferencingOptions]);
 
   useEffect(() => {
     if (selectedStartDate) {
@@ -3381,7 +3381,6 @@ const CreateEventScreen = () => {
                             ? null
                             : 'inperson',
                         );
-                        setShowVideoConferencingOptions(false);
                       }
                     }}
                     disabled={isLoading}
@@ -3414,7 +3413,6 @@ const CreateEventScreen = () => {
                         setSelectedVideoConferencing('google');
                         setLocation(''); // Clear location when Google Meet is selected
                         setLocationError('');
-                        setShowVideoConferencingOptions(false);
                       }
                     }}
                     disabled={isLoading}
@@ -3445,8 +3443,6 @@ const CreateEventScreen = () => {
                       if (!isLoading) {
                         setLocation(''); // Clear location when Zoom is selected
                         setLocationError('');
-                        // Always close dropdown first
-                        setShowVideoConferencingOptions(false);
 
                         // If Zoom is connected, set selection
                         if (zoomIntegration.isConnected) {
@@ -4448,6 +4444,7 @@ const styles = StyleSheet.create({
   },
   fieldContainer: {
     marginBottom: scaleHeight(20),
+    zIndex: 1,
   },
   labelText: {
     fontFamily: Fonts.latoMedium,
@@ -4760,6 +4757,8 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
     backgroundColor: colors.white,
     marginTop: -1,
+    zIndex: 1000,
+    elevation: 8,
   },
   videoConferencingDropdownItem: {
     flexDirection: 'row',
