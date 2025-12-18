@@ -731,16 +731,12 @@ const SettingsScreen = () => {
       return;
     }
 
-    console.log('🗓 Exporting events...');
-
     try {
       // 1️⃣ Generate the ICS content
 
       const icsContentArray = await ExportService.exportEvents(events, account);
 
       const combinedICS = icsContentArray.join('\n\n');
-
-      console.log('ICS data ready.');
 
       // 2️⃣ Create filename
 
@@ -795,9 +791,6 @@ const SettingsScreen = () => {
         filePath = `${dirs.DocumentDir}/${filename}`;
 
         await RNBlobUtil.fs.writeFile(filePath, combinedICS, 'utf8');
-
-        console.log('✅ File written to:', filePath);
-
         // Optionally open Share sheet
 
         const shareOptions = {
@@ -856,8 +849,6 @@ const SettingsScreen = () => {
       // Handle cancellation
 
       if (!results || results.length === 0) {
-        console.log('User cancelled the file picker.');
-
         return;
       }
 
@@ -870,13 +861,9 @@ const SettingsScreen = () => {
             : selectedFile.uri.replace('file://', '');
 
         // Read the file as text
-
         const icalDataString = await RNFS.readFile(filePath, 'utf8');
 
-        console.log('Account user name', account.userName);
-
         // Parse the file to get all events (before filtering)
-
         const allParsedEvents = importService.parseIcal(
           icalDataString,
           account,
@@ -884,10 +871,6 @@ const SettingsScreen = () => {
         );
 
         const parsed = importService.parseIcal(icalDataString, account, events);
-
-        console.log('All parsed events:', allParsedEvents);
-
-        console.log('Filtered parsed events:', parsed);
 
         // Determine the scenario
 
@@ -954,6 +937,14 @@ const SettingsScreen = () => {
 
             // Success: Events imported
 
+            // ✅ ADD EVENTS TO LOCAL STORE SO THEY APPEAR IN UI
+            const { optimisticallyAddEvent } = useEventsStore.getState();
+            parsed.forEach(event => {
+              optimisticallyAddEvent(event);
+            });
+
+            const skippedCount = totalEventsInFile - newEventsCount;
+
             showAlert(
               'Import Successful',
 
@@ -968,8 +959,6 @@ const SettingsScreen = () => {
               'success',
             );
           } catch (saveError) {
-            console.error('Error saving imported events:', saveError);
-
             showAlert(
               'Import Failed',
 
@@ -980,8 +969,6 @@ const SettingsScreen = () => {
           }
         }
       } catch (err) {
-        console.error('Error processing file:', err);
-
         const errorMessage =
           err instanceof Error ? err.message : 'Unknown error occurred';
 
@@ -994,8 +981,6 @@ const SettingsScreen = () => {
         );
       }
     } catch (err) {
-      console.error('Error selecting file:', err);
-
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to access the file';
 
