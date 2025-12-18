@@ -307,7 +307,6 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
 
 const styles = StyleSheet.create({
   section: {
-    marginBottom: spacing.lg,
     position: 'relative',
   },
   sectionTitle: {

@@ -31,11 +31,13 @@ import { fontSize } from '../utils/LightTheme';
 interface IntegrationsComponentProps {
   initialExpanded?: boolean;
   variant?: 'default' | 'compact';
+  onIntegrationSuccess?: () => void;
 }
 
 const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
   initialExpanded = false,
   variant = 'default',
+  onIntegrationSuccess,
 }) => {
   const [isIntegrationExpanded, setIsIntegrationExpanded] =
     useState(initialExpanded);
@@ -176,6 +178,9 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
         Alert.alert('Success', 'Google account connected successfully!', [
           {
             text: 'OK',
+            onPress: () => {
+              onIntegrationSuccess?.();
+            },
           },
         ]);
 
@@ -395,7 +400,14 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
 
               console.log('✅ Zoom state should now be connected');
 
-              Alert.alert('Success', 'Zoom connected successfully!');
+              Alert.alert('Success', 'Zoom connected successfully!', [
+                {
+                  text: 'OK',
+                  onPress: () => {
+                    onIntegrationSuccess?.();
+                  },
+                },
+              ]);
             } else {
               Alert.alert(
                 'Error',
@@ -472,7 +484,14 @@ const IntegrationsComponent: React.FC<IntegrationsComponentProps> = ({
 
                 connectZoom(zoomData);
 
-                Alert.alert('Success', 'Zoom connected successfully!');
+                Alert.alert('Success', 'Zoom connected successfully!', [
+                  {
+                    text: 'OK',
+                    onPress: () => {
+                      onIntegrationSuccess?.();
+                    },
+                  },
+                ]);
                 setIsLoadingZoom(false);
                 return;
               }

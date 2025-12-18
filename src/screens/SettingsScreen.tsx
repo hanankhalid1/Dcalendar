@@ -1064,7 +1064,15 @@ const SettingsScreen = () => {
         {/* Integrations Section */}
         <View style={styles.section}>
           <Text style={styles.sectionLabel}>Integrations</Text>
-          <IntegrationsComponent initialExpanded={false} />
+          <IntegrationsComponent
+            initialExpanded={expandIntegration || false}
+            onIntegrationSuccess={() => {
+              // Navigate back to CreateEventScreen after successful integration
+              if (expandIntegration) {
+                navigation.goBack();
+              }
+            }}
+          />
         </View>
 
         {/* About DCalendar Section */}

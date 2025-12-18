@@ -710,14 +710,7 @@ const CreateEventScreen = () => {
     validateDateTime();
   }, [validateDateTime]);
 
-  useFocusEffect(
-    React.useCallback(() => {
-      // Just show the video conferencing options when Google is connected
-      if (googleIntegration.isConnected && !showVideoConferencingOptions) {
-        setShowVideoConferencingOptions(true);
-      }
-    }, [googleIntegration.isConnected, showVideoConferencingOptions]),
-  );
+  // Removed auto-open dropdown on focus - dropdown should only open on user click
   const handleGoogleMeetClick = () => {
     if (!googleIntegration.isConnected) {
       // Show modal first, then navigate on Continue
@@ -3409,7 +3402,7 @@ const CreateEventScreen = () => {
 
             {/* Add video conferencing Field - Match task screen design */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.labelText}>Add video conferencing</Text>
+              <Text style={styles.labelText} numberOfLines={2}>Add video conferencing</Text>
               <TouchableOpacity
                 style={[
                   styles.datePicker,
@@ -3458,7 +3451,7 @@ const CreateEventScreen = () => {
                     onPress={() => {
                       if (!isLoading) {
                         setSelectedVideoConferencing('inperson');
-                        setLocation(''); // Clear location when switching to in-person
+                        setLocation('');
                         setLocationError('');
                         setShowVideoConferencingOptions(false);
                       }
@@ -3490,7 +3483,7 @@ const CreateEventScreen = () => {
                     onPress={() => {
                       if (!isLoading) {
                         setSelectedVideoConferencing('google');
-                        setLocation(''); // Clear location when Google Meet is selected
+                        setLocation('');
                         setLocationError('');
                         setShowVideoConferencingOptions(false);
                         handleGoogleMeetClick();
@@ -3522,12 +3515,11 @@ const CreateEventScreen = () => {
                     ]}
                     onPress={() => {
                       if (!isLoading) {
-                        setLocation(''); // Clear location when Zoom is selected
+                        setLocation('');
                         setLocationError('');
                         setSelectedVideoConferencing('zoom');
                         setShowVideoConferencingOptions(false);
 
-                        // If Zoom is not connected, prompt integration but keep selection
                         if (!zoomIntegration.isConnected) {
                           setIntegrationType('zoom');
                           setShowIntegrationModal(true);
@@ -3553,6 +3545,18 @@ const CreateEventScreen = () => {
                 </View>
               )}
             </View>
+
+            {/* Overlay for video conferencing dropdown */}
+            {showVideoConferencingOptions && (
+              <TouchableOpacity
+                style={styles.recurrenceOverlay}
+                activeOpacity={1}
+                onPress={() => {
+                  setShowVideoConferencingOptions(false);
+                  setActiveField(null);
+                }}
+              />
+            )}
 
             {/* Add location - Match task screen design */}
             <View
@@ -4524,13 +4528,12 @@ const styles = StyleSheet.create({
   },
   fieldContainer: {
     marginBottom: scaleHeight(20),
-    zIndex: 1,
   },
   labelText: {
     fontFamily: Fonts.latoMedium,
     fontWeight: '500',
     fontSize: 12,
-    lineHeight: 12,
+    lineHeight: 16,
     letterSpacing: 0,
     color: '#414651', // Gray-700
     marginBottom: scaleHeight(8),
@@ -4837,8 +4840,8 @@ const styles = StyleSheet.create({
     borderBottomRightRadius: 8,
     backgroundColor: colors.white,
     marginTop: -1,
-    zIndex: 1000,
-    elevation: 8,
+    zIndex: 1005,
+    elevation: 15,
   },
   videoConferencingDropdownItem: {
     flexDirection: 'row',
@@ -5444,8 +5447,8 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    marginTop: spacing.sm,
-    marginBottom: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: scaleHeight(20),
   },
   timezoneTagText: {
     fontSize: fontSize.textSize14,
@@ -5683,7 +5686,6 @@ const styles = StyleSheet.create({
   allDayToggle: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: spacing.md,
     paddingVertical: spacing.sm,
   },
   allDayText: {
