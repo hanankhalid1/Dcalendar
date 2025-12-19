@@ -25,15 +25,32 @@ export class ImportService {
                     const classType = event.getFirstPropertyValue("class") || null;
                     const visibility = classType && classType === "PRIVATE" ? "Private" : classType === "PUBLIC" ? "Public" : "Default Visibility";
                     const location = event.getFirstPropertyValue("location") || null;
+                    const urlProp = event.getFirstPropertyValue("url") || null;
                     const rruleProp = event.getFirstProperty("rrule");
-                    const rruleValues = rruleProp ? rruleProp.toJSON()[3] : null;
-                    const rrule = rruleValues ? rruleValues.freq : null;
-                    const byday = rruleValues ? rruleValues.byday : null;
-                    const until = rruleValues ? rruleValues.until : null;
+                    // Use ical.js Recur object directly for reliable fields
+                    const rruleValues = rruleProp?.getFirstValue?.() || null;
+                    // Normalize frequency (ical.js Recur uses numeric enums)
+                    const freqRaw = rruleValues ? rruleValues.freq : null;
+                    const freqMap = ['SECONDLY','MINUTELY','HOURLY','DAILY','WEEKLY','MONTHLY','YEARLY'];
+                    const rrule = typeof freqRaw === 'number'
+                        ? freqMap[freqRaw] || null
+                        : (typeof freqRaw === 'string' ? freqRaw.toUpperCase() : null);
+                    // Normalize BYDAY to plain strings (e.g., ["MO","WE"])
+                    const byday = Array.isArray(rruleValues?.byDay)
+                        ? rruleValues.byDay.map((d: any) => (d?.toString?.() || d || '').toString().toUpperCase())
+                        : (Array.isArray(rruleValues?.byday) ? rruleValues.byday : rruleValues?.byday ? [rruleValues.byday] : null);
+                    // Normalize BYMONTHDAY
+                    const bymonthday = Array.isArray(rruleValues?.byMonthDay)
+                        ? rruleValues.byMonthDay
+                        : Array.isArray(rruleValues?.bymonthday)
+                            ? rruleValues.bymonthday
+                            : rruleValues?.bymonthday
+                                ? [rruleValues.bymonthday]
+                                : null;
+                    const until = rruleValues?.until || null;
                     const wkst = rruleValues ? rruleValues.wkst : null;
                     const repeatEvery = rruleValues ? rruleValues.interval : null;
                     const count = rruleValues ? rruleValues.count : null;
-                    const bymonthday = rruleValues ? rruleValues.bymonthday : null;
                     const dtstartProp = event.getFirstProperty("dtstart");
                     const tzid = dtstartProp ? dtstartProp.getParameter("tzid") : null;
                     let selectedDays: any;
@@ -61,7 +78,9 @@ export class ImportService {
                     }
                     else {
                         if (until) {
-                            const day = moment(until).subtract(1, 'days').format('YYYY-MM-DD');
+                            // UNTIL is inclusive; format to date string without shifting
+                            const untilDate = until.toJSDate ? until.toJSDate() : new Date(until);
+                            const day = moment(untilDate).format('YYYY-MM-DD');
                             endOption = 'on';
                             endDate = day
                         }
@@ -86,23 +105,70 @@ export class ImportService {
                         const repeatUnit = "yearly";
                         response = this.formatEvents(repeatEvery, repeatUnit, selectedDays, endOption, endDate, occurrences, customSelectedMonth)
                     }
-                    const isCustom = this.isCustomizedRrule(rruleValues);
-                    if (isCustom) {
-                        repeatEvent = "custom_";
-                        customRepeatEvent = response;
+                    // Decide if this recurrence needs custom encoding
+                    const hasInterval = !!repeatEvery && Number(repeatEvery) > 1;
+                    const hasEnd = !!count || !!until;
+                    const hasByDayOrMonth = (byday && byday.length > 0) || (bymonthday && bymonthday.length > 0);
+                    const isCustom = hasInterval || hasEnd || hasByDayOrMonth;
+
+                    if (!rrule) {
+                        repeatEvent = undefined;
+                    } else if (!isCustom) {
+                        // Simple standard patterns
+                        if (rrule === 'DAILY') {
+                            repeatEvent = 'daily';
+                        } else if (rrule === 'WEEKLY') {
+                            if (byday && byday.length > 0) {
+                                repeatEvent = `weekly_${byday.join(',')}`;
+                            } else {
+                                repeatEvent = 'weekly';
+                            }
+                        } else if (rrule === 'MONTHLY') {
+                            if (bymonthday && bymonthday.length > 0) {
+                                repeatEvent = `monthly_${bymonthday[0]}`;
+                            } else {
+                                repeatEvent = 'monthly';
+                            }
+                        } else if (rrule === 'YEARLY') {
+                            repeatEvent = 'yearly';
+                        }
                     } else {
-                        repeatEvent = response;
+                        // Custom string goes into customRepeatEvent; repeatEvent signals custom
+                        repeatEvent = 'custom_';
+                        customRepeatEvent = response;
                     }
                     event.getAllProperties("attendee").forEach((attendee: any) => {
                         const attendeeEmail = attendee.getFirstValue();
                         list.push({ key: "guest", value: attendeeEmail?.split(":")[1] });
                     });
 
+                    // Detect meeting links so they are treated like video-conferencing (not plain location)
+                    const detectMeetingLink = (val: string | null) => {
+                        if (!val) return null;
+                        const lower = val.toLowerCase();
+                        if (lower.includes('meet.google.com')) return { type: 'google', link: val };
+                        if (lower.includes('zoom.us') || lower.includes('zoom.com')) return { type: 'zoom', link: val };
+                        return null;
+                    };
+
+                    // Treat placeholder/none locations as empty
+                    const isNoneLocation = (val: string | null) => {
+                        if (!val) return true;
+                        const norm = val.trim().toLowerCase();
+                        return norm === 'none' || norm === 'no location' || norm === 'n/a';
+                    };
+
+                    const meetingDetection = detectMeetingLink(location) || detectMeetingLink(urlProp);
+                    const locationTypeEntry = meetingDetection
+                        ? { key: 'locationType', value: meetingDetection.type }
+                        : null;
+
                     const entries = [
-                        {
+                        !isNoneLocation(location) ? {
                             key: "location",
-                            value: location || ""
-                        },
+                            value: meetingDetection?.link || location || ""
+                        } : null,
+                        locationTypeEntry,
                         {
                             key: "visibility",
                             value: visibility.toString()
@@ -127,7 +193,7 @@ export class ImportService {
                             key: "organizer",
                             value: active.userName
                         }
-                    ].filter((entry) => entry.value !== undefined && entry.value !== '');
+                    ].filter((entry) => entry && entry.value !== undefined && entry.value !== '');
                     list.push(...entries);
 
                     console.log("From time logged", e.startDate);
