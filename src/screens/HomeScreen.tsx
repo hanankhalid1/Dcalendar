@@ -487,13 +487,18 @@ const HomeScreen = () => {
   // Memoize processed events to avoid recomputing on every focus
   const processedEvents = useMemo(() => {
     if (!userEvents || userEvents.length === 0) return [];
+
     let transformedData = transformEventsToCalendar(
       userEvents,
       selectedTimeZone,
     );
+
     transformedData = filterEventsByTaskType(transformedData, filterType);
+
     transformedData = filterEventsByTab(transformedData, selectedTab);
+
     const filteredData = filterEventsByView(transformedData, currentView);
+
     return filteredData;
   }, [userEvents, currentView, selectedTimeZone, filterType, selectedTab]);
 

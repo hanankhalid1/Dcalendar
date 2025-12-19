@@ -13,6 +13,7 @@ import {
   Dimensions,
   Platform,
   ScrollView,
+  ActivityIndicator,
 } from 'react-native';
 
 import Share from 'react-native-share';
@@ -578,6 +579,10 @@ const SettingsScreen = () => {
     'success' | 'error' | 'warning' | 'info'
   >('info');
 
+  // Import Events Loading State
+
+  const [isImporting, setIsImporting] = useState(false);
+
   // Helper function to show custom alert
 
   const showAlert = (
@@ -860,17 +865,31 @@ const SettingsScreen = () => {
             ? selectedFile.uri
             : selectedFile.uri.replace('file://', '');
 
+        // Show loading indicator
+
+        setIsImporting(true);
+
         // Read the file as text
         const icalDataString = await RNFS.readFile(filePath, 'utf8');
 
-        // Parse the file to get all events (before filtering)
+        // Parse the file only once
         const allParsedEvents = importService.parseIcal(
           icalDataString,
           account,
           [],
         );
 
-        const parsed = importService.parseIcal(icalDataString, account, events);
+        // Filter out duplicates (events already in the store) in a single pass
+        const parsed =
+          allParsedEvents?.filter(
+            event =>
+              !events.some(
+                existingEvent =>
+                  existingEvent.uid === event.uid ||
+                  (existingEvent.title === event.title &&
+                    existingEvent.fromTime === event.fromTime),
+              ),
+          ) || [];
 
         console.log('Imported events are here:', parsed);
 
@@ -881,12 +900,13 @@ const SettingsScreen = () => {
             ? allParsedEvents.length
             : 0;
 
-        const newEventsCount =
-          parsed && Array.isArray(parsed) ? parsed.length : 0;
+        const newEventsCount = Array.isArray(parsed) ? parsed.length : 0;
 
         // Case 1: File is invalid or parsing failed
 
         if (allParsedEvents === null || !Array.isArray(allParsedEvents)) {
+          setIsImporting(false);
+
           showAlert(
             'Invalid File',
 
@@ -901,6 +921,8 @@ const SettingsScreen = () => {
         // Case 2: File has no valid events
 
         if (totalEventsInFile === 0) {
+          setIsImporting(false);
+
           showAlert(
             'No Events Found',
 
@@ -915,6 +937,8 @@ const SettingsScreen = () => {
         // Case 3: All events already exist (duplicates)
 
         if (totalEventsInFile > 0 && newEventsCount === 0) {
+          setIsImporting(false);
+
           showAlert(
             'Events Already Exist',
 
@@ -930,22 +954,14 @@ const SettingsScreen = () => {
 
         if (newEventsCount > 0) {
           try {
-            await blockchainService.saveImportedEvents(
-              parsed,
-              account.userName,
-              token,
-              api,
-            );
-
-            // Success: Events imported
-
-            // ✅ ADD EVENTS TO LOCAL STORE SO THEY APPEAR IN UI
+            // ⚡ Immediately add events to local store for instant UI feedback
             const { optimisticallyAddEvent } = useEventsStore.getState();
-            parsed.forEach(event => {
+            parsed?.forEach(event => {
               optimisticallyAddEvent(event);
             });
 
-            const skippedCount = totalEventsInFile - newEventsCount;
+            // Hide loading and show success immediately (blockchain save happens in background)
+            setIsImporting(false);
 
             showAlert(
               'Import Successful',
@@ -960,7 +976,17 @@ const SettingsScreen = () => {
 
               'success',
             );
+
+            // ⚡ Save to blockchain in background (non-blocking)
+            blockchainService
+              .saveImportedEvents(parsed, account.userName, token, api)
+              .catch(error => {
+                console.error('Background blockchain save failed:', error);
+                // Events are already in local store, so this is just a sync issue
+              });
           } catch (saveError) {
+            setIsImporting(false);
+
             showAlert(
               'Import Failed',
 
@@ -971,6 +997,8 @@ const SettingsScreen = () => {
           }
         }
       } catch (err) {
+        setIsImporting(false);
+
         const errorMessage =
           err instanceof Error ? err.message : 'Unknown error occurred';
 
@@ -983,6 +1011,8 @@ const SettingsScreen = () => {
         );
       }
     } catch (err) {
+      setIsImporting(false);
+
       const errorMessage =
         err instanceof Error ? err.message : 'Failed to access the file';
 
@@ -1135,6 +1165,50 @@ const SettingsScreen = () => {
         type={alertType}
         onClose={() => setAlertVisible(false)}
       />
+
+      {/* Import Loading Modal */}
+      <Modal
+        visible={isImporting}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {}}
+      >
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: 'rgba(0, 0, 0, 0.5)',
+            justifyContent: 'center',
+            alignItems: 'center',
+          }}
+        >
+          <View
+            style={{
+              backgroundColor: Colors.white,
+              borderRadius: 16,
+              padding: scaleHeight(30),
+              alignItems: 'center',
+              justifyContent: 'center',
+              minWidth: scaleWidth(200),
+            }}
+          >
+            <ActivityIndicator
+              size="large"
+              color={Colors.primaryBlue}
+              style={{ marginBottom: scaleHeight(16) }}
+            />
+            <Text
+              style={{
+                fontSize: fontSize.textSize16,
+                fontWeight: '600',
+                color: Colors.black,
+                fontFamily: Fonts.latoBold,
+              }}
+            >
+              Importing Events...
+            </Text>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };

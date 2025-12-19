@@ -90,11 +90,18 @@ const DailyCalendarScreen = () => {
   const { eventsByDate } = useMemo(() => {
     const grouped: { [key: string]: any[] } = {};
 
-    // Expand events for a wider range (current month) to catch all recurring instances
-    const today = new Date();
-    const viewStart = new Date(today.getFullYear(), today.getMonth(), 1);
+    // Expand events for the selected month (based on selectedDate, not today!)
+    const viewStart = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      1,
+    );
     viewStart.setHours(0, 0, 0, 0);
-    const viewEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+    const viewEnd = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth() + 1,
+      0,
+    );
     viewEnd.setHours(23, 59, 59, 999);
 
     const expanded = expandEventsForRange(
@@ -130,7 +137,7 @@ const DailyCalendarScreen = () => {
     });
 
     return { eventsByDate: grouped };
-  }, [userEvents, selectedTimeZone]);
+  }, [userEvents, selectedTimeZone, selectedDate]);
 
   // Get events for selected date and sort by time
   const selectedDateEvents = useMemo(() => {

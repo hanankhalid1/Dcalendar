@@ -1289,9 +1289,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
 
   const selectedDateEvents = eventsByDate[selectedDateString] || [];
 
-  console.log('Selected date:', selectedDateString);
-  console.log('Events for selected date:', selectedDateEvents.length);
-
   return (
     <View style={styles.container}>
       <EventDetailsModal
