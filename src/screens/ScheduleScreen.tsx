@@ -45,6 +45,7 @@ import { useEventsStore } from '../stores/useEventsStore';
 import { useApiClient } from '../hooks/useApi';
 import { parseTimeToPST, isEventInPast } from '../utils';
 import { expandEventsForRange } from '../utils/recurrence';
+import { convertToSelectedTimezone } from '../utils/timezone';
 import { useSettingsStore } from '../stores/useSetting';
 import { s } from 'react-native-size-matters';
 import CustomAlert from '../components/CustomAlert';
@@ -287,6 +288,52 @@ const ScheduleScreen = () => {
         eventTime = 'Time not available';
       }
 
+      // Handle multi-day events - add event to all dates it spans
+      if (!isAllDay && startTimeData?.date && endTimeData?.date) {
+        const startDate = new Date(startTimeData.date);
+        startDate.setHours(0, 0, 0, 0);
+        const endDate = new Date(endTimeData.date);
+        endDate.setHours(0, 0, 0, 0);
+
+        const isMultiDay = startDate.getTime() !== endDate.getTime();
+
+        if (isMultiDay) {
+          // Add event to all dates in the range
+          const currentDate = new Date(startDate);
+          while (currentDate <= endDate) {
+            const year = currentDate.getFullYear();
+            const month = currentDate.getMonth() + 1;
+            const day = currentDate.getDate();
+            const dateKey = `${year}-${String(month).padStart(2, '0')}-${String(
+              day,
+            ).padStart(2, '0')}`;
+
+            if (!groupedEvents[dateKey]) {
+              groupedEvents[dateKey] = [];
+            }
+
+            groupedEvents[dateKey].push({
+              id: event.uid,
+              title: event.title || 'Untitled Event',
+              time: eventTime,
+              description: event.description || '',
+              date: dateKey,
+              color: eventColor,
+              tags: event.list || [],
+              isExpandable: true,
+              hasActions: true,
+              originalRawEventData: event,
+              sortDate: startTimeData?.date || parseAllDayDate(event.fromTime),
+              isMultiDay: true,
+            });
+
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+          return; // Skip the regular single-date add below
+        }
+      }
+
+      // Single day event
       if (!groupedEvents[eventDateKey]) {
         groupedEvents[eventDateKey] = [];
       }
@@ -304,6 +351,7 @@ const ScheduleScreen = () => {
         originalRawEventData: event,
         // Store the UTC date for sorting
         sortDate: startTimeData?.date || parseAllDayDate(event.fromTime),
+        isMultiDay: false,
       });
     });
 
@@ -636,6 +684,7 @@ const ScheduleScreen = () => {
         currentDate={new Date()}
         showBranding={true}
         showMonthSelector={false}
+        showCalendarIcon={false}
       />
 
       {/* Segmented Control Navigation */}
@@ -715,13 +764,7 @@ const ScheduleScreen = () => {
                     height={scaleHeight(54)}
                     fill={colors.primaryBlue}
                   />
-                ) : (
-                  <CalendarIcon
-                    width={scaleWidth(54)}
-                    height={scaleHeight(54)}
-                    fill={colors.primaryBlue}
-                  />
-                )}
+                ) : null}
               </View>
               <Text style={styles.emptyStateTitle}>
                 {selectedTab === 'All'

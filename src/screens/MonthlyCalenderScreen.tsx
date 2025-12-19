@@ -162,7 +162,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
 
   const selectedDateString = useMemo(() => {
     const dateString = formatDate(selectedDate);
-    console.log('✅ Calendar `current` date updated:', dateString);
+    console.log('📅 MonthlyCalenderScreen - Selected date:', dateString);
     return dateString;
   }, [selectedDate]);
 
@@ -1288,6 +1288,16 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
 
   const selectedDateEvents = eventsByDate[selectedDateString] || [];
+  console.log(
+    '📅 MonthlyCalenderScreen - Selected date events count:',
+    selectedDateEvents.length,
+  );
+  if (selectedDateEvents.length > 0) {
+    console.log(
+      '📅 MonthlyCalenderScreen - Event titles:',
+      selectedDateEvents.map((e: any) => e.title),
+    );
+  }
 
   return (
     <View style={styles.container}>
@@ -1351,7 +1361,9 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
             {selectedDateEvents.length > 0 ? (
               selectedDateEvents.map((event, index) => (
                 <View
-                  key={`${event.uid}-${index}`}
+                  key={`${event.uid}-${
+                    event.instanceDate || selectedDateString
+                  }-${index}`}
                   style={{
                     display: 'flex',
                     flexDirection: 'column',

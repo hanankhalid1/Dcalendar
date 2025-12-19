@@ -36,6 +36,7 @@ interface WeekHeaderProps {
   selectedDate?: Date | null;
   showBranding?: boolean; // Show DCalendar branding (only for Schedule screen)
   showMonthSelector?: boolean; // Show month selector (hide in Schedule screen)
+  showCalendarIcon?: boolean; // Show calendar icon (hide in Schedule screen)
 }
 
 const WeekHeader: React.FC<WeekHeaderProps> = ({
@@ -48,6 +49,7 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
   selectedDate,
   showBranding = false,
   showMonthSelector = true,
+  showCalendarIcon = true,
 }) => {
   const [isCalendarVisible, setIsCalendarVisible] = useState(false);
   const [isMonthDropdownVisible, setIsMonthDropdownVisible] = useState(false);
@@ -239,14 +241,16 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
         </View>
 
         {/* Right Section - Calendar Icon */}
-        <View style={styles.rightSection}>
-          <TouchableOpacity
-            style={styles.calendarButton}
-            onPress={handleMonthPress}
-          >
-            <CalendarIconHeader width={24} height={24} />
-          </TouchableOpacity>
-        </View>
+        {showCalendarIcon && (
+          <View style={styles.rightSection}>
+            <TouchableOpacity
+              style={styles.calendarButton}
+              onPress={handleMonthPress}
+            >
+              <CalendarIconHeader width={24} height={24} />
+            </TouchableOpacity>
+          </View>
+        )}
       </View>
 
       {/* Month Slider - Full width horizontal slider */}

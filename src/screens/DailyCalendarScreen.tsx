@@ -22,6 +22,7 @@ import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
 import { parseTimeToPST, isEventInPast } from '../utils';
 import { expandEventsForRange, formatYMD } from '../utils/recurrence';
+import { convertToSelectedTimezone } from '../utils/timezone';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
 import {
@@ -83,71 +84,300 @@ const DailyCalendarScreen = () => {
     const year = selectedDate.getFullYear();
     const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
     const day = String(selectedDate.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
+    const dateString = `${year}-${month}-${day}`;
+    console.log('📅 DailyCalendarScreen - Selected date:', dateString);
+    return dateString;
   }, [selectedDate]);
 
-  // Group events by date (using expanded instances, same logic as Monthly)
-  const { eventsByDate } = useMemo(() => {
-    const grouped: { [key: string]: any[] } = {};
+  // Format date function (same as MonthlyCalenderScreen)
+  const formatDate = (date: Date): string => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
 
-    // Expand events for the selected month (based on selectedDate, not today!)
-    const viewStart = new Date(
+  // Group events by date using SAME approach as MonthlyCalenderScreen
+  const { eventsByDate } = useMemo(() => {
+    const byDate: { [key: string]: any[] } = {};
+
+    // Expand events for the selected month
+    const firstDayOfMonth = new Date(
       selectedDate.getFullYear(),
       selectedDate.getMonth(),
       1,
     );
-    viewStart.setHours(0, 0, 0, 0);
-    const viewEnd = new Date(
+    const lastDayOfMonth = new Date(
       selectedDate.getFullYear(),
       selectedDate.getMonth() + 1,
       0,
     );
-    viewEnd.setHours(23, 59, 59, 999);
 
-    const expanded = expandEventsForRange(
-      userEvents || [],
-      viewStart,
-      viewEnd,
-      selectedTimeZone,
+    const viewStartDate = new Date(firstDayOfMonth);
+    viewStartDate.setDate(viewStartDate.getDate() - 7);
+
+    const viewEndDate = new Date(lastDayOfMonth);
+    viewEndDate.setDate(viewEndDate.getDate() + 7);
+
+    console.log(
+      '📅 DailyCalendarScreen - Processing',
+      userEvents?.length || 0,
+      'total events',
     );
 
-    expanded.forEach(ev => {
-      let key: string;
+    (userEvents || []).forEach((ev: any) => {
+      const startTimeData = convertToSelectedTimezone(
+        ev.fromTime,
+        selectedTimeZone,
+      );
+      const endTimeData = convertToSelectedTimezone(
+        ev.toTime,
+        selectedTimeZone,
+      );
 
-      // Use instanceDate if available (for recurring events)
-      if (ev.instanceDate) {
-        key = ev.instanceDate;
-      } else if (ev.fromTime) {
-        // Parse the fromTime format (YYYYMMDDTHHmmss) directly
-        const match = ev.fromTime.match(/^(\d{4})(\d{2})(\d{2})/);
-        if (match) {
-          const [, year, month, day] = match;
-          key = `${year}-${month}-${day}`;
-        } else {
-          // Fallback: try parseTimeToPST
-          const parsed = parseTimeToPST(ev.fromTime);
-          key = parsed ? formatYMD(parsed) : formatYMD(new Date());
-        }
-      } else {
-        key = formatYMD(new Date());
+      if (!startTimeData || !endTimeData) {
+        console.log(
+          '📅 DailyCalendarScreen - Skipping event (timezone conversion failed):',
+          ev.title,
+        );
+        return;
       }
 
-      if (!grouped[key]) grouped[key] = [];
-      grouped[key].push(ev);
+      const startDate = startTimeData.date;
+      const endDate = endTimeData.date;
+
+      if (
+        !startDate ||
+        !endDate ||
+        isNaN(startDate.getTime()) ||
+        isNaN(endDate.getTime())
+      ) {
+        console.log(
+          '📅 DailyCalendarScreen - Skipping event (invalid dates):',
+          ev.title,
+        );
+        return;
+      }
+
+      const isTask = ev.list?.some(
+        (item: any) => item.key === 'task' && item.value === 'true',
+      );
+      const repeatType =
+        ev.repeatEvent ||
+        ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
+      const isRecurring = repeatType && repeatType !== 'Does not repeat';
+
+      console.log(
+        '📅 DailyCalendarScreen - Processing event:',
+        ev.title,
+        'Recurring:',
+        isRecurring,
+      );
+
+      // Non-recurring event - simple case
+      if (!isRecurring) {
+        const isMultiDay = startDate.toDateString() !== endDate.toDateString();
+
+        if (isMultiDay) {
+          // Handle multi-day events - add to all dates in range
+          console.log(
+            '📅 DailyCalendarScreen - Multi-day event:',
+            ev.title,
+            'from',
+            formatDate(startDate),
+            'to',
+            formatDate(endDate),
+          );
+          const currentDate = new Date(startDate);
+          currentDate.setHours(0, 0, 0, 0);
+          const endDateOnly = new Date(endDate);
+          endDateOnly.setHours(0, 0, 0, 0);
+
+          while (currentDate <= endDateOnly) {
+            const dateString = formatDate(currentDate);
+            if (!byDate[dateString]) {
+              byDate[dateString] = [];
+            }
+            byDate[dateString].push({
+              ...ev,
+              instanceDate: dateString,
+              instanceStartTime: startDate,
+              instanceEndTime: endDate,
+              isTask,
+              isRecurring: false,
+              isMultiDay: true,
+            });
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        } else {
+          // Single day event
+          const dateString = formatDate(startDate);
+          console.log(
+            '📅 DailyCalendarScreen - Single-day event:',
+            ev.title,
+            'on',
+            dateString,
+          );
+          if (!byDate[dateString]) {
+            byDate[dateString] = [];
+          }
+          byDate[dateString].push({
+            ...ev,
+            instanceDate: dateString,
+            instanceStartTime: startDate,
+            instanceEndTime: endDate,
+            isTask,
+            isRecurring: false,
+            isMultiDay: false,
+          });
+        }
+      } else {
+        // Recurring event - expand instances
+        let instances: Array<{ date: Date }> = [];
+
+        if (repeatType.toLowerCase().includes('daily')) {
+          // Daily recurrence
+          const endRecurrenceDate = new Date(endDate);
+          endRecurrenceDate.setFullYear(endRecurrenceDate.getFullYear() + 1);
+
+          let currentDate = new Date(startDate);
+          while (
+            currentDate <= endRecurrenceDate &&
+            currentDate <= viewEndDate
+          ) {
+            if (currentDate >= viewStartDate) {
+              instances.push({ date: new Date(currentDate) });
+            }
+            currentDate.setDate(currentDate.getDate() + 1);
+          }
+        } else if (
+          repeatType.toLowerCase().includes('weekly') ||
+          (repeatType.toLowerCase().includes('every') &&
+            repeatType.toLowerCase().includes('week'))
+        ) {
+          // Weekly recurrence
+          const endRecurrenceDate = new Date(endDate);
+          endRecurrenceDate.setFullYear(endRecurrenceDate.getFullYear() + 1);
+
+          let currentDate = new Date(startDate);
+          while (
+            currentDate <= endRecurrenceDate &&
+            currentDate <= viewEndDate
+          ) {
+            if (currentDate >= viewStartDate) {
+              instances.push({ date: new Date(currentDate) });
+            }
+            currentDate.setDate(currentDate.getDate() + 7);
+          }
+        } else if (repeatType.toLowerCase().includes('monthly')) {
+          // Monthly recurrence
+          const endRecurrenceDate = new Date(endDate);
+          endRecurrenceDate.setFullYear(endRecurrenceDate.getFullYear() + 1);
+
+          let currentDate = new Date(startDate);
+          while (
+            currentDate <= endRecurrenceDate &&
+            currentDate <= viewEndDate
+          ) {
+            if (currentDate >= viewStartDate) {
+              instances.push({ date: new Date(currentDate) });
+            }
+            currentDate.setMonth(currentDate.getMonth() + 1);
+          }
+        } else if (repeatType.toLowerCase().includes('yearly')) {
+          // Yearly recurrence
+          const endRecurrenceDate = new Date(endDate);
+          endRecurrenceDate.setFullYear(endRecurrenceDate.getFullYear() + 2);
+
+          let currentDate = new Date(startDate);
+          while (
+            currentDate <= endRecurrenceDate &&
+            currentDate <= viewEndDate
+          ) {
+            if (currentDate >= viewStartDate) {
+              instances.push({ date: new Date(currentDate) });
+            }
+            currentDate.setFullYear(currentDate.getFullYear() + 1);
+          }
+        }
+
+        console.log(
+          '📅 DailyCalendarScreen - Recurring event:',
+          ev.title,
+          'instances:',
+          instances.length,
+        );
+
+        // Add instances to byDate
+        instances.forEach(({ date: instanceDate }) => {
+          const startHour = startDate.getHours();
+          const startMinute = startDate.getMinutes();
+          const startSecond = startDate.getSeconds();
+
+          const endHour = endDate.getHours();
+          const endMinute = endDate.getMinutes();
+          const endSecond = endDate.getSeconds();
+
+          const instanceStartDate = new Date(instanceDate);
+          instanceStartDate.setHours(startHour, startMinute, startSecond);
+
+          const duration = endDate.getTime() - startDate.getTime();
+          const instanceEndDate = new Date(
+            instanceStartDate.getTime() + duration,
+          );
+
+          const dateString = formatDate(instanceStartDate);
+
+          if (!byDate[dateString]) {
+            byDate[dateString] = [];
+          }
+
+          const alreadyExists = byDate[dateString].some(
+            (e: any) => e.uid === ev.uid && e.instanceDate === dateString,
+          );
+
+          if (!alreadyExists) {
+            byDate[dateString].push({
+              ...ev,
+              instanceDate: dateString,
+              instanceStartTime: instanceStartDate,
+              instanceEndTime: instanceEndDate,
+              isTask,
+              isRecurring: true,
+            });
+          }
+        });
+      }
     });
 
-    return { eventsByDate: grouped };
+    console.log(
+      '📅 DailyCalendarScreen - Total dates with events:',
+      Object.keys(byDate).length,
+    );
+
+    return { eventsByDate: byDate };
   }, [userEvents, selectedTimeZone, selectedDate]);
 
   // Get events for selected date and sort by time
   const selectedDateEvents = useMemo(() => {
     const events = eventsByDate[selectedDateString] || [];
-    return events.sort((a, b) => {
+    const sorted = events.sort((a, b) => {
       const timeA = parseTimeToPST(a.fromTime);
       const timeB = parseTimeToPST(b.fromTime);
       if (!timeA || !timeB) return 0;
       return timeA.getTime() - timeB.getTime();
     });
+    console.log(
+      '📅 DailyCalendarScreen - Selected date events count:',
+      sorted.length,
+    );
+    if (sorted.length > 0) {
+      console.log(
+        '📅 DailyCalendarScreen - Event titles:',
+        sorted.map((e: any) => e.title),
+      );
+    }
+    return sorted;
   }, [eventsByDate, selectedDateString]);
 
   // Calculate duration
@@ -494,7 +724,9 @@ const DailyCalendarScreen = () => {
 
                       return (
                         <View
-                          key={`${event.uid}-${index}`}
+                          key={`${event.uid}-${
+                            event.instanceDate || selectedDateString
+                          }-${index}`}
                           style={styles.eventCardWrapper}
                         >
                           <EventCard
