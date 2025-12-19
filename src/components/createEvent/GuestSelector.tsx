@@ -30,7 +30,7 @@ import { Fonts } from '../../constants/Fonts';
 interface GuestSelectorProps {
   isVisible: boolean;
   selectedGuests: string[];
-  onGuestSelect: (guestEmail: string) => void;
+  onConfirmSelection: (guestEmails: string[]) => void;
   onToggleDropdown: () => void;
   showGuestModal: boolean;
   onToggleGuestModal: () => void;
@@ -42,7 +42,7 @@ interface GuestSelectorProps {
 const GuestSelector: React.FC<GuestSelectorProps> = ({
   isVisible,
   selectedGuests,
-  onGuestSelect,
+  onConfirmSelection,
   onToggleDropdown,
   showGuestModal,
   onToggleGuestModal,
@@ -51,6 +51,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   disabled = false,
 }) => {
   const [guests, setGuests] = useState<DynamicGuest[]>([]);
+  const [pendingSelection, setPendingSelection] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const { account } = useActiveAccount();
@@ -85,16 +86,26 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
     }
   }, [showGuestModal, account?.userName]);
 
-  // Load contacts when modal opens
+  // Load contacts when modal opens and seed pending selection
   useEffect(() => {
     if (showGuestModal) {
+      setPendingSelection(selectedGuests);
       loadContacts();
     } else {
       // Reset when modal closes
       setGuests([]);
       onSearchQueryChange('');
+      setPendingSelection([]);
     }
-  }, [showGuestModal, loadContacts, onSearchQueryChange]);
+  }, [showGuestModal, loadContacts, onSearchQueryChange, selectedGuests]);
+
+  const togglePendingGuest = (guestEmail: string) => {
+    setPendingSelection(prev =>
+      prev.includes(guestEmail)
+        ? prev.filter(email => email !== guestEmail)
+        : [...prev, guestEmail],
+    );
+  };
 
   // Filter guests based on search query
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -109,7 +120,18 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   const hasNoResults =
     hasSearchTerm && !isLoading && !error && filteredGuests.length === 0;
   // Allow adding if guests are selected, even if current search has no results
-  const isAddDisabled = selectedGuests.length === 0 || disabled;
+  const isAddDisabled = pendingSelection.length === 0 || disabled;
+
+  const handleCancel = () => {
+    setPendingSelection(selectedGuests);
+    onToggleGuestModal();
+  };
+
+  const handleAdd = () => {
+    onConfirmSelection(pendingSelection);
+    onToggleGuestModal();
+  };
+
   return (
     <View style={styles.section}>
       <TouchableOpacity
@@ -133,7 +155,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
         visible={showGuestModal}
         animationType="slide"
         transparent={true}
-        onRequestClose={onToggleGuestModal}
+        onRequestClose={handleCancel}
       >
         <KeyboardAvoidingView
           style={styles.modalOverlay}
@@ -143,7 +165,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
           <TouchableOpacity
             style={styles.backdrop}
             activeOpacity={1}
-            onPress={onToggleGuestModal}
+            onPress={handleCancel}
             accessible={false}
           />
           <View style={styles.guestModalContainer}>
@@ -223,7 +245,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                 renderItem={({ item }) => (
                   <TouchableOpacity
                     style={styles.guestItem}
-                    onPress={() => onGuestSelect(item.email)}
+                    onPress={() => togglePendingGuest(item.email)}
                   >
                     <View style={styles.guestInfo}>
                       {/* Avatar */}
@@ -258,11 +280,11 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                     <View
                       style={[
                         styles.checkbox,
-                        selectedGuests.includes(item.email) &&
+                        pendingSelection.includes(item.email) &&
                           styles.checkboxSelected,
                       ]}
                     >
-                      {selectedGuests.includes(item.email) && (
+                      {pendingSelection.includes(item.email) && (
                         <FeatherIcon name="check" size={14} color="white" />
                       )}
                     </View>
@@ -273,10 +295,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
 
             {/* Action Buttons */}
             <View style={styles.modalActions}>
-              <TouchableOpacity
-                style={styles.cancelButton}
-                onPress={onToggleGuestModal}
-              >
+              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
@@ -285,7 +304,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                   styles.addButton,
                   isAddDisabled && styles.addButtonDisabled,
                 ]}
-                onPress={onToggleGuestModal}
+                onPress={handleAdd}
                 disabled={isAddDisabled}
               >
                 <Text

@@ -1045,16 +1045,6 @@ const CreateEventScreen = () => {
     }));
   };
 
-  const handleGuestSelect = (guestEmail: string) => {
-    setSelectedGuests(prev => {
-      const newSelection = prev.includes(guestEmail)
-        ? prev.filter(email => email !== guestEmail)
-        : [...prev, guestEmail];
-
-      return newSelection;
-    });
-  };
-
   // Filter guests based on search query
   const filteredGuests = guestData.filter(
     guest =>
@@ -3611,7 +3601,7 @@ const CreateEventScreen = () => {
               <GuestSelector
                 isVisible={showGuestDropdown}
                 selectedGuests={selectedGuests}
-                onGuestSelect={handleGuestSelect}
+                onConfirmSelection={setSelectedGuests}
                 onToggleDropdown={() => {
                   if (!isLoading) {
                     closeInlineDropdowns();
