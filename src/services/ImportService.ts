@@ -209,35 +209,49 @@ export class ImportService {
 
     // ... (rest of your ImportService class)
 
-    public formattedDate(icalTimeObject: any, timezone: any) {
-        if (!icalTimeObject) return null; // Safety check
+    public formattedDate(icalTimeObject: any, tzidParam: any) {
+        if (!icalTimeObject) return null;
 
-        // 1. Check if it's an all-day event (Date-Only)
+        // Handle all-day events (date-only)
         if (icalTimeObject.isDate) {
-            // For Date-Only events, simply format the date part (YYYYMMDD)
             const datePart = icalTimeObject.toString();
-            return `${datePart}T000000`; // Should return format like YYYYMMDD
-        } else {
-            // 2. It's a Date-Time event
-            const userTimezone = timezone || moment.tz.guess();
+            return `${datePart}T000000`;
+        }
 
-            try {
-                const icalString = icalTimeObject.toString();
+        // Date-time events with timezone handling
+        try {
+            const icalString: string = icalTimeObject.toString();
 
-                // Check if the time part is invalid (like "T::")
-                if (icalString.includes('T::')) {
-                    // Treat it as a date-only event
-                    return icalString.split('T')[0]; // Return just the date part (YYYYMMDD)
-                }
-
-                const localTime = moment.utc(icalString).tz(userTimezone).format('YYYYMMDDTHHmmss');
-                return localTime;
-            } catch (error) {
-                console.warn('Error formatting date, using raw date value:', error);
-                // Fallback: return just the date part
-                const icalString = icalTimeObject.toString();
+            // Guard for malformed time
+            if (icalString.includes('T::')) {
                 return icalString.split('T')[0];
             }
+
+            const hasZuluSuffix = /Z$/.test(icalString);
+
+            // Source timezone: TZID if provided, else UTC if Z present, else treat as local-floating
+            const sourceTz = tzidParam || (hasZuluSuffix ? 'UTC' : moment.tz.guess());
+            // Target timezone: user's current timezone
+            const targetTz = moment.tz.guess();
+
+            let m;
+            if (hasZuluSuffix) {
+                // Example: 20250101T120000Z
+                m = moment.utc(icalString, 'YYYYMMDDTHHmmss[Z]');
+            } else if (tzidParam) {
+                // Example: 20250101T120000 with TZID=Asia/Kolkata
+                m = moment.tz(icalString, 'YYYYMMDDTHHmmss', sourceTz);
+            } else {
+                // Floating time (no TZID, no Z) — interpret in local timezone
+                m = moment.tz(icalString, 'YYYYMMDDTHHmmss', sourceTz);
+            }
+
+            const localTime = m.tz(targetTz).format('YYYYMMDDTHHmmss');
+            return localTime;
+        } catch (error) {
+            console.warn('Error formatting date, using raw date value:', error);
+            const icalString = icalTimeObject.toString();
+            return icalString.split('T')[0];
         }
     }
 

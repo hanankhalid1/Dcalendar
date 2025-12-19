@@ -71,6 +71,7 @@ import CustomAlert from '../components/CustomAlert';
 import { spacing, fontSize, colors as themeColors } from '../utils/LightTheme';
 
 import * as DimensionsUtils from '../utils/dimensions';
+import { generateEventUID } from '../utils/eventUtils';
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -955,9 +956,14 @@ const SettingsScreen = () => {
         if (newEventsCount > 0) {
           try {
             // ⚡ Immediately add events to local store for instant UI feedback
+            // Ensure each imported event has a unique uid to avoid dedupe conflicts
             const { optimisticallyAddEvent } = useEventsStore.getState();
-            parsed?.forEach(event => {
-              optimisticallyAddEvent(event);
+            parsed?.forEach(evt => {
+              const safeEvent = {
+                ...evt,
+                uid: evt?.uid ?? generateEventUID(),
+              };
+              optimisticallyAddEvent(safeEvent as any);
             });
 
             // Hide loading and show success immediately (blockchain save happens in background)

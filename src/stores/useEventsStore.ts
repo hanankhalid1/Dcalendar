@@ -94,6 +94,12 @@ export const useEventsStore = create<EventsStore>()(
                     event.list?.some(item => item.key === '_optimistic')
                 );
 
+                // Preserve optimistic deletions currently in trash
+                const currentDeleted = get().deletedUserEvents;
+                const optimisticDeletedEvents = currentDeleted.filter(event =>
+                    event.list?.some(item => item.key === '_optimistic')
+                );
+
                 // Filter events by isDeleted key in list array
                 const activeEvents = events.filter(event => {
                     if (!event.list) return true; // If no list, consider it active
@@ -115,6 +121,15 @@ export const useEventsStore = create<EventsStore>()(
                     return isDeletedItem && isDeletedItem.value === 'true';
                 });
 
+                // Merge optimistic deleted events with fetched deleted events (avoid duplicates by uid)
+                const mergedDeletedEvents = [...deletedEvents];
+                optimisticDeletedEvents.forEach(optEvent => {
+                    const exists = mergedDeletedEvents.some(e => e.uid === optEvent.uid);
+                    if (!exists) {
+                        mergedDeletedEvents.push(optEvent);
+                    }
+                });
+
                 // Merge optimistic events with fetched events
                 // Optimistic events take precedence (they're newer)
                 const mergedEvents = [...activeEvents];
@@ -129,11 +144,11 @@ export const useEventsStore = create<EventsStore>()(
                     }
                 });
 
-                console.log("deleted events in event store:", deletedEvents);
+                console.log("deleted events in event store:", mergedDeletedEvents);
                 console.log("✅ Merged events (including optimistic):", mergedEvents.length);
                 set({
                     userEvents: mergedEvents,
-                    deletedUserEvents: deletedEvents
+                    deletedUserEvents: mergedDeletedEvents
                 });
             },
             clearUserEvents: () => set({ userEvents: [] }),
@@ -310,7 +325,8 @@ export const useEventsStore = create<EventsStore>()(
                 const updatedList = [
                     ...filteredList,
                     { key: 'isDeleted', value: 'true' },
-                    { key: 'deletedTime', value: deletedTime }
+                    { key: 'deletedTime', value: deletedTime },
+                    { key: '_optimistic', value: 'true' }
                 ];
                 
                 const markedAsDeletedEvent = {
