@@ -1977,12 +1977,78 @@ const CreateEventScreen = () => {
 
   const handleEditEvent = async (eventData: any, activeAccount: any) => {
     try {
+      // ✅ Get the previous Google Meet state from editEventData
+      const previousGoogleMeetEventId = editEventData?.meetingEventId || '';
+      const previousVideoConferencingType =
+        editEventData?.videoConferencing || '';
+      const currentVideoConferencingType = eventData.locationType || '';
+      const hasExistingGoogleMeet =
+        previousVideoConferencingType === 'google' && previousGoogleMeetEventId;
+      const hasExistingZoom =
+        previousVideoConferencingType === 'zoom' && previousGoogleMeetEventId;
+
+      // ✅ Handle Google Meet deletion if user changed from Google Meet to something else
+      if (hasExistingGoogleMeet && currentVideoConferencingType !== 'google') {
+        console.log(
+          '🗑️  Deleting Google Meet as user changed video conferencing...',
+        );
+        try {
+          const deletePayload = {
+            user_name: activeAccount.userName,
+            eventId: previousGoogleMeetEventId,
+          };
+
+          console.log('📤 Deleting Google Meet with payload:', deletePayload);
+          const deleteResponse = await api(
+            'POST',
+            '/google/delete-event',
+            deletePayload,
+          );
+          console.log(
+            '✅ Google Meet deleted successfully:',
+            deleteResponse.data,
+          );
+        } catch (deleteErr) {
+          console.error('❌ Error deleting Google Meet:', deleteErr);
+          // Continue with event update even if deletion fails
+        }
+      }
+
+      // ✅ Handle Zoom deletion if user changed from Zoom to something else
+      if (hasExistingZoom && currentVideoConferencingType !== 'zoom') {
+        console.log(
+          '🗑️  Deleting Zoom meeting as user changed video conferencing...',
+        );
+        try {
+          const deletePayload = {
+            meetingId: previousGoogleMeetEventId,
+            userName: activeAccount.userName,
+          };
+
+          console.log('📤 Deleting Zoom meeting with payload:', deletePayload);
+          const deleteResponse = await api(
+            'DELETE',
+            '/zoom/meetings',
+            deletePayload,
+            undefined,
+            'api',
+          );
+          console.log(
+            '✅ Zoom meeting deleted successfully:',
+            deleteResponse.data,
+          );
+        } catch (deleteErr) {
+          console.error('❌ Error deleting Zoom meeting:', deleteErr);
+          // Continue with event update even if deletion fails
+        }
+      }
+
       // ✅ If Google Meet is selected and user is connected to Google
       if (
         eventData.locationType === 'google' &&
         googleIntegration?.isConnected
       ) {
-        console.log('Updating Google Meet meeting...');
+        console.log('Handling Google Meet for edited event...');
 
         const googleEvent = {
           summary: eventData.title,
@@ -2019,81 +2085,155 @@ const CreateEventScreen = () => {
           googleEvent.recurrence = [eventData.recurrenceRule];
         }
 
-        // Wrap same as web code
-        const payload = {
-          eventDetails: googleEvent,
-          user_name: activeAccount.userName,
-          eventId: eventData.meetingEventId, // must match backend parameter
-        };
-
-        console.log('Google Event Update Payload:', payload);
-
         try {
-          // ✅ Direct backend call for updating Google Meet event
-          const response = await api('POST', '/google/update-event', {
-            eventDetails: payload,
-            user_name: payload.user_name,
-            eventId: payload.eventId,
-          });
-          const data = response?.data?.data || response?.data;
+          // ✅ Check if there's an existing Google Meet to update
+          if (hasExistingGoogleMeet) {
+            console.log('✅ Updating existing Google Meet meeting...');
 
-          if (data?.hangoutLink) {
-            console.log(
-              '✅ Google Meet updated via backend:',
-              data.hangoutLink,
-            );
-            eventData.location = data.hangoutLink;
-            eventData.meetingEventId = data.id;
+            // Wrap same as web code
+            const payload = {
+              eventDetails: googleEvent,
+              user_name: activeAccount.userName,
+              eventId: previousGoogleMeetEventId, // Use previous event ID
+            };
 
-            // ✅ Rebuild metadata list to include the updated Google Meet meeting link
-            console.log(
-              '🔄 Rebuilding metadata with updated Google Meet meeting link',
-            );
-            const updatedMetadataList = buildEventMetadata(
-              eventData as any,
-              null,
-            );
+            console.log('Google Event Update Payload:', payload);
 
-            // Replace location-related items in the list with updated ones
-            let updatedList = eventData.list.filter(
-              (item: any) =>
-                item.key !== 'location' &&
-                item.key !== 'locationType' &&
-                item.key !== 'meetingEventId',
-            );
-
-            // Add updated location items
-            updatedMetadataList.forEach((item: any) => {
-              if (
-                item.key === 'location' ||
-                item.key === 'locationType' ||
-                item.key === 'meetingEventId'
-              ) {
-                updatedList.push(item);
-              }
+            // ✅ Direct backend call for updating Google Meet event
+            const response = await api('POST', '/google/update-event', {
+              eventDetails: payload,
+              user_name: payload.user_name,
+              eventId: payload.eventId,
             });
+            const data = response?.data?.data || response?.data;
 
-            eventData.list = updatedList;
-            console.log(
-              '✅ Updated metadata with Google Meet link:',
-              updatedList.filter(
+            if (data?.hangoutLink) {
+              console.log(
+                '✅ Google Meet updated via backend:',
+                data.hangoutLink,
+              );
+              eventData.location = data.hangoutLink;
+              eventData.meetingEventId = data.id;
+
+              // ✅ Rebuild metadata list to include the updated Google Meet meeting link
+              console.log(
+                '🔄 Rebuilding metadata with updated Google Meet meeting link',
+              );
+              const updatedMetadataList = buildEventMetadata(
+                eventData as any,
+                null,
+              );
+
+              // Replace location-related items in the list with updated ones
+              let updatedList = eventData.list.filter(
                 (item: any) =>
+                  item.key !== 'location' &&
+                  item.key !== 'locationType' &&
+                  item.key !== 'meetingEventId',
+              );
+
+              // Add updated location items
+              updatedMetadataList.forEach((item: any) => {
+                if (
                   item.key === 'location' ||
                   item.key === 'locationType' ||
-                  item.key === 'meetingEventId',
-              ),
-            );
+                  item.key === 'meetingEventId'
+                ) {
+                  updatedList.push(item);
+                }
+              });
+
+              eventData.list = updatedList;
+              console.log(
+                '✅ Updated metadata with Google Meet link:',
+                updatedList.filter(
+                  (item: any) =>
+                    item.key === 'location' ||
+                    item.key === 'locationType' ||
+                    item.key === 'meetingEventId',
+                ),
+              );
+            } else {
+              console.error(
+                '❌ Failed to update Google Meet via backend:',
+                data,
+              );
+            }
           } else {
-            console.error('❌ Failed to update Google Meet via backend:', data);
+            console.log('✅ Creating new Google Meet meeting...');
+
+            // ✅ No existing Google Meet, so create a new one
+            const payload = {
+              user_name: activeAccount.userName,
+              eventDetails: googleEvent,
+            };
+
+            console.log('Google Event Create Payload:', googleEvent);
+
+            const response = await api('POST', '/google/create-event', payload);
+            const data = response?.data?.data || response?.data;
+
+            if (data?.hangoutLink) {
+              console.log(
+                '✅ New Google Meet created via backend:',
+                data.hangoutLink,
+              );
+              eventData.location = data.hangoutLink;
+              eventData.meetingEventId = data.id;
+
+              // ✅ Rebuild metadata list to include the new Google Meet meeting link
+              console.log(
+                '🔄 Rebuilding metadata with new Google Meet meeting link',
+              );
+              const updatedMetadataList = buildEventMetadata(
+                eventData as any,
+                null,
+              );
+
+              // Replace location-related items in the list with updated ones
+              let updatedList = eventData.list.filter(
+                (item: any) =>
+                  item.key !== 'location' &&
+                  item.key !== 'locationType' &&
+                  item.key !== 'meetingEventId',
+              );
+
+              // Add updated location items
+              updatedMetadataList.forEach((item: any) => {
+                if (
+                  item.key === 'location' ||
+                  item.key === 'locationType' ||
+                  item.key === 'meetingEventId'
+                ) {
+                  updatedList.push(item);
+                }
+              });
+
+              eventData.list = updatedList;
+              console.log(
+                '✅ Updated metadata with new Google Meet link:',
+                updatedList.filter(
+                  (item: any) =>
+                    item.key === 'location' ||
+                    item.key === 'locationType' ||
+                    item.key === 'meetingEventId',
+                ),
+              );
+            } else {
+              console.error(
+                '❌ Failed to create new Google Meet via backend:',
+                data,
+              );
+            }
           }
         } catch (err) {
-          console.error('❌ Google Meet update error via backend:', err);
+          console.error('❌ Google Meet handling error via backend:', err);
         }
       }
 
       // ✅ If Zoom is selected and user is connected to Zoom
       if (eventData.locationType === 'zoom' && zoomIntegration?.isConnected) {
-        console.log('Updating Zoom meeting...');
+        console.log('Handling Zoom meeting for edited event...');
         console.log(
           '🔍 Full Zoom Integration State:',
           JSON.stringify(zoomIntegration, null, 2),
@@ -2109,102 +2249,193 @@ const CreateEventScreen = () => {
           return; // Don't proceed with event update if token is missing
         }
 
-        // ✅ Build Zoom update payload - same structure as create, but with meetingId
+        // ✅ Build Zoom payload
         const startTime = new Date(selectedStartDate);
         const endTime = new Date(selectedEndDate);
         const durationMinutes = Math.round(
           (endTime.getTime() - startTime.getTime()) / (1000 * 60),
         );
 
-        const zoomMeetingUpdate = {
-          topic: eventData.title || 'Updated Meeting',
+        const zoomMeetingPayload = {
+          topic: eventData.title || 'Meeting',
           start_time: startTime.toISOString(),
           duration: durationMinutes,
           timezone: 'UTC',
           userName: activeAccount.userName,
           type: 'appointment',
-          meetingId: eventData.meetingEventId, // Use existing meeting ID for update
         };
 
-        console.log(
-          '📤 Sending to /zoom/meetings with payload:',
-          zoomMeetingUpdate,
-        );
-        console.log(
-          '🔑 Zoom access token:',
-          zoomIntegration.accessToken.substring(0, 20) + '...',
-        );
-
         try {
-          // ✅ Call backend API to update Zoom meeting (same endpoint as create)
-          const response = await api(
-            'POST',
-            '/zoom/meetings',
-            zoomMeetingUpdate,
-            undefined,
-            'api',
-          );
+          // ✅ Check if there's an existing Zoom meeting to update or create new
+          if (hasExistingZoom) {
+            console.log('✅ Updating existing Zoom meeting...');
+            zoomMeetingPayload.meetingId = previousGoogleMeetEventId; // Use existing meeting ID for update
 
-          console.log('✅ Zoom API Update Response Status:', response.status);
-          console.log('✅ Zoom API Update Response Data:', response.data);
-
-          // Extract zoom meeting link from response
-          const data = response?.data?.data || response?.data;
-
-          if (data?.join_url || data?.joinUrl) {
-            const zoomLink = data.join_url || data.joinUrl;
-            console.log('✅ Zoom meeting updated via backend:', zoomLink);
-            eventData.location = zoomLink;
-            eventData.meetingEventId = data.id || eventData.meetingEventId;
-
-            // ✅ Rebuild metadata list to include the updated Zoom meeting link
             console.log(
-              '🔄 Rebuilding metadata with updated Zoom meeting link',
+              '📤 Sending to /zoom/meetings with payload:',
+              zoomMeetingPayload,
             );
-            const updatedMetadataList = buildEventMetadata(
-              eventData as any,
-              null,
-            );
-
-            // Replace location-related items in the list with updated ones
-            let updatedList = eventData.list.filter(
-              (item: any) =>
-                item.key !== 'location' &&
-                item.key !== 'locationType' &&
-                item.key !== 'meetingEventId',
-            );
-
-            // Add updated location items
-            updatedMetadataList.forEach((item: any) => {
-              if (
-                item.key === 'location' ||
-                item.key === 'locationType' ||
-                item.key === 'meetingEventId'
-              ) {
-                updatedList.push(item);
-              }
-            });
-
-            eventData.list = updatedList;
             console.log(
-              '✅ Updated metadata with Zoom link:',
-              updatedList.filter(
+              '🔑 Zoom access token:',
+              zoomIntegration.accessToken.substring(0, 20) + '...',
+            );
+
+            // ✅ Call backend API to update Zoom meeting (same endpoint as create)
+            const response = await api(
+              'POST',
+              '/zoom/meetings',
+              zoomMeetingPayload,
+              undefined,
+              'api',
+            );
+
+            console.log('✅ Zoom API Update Response Status:', response.status);
+            console.log('✅ Zoom API Update Response Data:', response.data);
+
+            // Extract zoom meeting link from response
+            const data = response?.data?.data || response?.data;
+
+            if (data?.join_url || data?.joinUrl) {
+              const zoomLink = data.join_url || data.joinUrl;
+              console.log('✅ Zoom meeting updated via backend:', zoomLink);
+              eventData.location = zoomLink;
+              eventData.meetingEventId = data.id || eventData.meetingEventId;
+
+              // ✅ Rebuild metadata list to include the updated Zoom meeting link
+              console.log(
+                '🔄 Rebuilding metadata with updated Zoom meeting link',
+              );
+              const updatedMetadataList = buildEventMetadata(
+                eventData as any,
+                null,
+              );
+
+              // Replace location-related items in the list with updated ones
+              let updatedList = eventData.list.filter(
                 (item: any) =>
+                  item.key !== 'location' &&
+                  item.key !== 'locationType' &&
+                  item.key !== 'meetingEventId',
+              );
+
+              // Add updated location items
+              updatedMetadataList.forEach((item: any) => {
+                if (
                   item.key === 'location' ||
                   item.key === 'locationType' ||
-                  item.key === 'meetingEventId',
-              ),
-            );
+                  item.key === 'meetingEventId'
+                ) {
+                  updatedList.push(item);
+                }
+              });
+
+              eventData.list = updatedList;
+              console.log(
+                '✅ Updated metadata with Zoom link:',
+                updatedList.filter(
+                  (item: any) =>
+                    item.key === 'location' ||
+                    item.key === 'locationType' ||
+                    item.key === 'meetingEventId',
+                ),
+              );
+            } else {
+              console.error(
+                '❌ Failed to update Zoom meeting via backend:',
+                data,
+              );
+              Alert.alert('Error', 'Failed to update Zoom meeting');
+            }
           } else {
-            console.error(
-              '❌ Failed to update Zoom meeting via backend:',
-              data,
+            console.log('✅ Creating new Zoom meeting...');
+
+            console.log(
+              '📤 Sending to /zoom/meetings with payload:',
+              zoomMeetingPayload,
             );
-            Alert.alert('Error', 'Failed to update Zoom meeting');
+            console.log(
+              '🔑 Zoom access token:',
+              zoomIntegration.accessToken.substring(0, 20) + '...',
+            );
+
+            // ✅ Call backend API to create Zoom meeting
+            const response = await api(
+              'POST',
+              '/zoom/meetings',
+              zoomMeetingPayload,
+              undefined,
+              'api',
+            );
+
+            console.log('✅ Zoom API Create Response Status:', response.status);
+            console.log('✅ Zoom API Create Response Data:', response.data);
+
+            // Extract zoom meeting link from response
+            const data = response?.data?.data || response?.data;
+
+            if (data?.join_url || data?.joinUrl) {
+              const zoomLink = data.join_url || data.joinUrl;
+              console.log('✅ New Zoom meeting created via backend:', zoomLink);
+              eventData.location = zoomLink;
+              eventData.meetingEventId = data.id;
+
+              // ✅ Rebuild metadata list to include the new Zoom meeting link
+              console.log('🔄 Rebuilding metadata with new Zoom meeting link');
+              const updatedMetadataList = buildEventMetadata(
+                eventData as any,
+                null,
+              );
+
+              // Replace location-related items in the list with updated ones
+              let updatedList = eventData.list.filter(
+                (item: any) =>
+                  item.key !== 'location' &&
+                  item.key !== 'locationType' &&
+                  item.key !== 'meetingEventId',
+              );
+
+              // Add updated location items
+              updatedMetadataList.forEach((item: any) => {
+                if (
+                  item.key === 'location' ||
+                  item.key === 'locationType' ||
+                  item.key === 'meetingEventId'
+                ) {
+                  updatedList.push(item);
+                }
+              });
+
+              eventData.list = updatedList;
+              console.log(
+                '✅ Updated metadata with new Zoom link:',
+                updatedList.filter(
+                  (item: any) =>
+                    item.key === 'location' ||
+                    item.key === 'locationType' ||
+                    item.key === 'meetingEventId',
+                ),
+              );
+            } else {
+              console.warn(
+                'No Zoom meeting link returned, continuing without it',
+              );
+            }
           }
-        } catch (err) {
-          console.error('❌ Zoom meeting update error via backend:', err);
-          Alert.alert('Error', 'Failed to update Zoom meeting');
+        } catch (err: any) {
+          console.error('Zoom meeting handling error:', {
+            status: err.response?.status,
+            statusText: err.response?.statusText,
+            fullUrl: err.config?.url,
+            baseURL: err.config?.baseURL,
+            urlPath: err.config?.url?.replace(err.config?.baseURL, ''),
+            method: err.config?.method,
+            headers: err.config?.headers,
+            message: err.message,
+            data: err.response?.data,
+            requestPayload: err.config?.data,
+          });
+          // Don't fail event update if Zoom meeting fails - continue with event
+          console.log('Continuing event update without Zoom meeting');
         }
       }
 
@@ -3402,7 +3633,9 @@ const CreateEventScreen = () => {
 
             {/* Add video conferencing Field - Match task screen design */}
             <View style={styles.fieldContainer}>
-              <Text style={styles.labelText} numberOfLines={2}>Add video conferencing</Text>
+              <Text style={styles.labelText} numberOfLines={2}>
+                Add video conferencing
+              </Text>
               <TouchableOpacity
                 style={[
                   styles.datePicker,
