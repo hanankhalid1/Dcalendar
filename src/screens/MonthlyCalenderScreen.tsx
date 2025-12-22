@@ -297,11 +297,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
 
     const repeatTypeLower = repeatType.toLowerCase();
 
-    // ✅ Parse custom recurrence format: "Every 2 week on Monday, Wednesday (5 times)"
-    const customMatch = repeatType.match(
-      /^Every (\d+) (day|week|month|year)s?(?:\s+on\s+([^(]+))?(?:\s+\((?:(\d+) times|until ([^)]+))\))?$/i,
-    );
-
     let customInterval = 1;
     let customUnit = '';
     let customDays: string[] = [];
@@ -309,20 +304,85 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     let customEndAfter = 0;
     let customEndDate: Date | null = null;
 
-    if (customMatch) {
-      customInterval = parseInt(customMatch[1]);
-      customUnit = customMatch[2].toLowerCase();
+    // ✅ Check if this is a custom recurrence from ImportService (format: "_interval~2_unit~weekly_count~10")
+    if (repeatType === 'custom_' || repeatTypeLower.startsWith('custom')) {
+      const customRepeatEvent =
+        event.customRepeatEvent ||
+        event.list?.find((item: any) => item.key === 'customRepeatEvent')
+          ?.value;
 
-      if (customMatch[3]) {
-        customDays = customMatch[3].split(',').map(d => d.trim().toLowerCase());
+      if (customRepeatEvent && typeof customRepeatEvent === 'string') {
+        // Parse "_interval~2_unit~weekly_byday~MO,WE_count~10_endDate~2026-03-15" format
+        const parts: { [key: string]: string } = {};
+        const segments = customRepeatEvent.split('_').filter((s: string) => s);
+
+        segments.forEach((segment: string) => {
+          const [key, value] = segment.split('~');
+          if (key && value) {
+            parts[key] = value;
+          }
+        });
+
+        if (parts.interval) customInterval = parseInt(parts.interval, 10);
+        if (parts.unit) customUnit = parts.unit.toLowerCase();
+        if (parts.byday) {
+          // Convert "MO,WE,FR" to ["monday", "wednesday", "friday"]
+          const dayMap: { [key: string]: string } = {
+            SU: 'sunday',
+            MO: 'monday',
+            TU: 'tuesday',
+            WE: 'wednesday',
+            TH: 'thursday',
+            FR: 'friday',
+            SA: 'saturday',
+          };
+          customDays = parts.byday
+            .split(',')
+            .map((d: string) => dayMap[d.trim()] || d.toLowerCase())
+            .filter(Boolean);
+        }
+        if (parts.count) {
+          customEndType = 'after';
+          customEndAfter = parseInt(parts.count, 10);
+        } else if (parts.endDate) {
+          customEndType = 'on';
+          customEndDate = new Date(parts.endDate);
+        }
+
+        console.log('Parsed custom recurrence:', {
+          event: event.title,
+          customRepeatEvent,
+          customUnit,
+          customInterval,
+          customDays,
+          customEndType,
+          customEndAfter,
+          customEndDate,
+        });
       }
+    } else {
+      // ✅ Parse human-readable format: "Every 2 week on Monday, Wednesday (5 times)"
+      const customMatch = repeatType.match(
+        /^Every (\d+) (day|week|month|year)s?(?:\s+on\s+([^(]+))?(?:\s+\((?:(\d+) times|until ([^)]+))\))?$/i,
+      );
 
-      if (customMatch[4]) {
-        customEndType = 'after';
-        customEndAfter = parseInt(customMatch[4]);
-      } else if (customMatch[5]) {
-        customEndType = 'on';
-        customEndDate = new Date(customMatch[5].trim());
+      if (customMatch) {
+        customInterval = parseInt(customMatch[1]);
+        customUnit = customMatch[2].toLowerCase();
+
+        if (customMatch[3]) {
+          customDays = customMatch[3]
+            .split(',')
+            .map(d => d.trim().toLowerCase());
+        }
+
+        if (customMatch[4]) {
+          customEndType = 'after';
+          customEndAfter = parseInt(customMatch[4]);
+        } else if (customMatch[5]) {
+          customEndType = 'on';
+          customEndDate = new Date(customMatch[5].trim());
+        }
       }
     }
 
@@ -400,7 +460,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     };
 
     // Function to add a valid instance
-    const addInstance = (date: Date) => {
+    const addInstance = (date: Date, shouldCountOccurrence: boolean = true) => {
       if (date >= viewStartDate && date <= viewEndDate) {
         instances.push({
           date: new Date(date),
@@ -410,15 +470,20 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
           },
         });
       }
+      // Return true if we should count this occurrence (regardless of view range)
+      return shouldCountOccurrence;
     };
 
     // Handle the very first instance if it's within the view range
     const startDayInstance = new Date(startDate);
     startDayInstance.setHours(0, 0, 0, 0);
 
+    let occurrenceCount = 0; // Start at 0, we'll increment as we generate
     if (startDayInstance >= viewStartDate && startDayInstance <= viewEndDate) {
-      addInstance(startDayInstance);
+      addInstance(startDayInstance, false); // Don't count yet, will increment below
     }
+    // Always count the first occurrence for limit tracking
+    occurrenceCount = 1;
 
     // Calculate the *next* date based on recurrence rule
     // Start from the earliest date that could have instances in the view range
@@ -467,7 +532,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     }
 
     let iteration = 0;
-    let occurrenceCount = 1; // Track occurrences for "after N times"
+    // occurrenceCount is already initialized above when handling first instance
     const maxIterations = isAnnualEvent ? 50 : 366 * 2;
 
     while (nextDate <= limitDate && iteration < maxIterations) {
@@ -480,12 +545,12 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
 
       let hasMoved = false;
 
-      // ✅ Handle custom recurrence first
-      if (customMatch) {
-        if (customUnit === 'day') {
+      // ✅ Handle custom recurrence first (both parsed formats)
+      if (customUnit) {
+        if (customUnit === 'day' || customUnit === 'daily') {
           nextDate.setDate(nextDate.getDate() + customInterval);
           hasMoved = true;
-        } else if (customUnit === 'week') {
+        } else if (customUnit === 'week' || customUnit === 'weekly') {
           if (customDays.length > 0) {
             // Weekly with specific days
             // Calculate the target days in order
@@ -535,14 +600,14 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
             nextDate.setDate(nextDate.getDate() + 7 * customInterval);
             hasMoved = true;
           }
-        } else if (customUnit === 'month') {
+        } else if (customUnit === 'month' || customUnit === 'monthly') {
           const currentDay = nextDate.getDate();
           nextDate.setMonth(nextDate.getMonth() + customInterval);
           if (nextDate.getDate() < currentDay) {
             nextDate.setDate(0);
           }
           hasMoved = true;
-        } else if (customUnit === 'year') {
+        } else if (customUnit === 'year' || customUnit === 'yearly') {
           nextDate.setFullYear(nextDate.getFullYear() + customInterval);
           hasMoved = true;
         }
@@ -696,8 +761,10 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       }
 
       if (nextDate <= limitDate) {
-        addInstance(nextDate);
-        occurrenceCount++;
+        // Always count occurrences for the limit check, even if outside view range
+        if (addInstance(nextDate, true)) {
+          occurrenceCount++;
+        }
       }
 
       if (instances.length > 366) {
@@ -725,10 +792,10 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     );
 
     const viewStartDate = new Date(firstDayOfMonth);
-    viewStartDate.setDate(viewStartDate.getDate() - 7);
+    viewStartDate.setDate(viewStartDate.getDate() - 365); // Show full year before
 
     const viewEndDate = new Date(lastDayOfMonth);
-    viewEndDate.setDate(viewEndDate.getDate() + 7);
+    viewEndDate.setDate(viewEndDate.getDate() + 365); // Show full year after
 
     (userEvents || []).forEach(ev => {
       const startTimeData = convertToSelectedTimezone(

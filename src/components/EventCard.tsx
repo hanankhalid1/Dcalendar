@@ -39,6 +39,7 @@ import CalendarIcon from '../assets/svgs/calendar.svg';
 import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import { Fonts } from '../constants/Fonts';
+import { parseCustomRecurrence } from '../utils/recurrence';
 
 interface EventTag {
   id: string;
@@ -211,6 +212,19 @@ const EventCard: React.FC<EventCardProps> = ({
         tag && (tag.key === 'recurrence' || tag.key === 'repeatEvent'),
     );
     if (!recurrenceTag || !recurrenceTag.value) return null;
+
+    // If it's "custom" or "custom_", check for customRepeatEvent to parse
+    if (recurrenceTag.value === 'custom' || recurrenceTag.value === 'custom_') {
+      const customRepeatTag = eventTags.find(
+        (tag: any) => tag && tag.key === 'customRepeatEvent',
+      );
+      if (customRepeatTag && customRepeatTag.value) {
+        return parseCustomRecurrence(customRepeatTag.value);
+      }
+      // Fallback to "custom" if no customRepeatEvent data
+      return 'custom';
+    }
+
     return recurrenceTag.value;
   };
 

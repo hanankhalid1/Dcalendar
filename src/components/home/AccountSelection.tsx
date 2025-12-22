@@ -9,6 +9,7 @@ import {
   Image,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Fonts } from '../../constants/Fonts';
@@ -94,7 +95,9 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
           if (token && token !== null && token !== undefined) {
             await AsyncStorage.setItem('ac', JSON.stringify(token));
             setToken(token);
-            const selectedAccount = accounts.find(acc => acc.userName === userName);
+            const selectedAccount = accounts.find(
+              acc => acc.userName === userName,
+            );
             if (selectedAccount) {
               setAccount(selectedAccount); // ⬅️ Set active account
             }
@@ -104,7 +107,6 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
               'Token in Zustand (useToken):',
               useToken.getState().token,
             );
-
 
             // ONLY NOW close modal and trigger navigation
             onClose();
@@ -246,10 +248,14 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
           </View>
 
           <View style={styles.accountInfo}>
-            <Text style={[styles.accountName, { fontFamily: Fonts.latoRegular }]}>
+            <Text
+              style={[styles.accountName, { fontFamily: Fonts.latoRegular }]}
+            >
               {item.name}
             </Text>
-            <Text style={[styles.accountEmail, { fontFamily: Fonts.latoRegular }]}>
+            <Text
+              style={[styles.accountEmail, { fontFamily: Fonts.latoRegular }]}
+            >
               {item.userName}
             </Text>
           </View>
@@ -268,74 +274,94 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
 
   return (
     <View style={styles.container}>
-      {/* Logo Section */}
-      <View style={styles.logoSection}>
-        <DIcon width={72} height={72} />
-      </View>
+      <ScrollView
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={true}
+        keyboardShouldPersistTaps="handled"
+      >
+        {/* Logo Section */}
+        <View style={styles.logoSection}>
+          <DIcon width={72} height={72} />
+        </View>
 
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={[styles.chooseText, { fontFamily: Fonts.latoExtraBold }]}>
-          Choose an account
-        </Text>
-      </View>
-
-      {/* Subtitle */}
-      <Text style={[styles.subtitle, { fontFamily: Fonts.latoRegular }]}>
-        Select or add new account to continue Dcalendar
-      </Text>
-
-      {/* Accounts List Card */}
-      <View style={styles.accountsCard}>
-        {/* Accounts Header */}
-        <View style={styles.accountsHeader}>
-          <Text style={[styles.accountsLabel, { fontFamily: Fonts.latoMedium }]}>
-            Accounts
+        {/* Header */}
+        <View style={styles.header}>
+          <Text
+            style={[styles.chooseText, { fontFamily: Fonts.latoExtraBold }]}
+          >
+            Choose an account
           </Text>
         </View>
-        {/* Accounts List */}
-        <FlatList
-          data={accounts}
-          renderItem={renderAccountItem}
-          style={styles.accountList}
-          showsVerticalScrollIndicator={false}
-        />
-      </View>
 
-      {/* Action Buttons */}
-      <View style={styles.buttonContainer}>
-        <TouchableOpacity
-          style={styles.connectButton}
-          onPress={() => {
-            if (tempSelectedId) {
-              const selectedAccount = accounts.find(acc => acc.userName === tempSelectedId);
-              if (selectedAccount) {
-                fetchAccountTokenAndSave(selectedAccount.userName);
+        {/* Subtitle */}
+        <Text style={[styles.subtitle, { fontFamily: Fonts.latoRegular }]}>
+          Select or add new account to continue Dcalendar
+        </Text>
+
+        {/* Accounts List Card */}
+        <View style={styles.accountsCard}>
+          {/* Accounts Header */}
+          <View style={styles.accountsHeader}>
+            <Text
+              style={[styles.accountsLabel, { fontFamily: Fonts.latoMedium }]}
+            >
+              Accounts
+            </Text>
+          </View>
+          {/* Accounts List */}
+          <FlatList
+            data={accounts}
+            renderItem={renderAccountItem}
+            style={styles.accountList}
+            showsVerticalScrollIndicator={false}
+            scrollEnabled={false}
+          />
+        </View>
+
+        {/* Action Buttons */}
+        <View style={styles.buttonContainer}>
+          <TouchableOpacity
+            style={styles.connectButton}
+            onPress={() => {
+              if (tempSelectedId) {
+                const selectedAccount = accounts.find(
+                  acc => acc.userName === tempSelectedId,
+                );
+                if (selectedAccount) {
+                  fetchAccountTokenAndSave(selectedAccount.userName);
+                }
               }
-            }
-          }}
-          activeOpacity={0.7}
-          disabled={!tempSelectedId}
-        >
-          <Text style={[styles.connectButtonText, { fontFamily: Fonts.latoMedium }]}>
-            {tempSelectedId ? 'Continue with selected account' : 'Connect'}
-          </Text>
-        </TouchableOpacity>
+            }}
+            activeOpacity={0.7}
+            disabled={!tempSelectedId}
+          >
+            <Text
+              style={[
+                styles.connectButtonText,
+                { fontFamily: Fonts.latoMedium },
+              ]}
+            >
+              {tempSelectedId ? 'Continue with selected account' : 'Connect'}
+            </Text>
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={styles.addAccountButton}
-          onPress={() => {
-            onAddNewAccount();
-            onClose();
-          }}
-          activeOpacity={0.7}
-        >
-          <Icon name="plus" size={20} color={Colors.white} />
-          <Text style={[styles.addAccountText, { fontFamily: Fonts.latoMedium }]}>
-            Add new account
-          </Text>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={styles.addAccountButton}
+            onPress={() => {
+              onAddNewAccount();
+              onClose();
+            }}
+            activeOpacity={0.7}
+          >
+            <Icon name="plus" size={20} color={Colors.white} />
+            <Text
+              style={[styles.addAccountText, { fontFamily: Fonts.latoMedium }]}
+            >
+              Add new account
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
 
       {loading && (
         <View style={styles.loadingOverlay}>
@@ -352,6 +378,10 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
 };
 
 const styles = StyleSheet.create({
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: 20,
+  },
 
   titleContainer: {
     flexDirection: 'row',
@@ -364,7 +394,6 @@ const styles = StyleSheet.create({
   closeButton: {
     padding: 4,
   },
-
 
   selectedAccountItem: {
     backgroundColor: '#F0F8FF',
@@ -466,8 +495,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#F5F5F5', // Gray background matching app design
+  },
+  scrollContent: {
+    flexGrow: 1,
     paddingHorizontal: 24,
     paddingTop: 20,
+    paddingBottom: 20,
   },
   logoSection: {
     alignItems: 'center',

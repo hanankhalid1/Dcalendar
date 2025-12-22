@@ -665,6 +665,14 @@ export class BlockchainService {
 
   async saveImportedEvents(eventsData, account, token, api) {
     try {
+      console.log('📊 DEBUG: saveImportedEvents called with:', {
+        eventCount: eventsData.length,
+        firstEventSample: eventsData[0] ? {
+          title: eventsData[0].title,
+          list: eventsData[0].list,
+        } : null,
+      });
+
       const publicKey = await this.hostContract.methods
         .getPublicKeyOfUser(account)
         .call();
@@ -672,95 +680,123 @@ export class BlockchainService {
         return await encryptWithNECJS(JSON.stringify(event), publicKey, token);
       });
       const encryptedEvents = await Promise.all(encryptionPromises);
-      let inputContact = [];
-      let eventParamsValue = [];
-      const shareEvents = [];
       const walletAddress = await this.getWalletAddress(Config.NECJSPK);
+      const allShareEvents = [];
 
       console.log("eventsData here", eventsData);
-      eventsData.map(async (data, index) => {
-        eventParamsValue.push({
-          uuid: encryptedEvents[index],
-          uid: data?.uid.toString(),
-          title: data?.title,
-          fromTime: data?.fromTime || "",
-          toTime: data?.toTime || "",
-        })
-        const repeatEvents = data.list?.filter(data => data.key === "repeatEvent").map(data => data.value).filter(value => value !== null)
-        const customRepeat = data.list?.filter(data => data.key === "customRepeatEvent").map(data => data.value).filter(value => value !== null)
-        shareEvents.push({
-          uid: data?.uid.toString(),
-          title: data?.title,
-          fromTime: data?.fromTime || "",
-          toTime: data?.toTime || "",
-          repeatEvent: `${repeatEvents}`,
-          customRepeatEvent: `${customRepeat}`
-        })
-        const contacts = data.list.filter((event) => event.key === "guest").map((event) => ({ key: "contact", value: event.value }))
-        inputContact.push(...contacts);
-      })
-      const responseValue = [...new Set(inputContact)]
-      const filteredValue = { contact: responseValue }
-      const paramsValue = [eventParamsValue, account, filteredValue];
 
-    
-      console.log("🔍 eventParamsValue:", eventParamsValue);
-
+      // Process in batches to avoid RPC reversion
+      const BATCH_SIZE = 10; // Save 10 events per transaction
       const calendarContract = new Contract(
         CONTRACT_ADDRESSES.CALENDAR,
         CALENDAR_CONTRACT_ABI,
         this.provider,
       );
 
-
-
-      const gasEstimate = await calendarContract.methods
-        .addEvent(...paramsValue)
-        .estimateGas({
-          from: walletAddress,
-        });
-
-      const sender = await WalletModule.privateKeyToWalletAddressMobile(
-        Config.NECJSPK,
-      );
-
-      const nonce = await this.provider.getTransactionCount(sender);
-
+      let currentNonce = await this.provider.getTransactionCount(walletAddress);
       const gasPrice = await this.provider.getGasPrice();
-      const transactionHash = await calendarContract.methods
-        .addEvent(...paramsValue)
-        .nativeSend({
-          from: walletAddress,
-          gas: gasEstimate,
-          gasPrice: gasPrice,
-          nonce: nonce,
-          value: '0x0',
+
+      for (let batchStart = 0; batchStart < eventsData.length; batchStart += BATCH_SIZE) {
+        const batchEnd = Math.min(batchStart + BATCH_SIZE, eventsData.length);
+        const batchEvents = eventsData.slice(batchStart, batchEnd);
+        const batchEncrypted = encryptedEvents.slice(batchStart, batchEnd);
+        
+        console.log(`\n📦 Processing batch ${Math.floor(batchStart / BATCH_SIZE) + 1}/${Math.ceil(eventsData.length / BATCH_SIZE)}...`);
+
+        let inputContact = [];
+        let eventParamsValue = [];
+        const shareEvents = [];
+
+        batchEvents.forEach((data, index) => {
+          eventParamsValue.push({
+            uuid: batchEncrypted[index],
+            uid: data?.uid.toString(),
+            title: data?.title,
+            fromTime: data?.fromTime || "",
+            toTime: data?.toTime || "",
+          });
+          
+          const repeatEvents = data.list?.filter(item => item.key === "repeatEvent").map(item => item.value).filter(value => value !== null);
+          const customRepeat = data.list?.filter(item => item.key === "customRepeatEvent").map(item => item.value).filter(value => value !== null);
+          
+          const finalRepeatEvent = repeatEvents && repeatEvents.length > 0 ? repeatEvents[0] : "";
+          const finalCustomRepeat = customRepeat && customRepeat.length > 0 ? customRepeat[0] : "";
+          
+          console.log(`Event: "${data?.title}" | repeatEvent: "${finalRepeatEvent}" | customRepeatEvent: "${finalCustomRepeat}"`);
+          
+          shareEvents.push({
+            uid: data?.uid.toString(),
+            title: data?.title,
+            fromTime: data?.fromTime || "",
+            toTime: data?.toTime || "",
+            repeatEvent: finalRepeatEvent,
+            customRepeatEvent: finalCustomRepeat
+          });
+          
+          const contacts = data.list.filter((event) => event.key === "guest").map((event) => ({ key: "contact", value: event.value }));
+          inputContact.push(...contacts);
         });
 
-      console.log("Transaction hash", transactionHash);
+        allShareEvents.push(...shareEvents);
+        const responseValue = [...new Set(inputContact)];
+        const filteredValue = { contact: responseValue };
+        const paramsValue = [eventParamsValue, account, filteredValue];
 
-      const signedResult = await WalletModule.signTransactionMobile(
-        transactionHash,
-        Config.NECJSPK,
-      );
+        console.log(`🔍 Batch eventParamsValue (${eventParamsValue.length} events):`, eventParamsValue);
 
-      console.log("signed result");
+        try {
+          const gasEstimate = await calendarContract.methods
+            .addEvent(...paramsValue)
+            .estimateGas({
+              from: walletAddress,
+            });
 
-      // Send transaction
-      const txHash = await this.provider.sendRawTransaction(
-        signedResult.rawTransaction,
-      );
+          const sender = await WalletModule.privateKeyToWalletAddressMobile(
+            Config.NECJSPK,
+          );
 
-      console.log("Share events while import saving", shareEvents);
+          const transactionHash = await calendarContract.methods
+            .addEvent(...paramsValue)
+            .nativeSend({
+              from: walletAddress,
+              gas: gasEstimate,
+              gasPrice: gasPrice,
+              nonce: currentNonce,
+              value: '0x0',
+            });
+
+          console.log(`✅ Batch transaction hash:`, transactionHash);
+
+          const signedResult = await WalletModule.signTransactionMobile(
+            transactionHash,
+            Config.NECJSPK,
+          );
+
+          // Send transaction
+          const txHash = await this.provider.sendRawTransaction(
+            signedResult.rawTransaction,
+          );
+
+          console.log(`✅ Batch ${batchStart / BATCH_SIZE + 1} saved. TX:`, txHash);
+          currentNonce++; // Increment nonce for next batch
+        } catch (batchError) {
+          console.error(`❌ Failed to save batch ${batchStart / BATCH_SIZE + 1}:`, batchError);
+          throw batchError;
+        }
+      }
+
+      // Save all share events to API
+      console.log("Share events while import saving", allShareEvents);
       const shareCalendarparams = {
-        events: shareEvents,
+        events: allShareEvents,
         active: account,
         type: "update",
-      }
+      };
       await api('POST', '/updateevents', shareCalendarparams);
-      console.log("Imported events saved");
+      console.log(`✅ All ${eventsData.length} imported events saved successfully!`);
     } catch (err) {
-      console.error(err);
+      console.error(`❌ Error saving imported events:`, err);
+      throw err;
     }
   }
 
@@ -1291,13 +1327,27 @@ export class BlockchainService {
         };
       }
 
-      // Fetch all events from contract safely
-      const rawEvents = await this.safeCall(
-        async () =>
-          await this.calendarContract.methods
-            .getEvent(username, 0, eventCount)
-            .call(),
-      );
+      // Fetch all events in batches (contract limit is ~32 events per call)
+      const BATCH_SIZE = 32;
+      const allRawEvents = [];
+      
+      for (let offset = 0; offset < eventCount; offset += BATCH_SIZE) {
+        const limit = Math.min(BATCH_SIZE, eventCount - offset);
+        console.log(`📥 Fetching events from ${offset} to ${offset + limit}...`);
+        
+        const batchRawEvents = await this.safeCall(
+          async () =>
+            await this.calendarContract.methods
+              .getEvent(username, offset, limit)
+              .call(),
+        );
+        
+        if (Array.isArray(batchRawEvents)) {
+          allRawEvents.push(...batchRawEvents);
+        }
+      }
+      
+      const rawEvents = allRawEvents;
 
 
       console.log("[RETRIEVE] Raw events from contract:", JSON.stringify(rawEvents, null, 2));
