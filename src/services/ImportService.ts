@@ -2,9 +2,8 @@ import ICAL from 'ical.js';
 import moment from 'moment-timezone';
 export class ImportService {
 
-    public parseIcal(icalData: any, active: any, events: any) {
+    public parseIcal(icalData: any, active: any) {
         try {
-            const activeEvents = events
             const calendarBlocks = icalData.split(/(?=BEGIN:VCALENDAR)/g);
             let eventsDetails: { uid: any; title: any; description: any; fromTime: any; toTime: any; done: boolean; list: { key: string; value: any; }[]; }[] = [];
             calendarBlocks.forEach((block: any) => {
@@ -211,12 +210,7 @@ export class ImportService {
                 });
             });
 
-
-            const response = eventsDetails.filter(data => {
-                return !activeEvents.some(res => res.uid === data.uid);
-            });
-
-            return response;
+            return eventsDetails;
         } catch (error: any) {
             console.error("Error parsing ICS data:", error);
             console.error("Error details:", {

@@ -877,16 +877,20 @@ const SettingsScreen = () => {
         const allParsedEvents = importService.parseIcal(
           icalDataString,
           account,
-          [],
         );
 
         // Filter out duplicates (events already in the store) in a single pass
+        // Check by UID first (most reliable), then by title+fromTime combination
         const parsed =
           allParsedEvents?.filter(
             event =>
               !events.some(
                 existingEvent =>
-                  existingEvent.uid === event.uid ||
+                  // Match by UID (primary check)
+                  (event.uid &&
+                    existingEvent.uid &&
+                    existingEvent.uid === event.uid) ||
+                  // Match by title + fromTime (fallback for events without UID)
                   (existingEvent.title === event.title &&
                     existingEvent.fromTime === event.fromTime),
               ),

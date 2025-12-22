@@ -6,7 +6,7 @@ import { useAuthStore } from '../stores/useAuthStore';
 
 
 export const apiClient = axios.create({
-	//baseURL: 'https://dev-api.bmail.earth', // 🔁 Replace with your backend base URL
+	
 	baseURL: 'https://api.dmail.earth/', // 🔁 Replace with your backend base URL
 	headers: {
 		'Content-Type': 'application/json',
@@ -64,13 +64,15 @@ export const generateOpenApiToken = (secretKey: string): string => {
 // );
 
 export function useApiClient() {
-	const controllerRef = useRef<AbortController | null>(null);
+	const controllersRef = useRef<Set<AbortController>>(new Set());
 
 	useEffect(() => {
 		return () => {
-			if (controllerRef.current) {
-				controllerRef.current.abort();
-			}
+			// Abort all pending requests on unmount
+			controllersRef.current.forEach(controller => {
+				controller.abort();
+			});
+			controllersRef.current.clear();
 		};
 	}, []);
 
@@ -97,7 +99,9 @@ export function useApiClient() {
 		}
 		console.log('🔗 API resolved URL:', resolvedUrl);
 
-		controllerRef.current = new AbortController();
+		// Create a new controller for this request
+		const controller = new AbortController();
+		controllersRef.current.add(controller);
 
 		try {
 			// Prepare headers based on the new API specification
@@ -125,14 +129,20 @@ export function useApiClient() {
 				method,
 				url,
 				data,
-				signal: controllerRef.current.signal,
+				signal: controller.signal,
 				headers,
 				...config,
 			});
 
+			// Remove controller from set after successful completion
+			controllersRef.current.delete(controller);
+
 			console.log(`API ${method} ${resolvedUrl} response:`, response.data);
 			return response;
 		} catch (error: any) {
+			// Remove controller from set on error
+			controllersRef.current.delete(controller);
+
 			if (axios.isCancel(error)) {
 				console.warn('Request canceled:', error.message);
 			} else if (error.response) {
