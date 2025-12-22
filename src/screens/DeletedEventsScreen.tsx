@@ -268,6 +268,27 @@ const DeletedEventsScreen: React.FC = () => {
       // Optimistically restore event by removing isDeleted flag
       const { setUserEvents, userEvents, deletedUserEvents } =
         useEventsStore.getState();
+      // Check for duplicates before restoring using current active events
+      const isTask = (event?.list || []).some(
+        (item: any) => item.key === 'task',
+      );
+      const exists = (userEvents || []).some((existing: any) => {
+        const uidMatch =
+          event.uid && existing.uid && existing.uid === event.uid;
+        const contentMatch =
+          existing.title === event.title &&
+          existing.fromTime === event.fromTime;
+        return uidMatch || contentMatch;
+      });
+
+      if (exists) {
+        toast.warning(
+          isTask ? 'Task already exists' : 'Event already exists',
+          'This item is already present in your calendar.',
+          4000,
+        );
+        return;
+      }
       // Combine all events and remove duplicates by UID (keep the first occurrence)
       const allEventsMap = new Map();
       [...(userEvents || []), ...(deletedUserEvents || [])].forEach(
