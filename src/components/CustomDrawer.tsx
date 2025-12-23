@@ -867,7 +867,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             pointerEvents="auto"
           >
             <TouchableOpacity
-              style={styles.createMenuItem}
+              style={[styles.createMenuItem, { borderBottomWidth: 0 }]}
               onPress={() => {
                 console.log('>>>>>>>>> Event');
                 setShowCreateMenu(false);
@@ -878,7 +878,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
               <Text style={styles.createMenuTextOnly}>Event</Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={styles.createMenuItem}
+              style={[styles.createMenuItem, { borderBottomWidth: 0 }]}
               onPress={() => {
                 console.log('>>>>>>>>> Task');
                 setShowCreateMenu(false);

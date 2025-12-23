@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { TouchableOpacity, StyleSheet, Text, View } from 'react-native';
+import { TouchableOpacity, View, useWindowDimensions } from 'react-native';
 import AddIcon from '../assets/svgs/add.svg';
 import {
   moderateScale,
@@ -32,6 +32,7 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
   showMenu = true,
 }) => {
   const [isMenuVisible, setIsMenuVisible] = useState(false);
+  const { width, height } = useWindowDimensions();
 
   const handleFABPress = () => {
     if (showMenu) {
@@ -52,14 +53,44 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
     }
   };
 
+  // Responsive FAB position and size
+  const fabSize = width > 380 ? scaleWidth(52) : scaleWidth(48);
+  const fabRadius = width > 380 ? scaleWidth(12) : scaleWidth(10);
+  const fabBottom = height > 700 ? scaleHeight(100) : scaleHeight(80);
+  const fabRight = width > 400 ? scaleWidth(24) : scaleWidth(20);
+
   return (
     <>
       <TouchableOpacity
-        style={styles.container}
+        style={{
+          position: 'absolute',
+          bottom: fabBottom,
+          right: fabRight,
+          width: fabSize,
+          height: fabSize,
+          borderRadius: fabRadius,
+          shadowColor: '#000000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.2,
+          shadowRadius: 14,
+          elevation: 8,
+        }}
         onPress={handleFABPress}
         activeOpacity={0.8}
       >
-        <View style={styles.buttonBackground}>
+        <View
+          style={{
+            flex: 1,
+            width: '100%',
+            height: '100%',
+            borderRadius: fabRadius,
+            backgroundColor: '#00AEEF',
+            justifyContent: 'center',
+            alignItems: 'center',
+            padding: scaleWidth(12),
+            gap: scaleWidth(14),
+          }}
+        >
           <AddIcon
             width={scaleWidth(28)}
             height={scaleHeight(28)}
@@ -73,36 +104,12 @@ const FloatingActionButton: React.FC<FloatingActionButtonProps> = ({
         isVisible={isMenuVisible}
         onClose={handleMenuClose}
         onOptionSelect={handleOptionSelect}
+        windowDimensions={{ width, height }}
       />
     </>
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    position: 'absolute',
-    bottom: screenHeight > 700 ? scaleHeight(100) : scaleHeight(80),
-    right: screenWidth > 400 ? scaleWidth(24) : scaleWidth(20),
-    width: screenWidth > 380 ? scaleWidth(52) : scaleWidth(48),
-    height: screenWidth > 380 ? scaleWidth(52) : scaleWidth(48),
-    borderRadius: screenWidth > 380 ? scaleWidth(12) : scaleWidth(10),
-    shadowColor: '#000000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 14,
-    elevation: 8,
-  },
-  buttonBackground: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-    borderRadius: screenWidth > 380 ? scaleWidth(12) : scaleWidth(10),
-    backgroundColor: '#00AEEF',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: scaleWidth(12),
-    gap: scaleWidth(14),
-  },
-});
+// Styles removed; now handled inline for responsiveness
 
 export default FloatingActionButton;
