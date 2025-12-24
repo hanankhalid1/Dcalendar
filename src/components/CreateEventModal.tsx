@@ -260,6 +260,68 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
       // Only include location if it's not empty or whitespace-only
       const trimmedLocation = location.trim();
       const validLocation = trimmedLocation.length > 0 ? trimmedLocation : '';
+
+      // --- Blockchain Guest Registration Logic ---
+      const { BlockchainService } = require('../services/BlockChainService');
+      const { NECJSPRIVATE_KEY } = require('../constants/Config');
+      const blockchainService = new BlockchainService(NECJSPRIVATE_KEY);
+
+      // Helper: extract username from email
+      const extractUsernameFromEmail = email => email.split('@')[0];
+      const extractNameFromEmail = email => {
+        const localPart = email.split('@')[0];
+        return localPart
+          .replace(/[._]/g, ' ')
+          .split(' ')
+          .map(
+            word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase(),
+          )
+          .join(' ');
+      };
+
+      // Register each guest on-chain if not already present
+      for (const guestEmail of selectedGuests) {
+        try {
+          // Check if user exists on-chain (by wallet address = email or username)
+          // For demo, use username as wallet address (adapt as needed)
+          const username = extractUsernameFromEmail(guestEmail);
+          let userDetails;
+          try {
+            userDetails = await blockchainService.getUserDetailsForWallet(
+              guestEmail,
+            );
+          } catch (e) {
+            userDetails = null;
+          }
+          if (!userDetails || !userDetails.userName) {
+            // Register user on-chain
+            const params = {
+              organizationId: '', // Set as needed
+              role: 'guest',
+              userName: username,
+              domain: guestEmail.split('@')[1] || '',
+              name: extractNameFromEmail(guestEmail),
+              publicKey: '', // Optionally generate/fetch
+              walletAddress: guestEmail, // For demo, use email as walletAddress
+              status: true,
+              attributes: [],
+            };
+            try {
+              await blockchainService.createAccount(params);
+              console.log(`Registered guest on-chain: ${guestEmail}`);
+            } catch (err) {
+              console.warn(
+                `Failed to register guest on-chain: ${guestEmail}`,
+                err,
+              );
+            }
+          }
+        } catch (err) {
+          console.warn('Guest on-chain check error:', err);
+        }
+      }
+      // --- End Blockchain Guest Registration Logic ---
+
       const payload = {
         title: title.trim(),
         selectedDate: selectedDate!,

@@ -13,14 +13,29 @@ export function handleNcogResponse(url: string): boolean | void {
 
     if (params.success === 'true') {
       if (params?.data) {
-        let payload = JSON.parse(params.data); // first parse
-
-        // if payload is an array of stringified objects, parse again
-        if (Array.isArray(payload) && typeof payload[0] === 'string') {
-          payload = payload.map(item => JSON.parse(item));
+        let payload;
+        try {
+          if (typeof params.data === 'string' && params.data.trim() !== '') {
+            payload = JSON.parse(params.data); // first parse
+            // if payload is an array of stringified objects, parse again
+            if (Array.isArray(payload) && typeof payload[0] === 'string') {
+              payload = payload.map(item => {
+                try {
+                  return JSON.parse(item);
+                } catch (e) {
+                  console.warn('Failed to parse item in payload array:', item, e);
+                  return null;
+                }
+              }).filter(Boolean);
+            }
+            useEventsStore.getState().setUserEvents(payload);
+            console.log('Payload', payload);
+          } else {
+            console.warn('params.data is empty or not a string:', params.data);
+          }
+        } catch (e) {
+          console.error('Failed to parse params.data:', params.data, e);
         }
-        useEventsStore.getState().setUserEvents(payload);
-        console.log('Payload', payload);
       }
       const walletData = {
         walletAddress: decryptData(params.encryptedWalletAddress),

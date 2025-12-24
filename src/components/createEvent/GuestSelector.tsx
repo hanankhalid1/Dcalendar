@@ -11,21 +11,30 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
-import FeatherIcon from 'react-native-vector-icons/Feather';
-import LinearGradient from 'react-native-linear-gradient';
-import ArrowDownIcon from '../../assets/svgs/arrow-down.svg';
-import { moderateScale, scaleHeight, scaleWidth } from '../../utils/dimensions';
 import {
-  colors,
+  getLocalContacts,
+  addEmailsToLocalContacts,
+  Guest as LocalGuest,
+} from '../../utils/dcontactsUtils';
+import { getAllContacts, Guest as BackendGuest } from '../../utils/gueastUtils';
+import { useActiveAccount } from '../../stores/useActiveAccount';
+import { debugLogDcontacts } from '../../utils/debugDcontacts';
+import { Fonts } from '../../constants/Fonts';
+import { scaleHeight, scaleWidth } from '../../utils/dimensions';
+import {
   fontSize,
+  colors,
   spacing,
   borderRadius,
-  shadows,
 } from '../../utils/LightTheme';
-import { getAllContacts, Guest as DynamicGuest } from '../../utils/gueastUtils';
-import { useActiveAccount } from '../../stores/useActiveAccount';
-import { Fonts } from '../../constants/Fonts';
+import FeatherIcon from 'react-native-vector-icons/Feather';
+
+// Email validation regex (same as web)
+const emailRegex =
+  /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
+const isValidEmail = (email: string): boolean => {
+  return emailRegex.test(String(email).toLowerCase());
+};
 
 interface GuestSelectorProps {
   isVisible: boolean;
@@ -50,37 +59,50 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   onSearchQueryChange,
   disabled = false,
 }) => {
-  const [guests, setGuests] = useState<DynamicGuest[]>([]);
+  const [guests, setGuests] = useState<(LocalGuest | BackendGuest)[]>([]);
   const [pendingSelection, setPendingSelection] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [emailError, setEmailError] = useState('');
   const { account } = useActiveAccount();
 
   // Load contacts when modal opens
   const loadContacts = useCallback(async () => {
     if (!showGuestModal) return;
-
     setIsLoading(true);
     setError(null);
-    console.log('Loading contacts for user:', account?.userName);
-
     try {
-      const result = await getAllContacts(account?.userName);
-      console.log('Contact result:', result);
-
-      if (result.success && Array.isArray(result.data)) {
-        setGuests(result.data);
-        console.log('Loaded contacts:', result.data.length);
-      } else {
-        setError(result.error || 'Failed to load contacts');
-        setGuests([]);
-        console.error('Failed to load contacts:', result.error);
+      // Fetch both backend and local contacts
+      let backendGuests: BackendGuest[] = [];
+      try {
+        const backendResult = await getAllContacts(account?.userName);
+        if (backendResult.success && Array.isArray(backendResult.data)) {
+          backendGuests = backendResult.data;
+        }
+      } catch (e) {
+        // Ignore backend error, fallback to local only
       }
+      let localGuests: LocalGuest[] = [];
+      try {
+        localGuests = await getLocalContacts();
+        console.log('[GuestSelector] DContacts fetched:', localGuests);
+      } catch (e) {
+        // Ignore local error
+      }
+      // Merge and deduplicate by email
+      const allGuests = [...backendGuests, ...localGuests];
+      const seen = new Set<string>();
+      const deduped = allGuests.filter(g => {
+        if (!g.email) return false;
+        const em = g.email.toLowerCase();
+        if (seen.has(em)) return false;
+        seen.add(em);
+        return true;
+      });
+      setGuests(deduped);
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : 'Unknown error';
-      setError(errorMessage);
+      setError('Failed to load contacts');
       setGuests([]);
-      console.error('Error loading contacts:', err);
     } finally {
       setIsLoading(false);
     }
@@ -91,6 +113,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
     if (showGuestModal) {
       setPendingSelection(selectedGuests);
       loadContacts();
+      debugLogDcontacts(); // Log dcontacts for debugging
     } else {
       // Reset when modal closes
       setGuests([]);
@@ -105,7 +128,54 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
         ? prev.filter(email => email !== guestEmail)
         : [...prev, guestEmail],
     );
+    setEmailError('');
   };
+
+  // Add one or more emails to pending selection, validate, deduplicate, and store in AsyncStorage
+  const addEmailToList = useCallback(
+    async (input: string) => {
+      // Split input by comma, semicolon, or whitespace
+      const rawEmails = input
+        .split(/[,;\s]+/)
+        .map(e => e.trim().toLowerCase())
+        .filter(e => e.length > 0);
+      if (rawEmails.length === 0) {
+        setEmailError('Enter a valid email');
+        return;
+      }
+      // Remove duplicates in input
+      const uniqueEmails = Array.from(new Set(rawEmails));
+      // Validate and filter
+      const validEmails = uniqueEmails.filter(e => isValidEmail(e));
+      const invalidEmails = uniqueEmails.filter(e => !isValidEmail(e));
+      // Remove already selected and self
+      const filteredEmails = validEmails.filter(
+        e =>
+          !pendingSelection.some(sel => sel.toLowerCase() === e) &&
+          (!account?.userName || e !== account.userName.toLowerCase()),
+      );
+      if (filteredEmails.length === 0) {
+        if (invalidEmails.length > 0) {
+          setEmailError('Some emails are invalid');
+        } else {
+          setEmailError('Already added or cannot invite yourself');
+        }
+        return;
+      }
+      setPendingSelection(prev => [...prev, ...filteredEmails]);
+      setEmailError(
+        invalidEmails.length > 0 ? `Invalid: ${invalidEmails.join(', ')}` : '',
+      );
+      onSearchQueryChange('');
+      // Immediately add new emails to dcontactsDb (local contacts)
+      try {
+        await addEmailsToLocalContacts(filteredEmails);
+      } catch (e) {
+        // Ignore storage error
+      }
+    },
+    [pendingSelection, account?.userName, onSearchQueryChange],
+  );
 
   // Filter guests based on search query
   const normalizedQuery = searchQuery.trim().toLowerCase();
@@ -124,11 +194,13 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
 
   const handleCancel = () => {
     setPendingSelection(selectedGuests);
+    setEmailError('');
     onToggleGuestModal();
   };
 
   const handleAdd = () => {
     onConfirmSelection(pendingSelection);
+    setEmailError('');
     onToggleGuestModal();
   };
 
@@ -139,7 +211,6 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
         onPress={onToggleGuestModal}
         disabled={disabled}
       >
-        <MaterialIcons name="person-add" size={20} color="#A4A7AE" />
         <Text style={styles.guestInput}>
           {selectedGuests.length > 0
             ? `${selectedGuests.length} guest${
@@ -147,7 +218,9 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               } selected`
             : 'Add people'}
         </Text>
-        <FeatherIcon name="plus" size={20} color="#A4A7AE" />
+        <Text style={{ fontSize: 20, color: '#A4A7AE', marginLeft: 8 }}>
+          ＋
+        </Text>
       </TouchableOpacity>
 
       {/* Guest Modal */}
@@ -177,33 +250,111 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
               <Text style={styles.modalTitle}>Add people</Text>
             </View>
 
-            {/* Search Bar */}
+            {/* Search Bar (with email add logic) */}
             <View
               style={[
                 styles.searchContainer,
-                hasNoResults && styles.searchContainerError,
+                // If valid, new email, highlight with #00AEEF
+                isValidEmail(searchQuery.trim()) &&
+                !pendingSelection.some(
+                  e => e.toLowerCase() === searchQuery.trim().toLowerCase(),
+                ) &&
+                (!account?.userName ||
+                  searchQuery.trim().toLowerCase() !==
+                    account.userName.toLowerCase())
+                  ? { borderColor: '#00AEEF', backgroundColor: '#E6F7FB' }
+                  : hasNoResults
+                  ? styles.searchContainerError
+                  : null,
               ]}
             >
               <FeatherIcon
                 name="search"
                 size={20}
-                color={hasNoResults ? '#EF4444' : '#6C6C6C'}
+                color={
+                  isValidEmail(searchQuery.trim()) &&
+                  !pendingSelection.some(
+                    e => e.toLowerCase() === searchQuery.trim().toLowerCase(),
+                  ) &&
+                  (!account?.userName ||
+                    searchQuery.trim().toLowerCase() !==
+                      account.userName.toLowerCase())
+                    ? '#00AEEF'
+                    : hasNoResults
+                    ? '#EF4444'
+                    : '#6C6C6C'
+                }
               />
               <TextInput
-                style={[
-                  styles.searchInput,
-                  hasNoResults && styles.searchInputError,
-                ]}
-                placeholder="Search contacts..."
+                style={styles.searchInput}
+                placeholder="Search contacts or add by email..."
                 placeholderTextColor="#A4A7AE"
                 value={searchQuery}
-                onChangeText={onSearchQueryChange}
+                onChangeText={text => {
+                  onSearchQueryChange(text);
+                  setEmailError('');
+                }}
                 editable={!disabled}
+                autoCapitalize="none"
+                autoCorrect={false}
+                keyboardType="email-address"
+                returnKeyType="done"
+                onSubmitEditing={() => {
+                  if (searchQuery.trim().length > 0) {
+                    addEmailToList(searchQuery);
+                  }
+                }}
               />
             </View>
 
-            {/* Inline no-results helper under search input to avoid keyboard overlap */}
-            {hasNoResults && (
+            {/* If search is a valid, non-duplicate email, show cyan add option; suppress 'no such guest' in this case */}
+            {isValidEmail(searchQuery.trim()) &&
+              !pendingSelection.some(
+                e => e.toLowerCase() === searchQuery.trim().toLowerCase(),
+              ) &&
+              (!account?.userName ||
+                searchQuery.trim().toLowerCase() !==
+                  account.userName.toLowerCase()) && (
+                <TouchableOpacity
+                  style={{
+                    flexDirection: 'row',
+                    alignItems: 'center',
+                    marginLeft: 28,
+                    marginBottom: 8,
+                  }}
+                  onPress={() => addEmailToList(searchQuery)}
+                >
+                  <Text
+                    style={{ fontSize: 18, color: '#00AEEF', marginRight: 6 }}
+                  >
+                    ＋
+                  </Text>
+                  <Text
+                    style={{
+                      color: '#00AEEF',
+                      fontSize: 15,
+                      fontWeight: '600',
+                    }}
+                  >
+                    Add "{searchQuery.trim()}" as guest
+                  </Text>
+                </TouchableOpacity>
+              )}
+            {!!emailError && (
+              <Text
+                style={{
+                  color: '#EF4444',
+                  marginLeft: 28,
+                  fontSize: 12,
+                  marginBottom: 4,
+                }}
+              >
+                {emailError}
+              </Text>
+            )}
+
+            {/* Inline no-results helper: only show if not a valid email */}
+            {hasNoResults && !isValidEmail(searchQuery.trim()) && (
               <View style={styles.inlineNoResultsContainer}>
                 <Text style={styles.inlineErrorTitle}>No such guest found</Text>
                 <Text style={styles.inlineErrorSubtext}>
@@ -280,8 +431,10 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                     <View
                       style={[
                         styles.checkbox,
-                        pendingSelection.includes(item.email) &&
-                          styles.checkboxSelected,
+                        pendingSelection.includes(item.email) && {
+                          backgroundColor: '#00AEEF',
+                          borderColor: '#00AEEF',
+                        },
                       ]}
                     >
                       {pendingSelection.includes(item.email) && (
@@ -292,10 +445,84 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                 )}
               />
             )}
+            {/* Selected guest list (web-like style) */}
+            {pendingSelection.length > 0 && (
+              <View
+                style={{
+                  marginTop: 10,
+                  marginHorizontal: 20,
+                  maxHeight: 120,
+                  overflow: 'hidden',
+                }}
+              >
+                <View
+                  style={{
+                    maxHeight: 120,
+                    overflow: 'scroll',
+                    borderRadius: 8,
+                    backgroundColor: '#F6F7F9',
+                    paddingVertical: 6,
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  {pendingSelection.map((email, idx) => (
+                    <View
+                      key={email + idx}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 2,
+                        paddingVertical: 4,
+                        paddingHorizontal: 8,
+                        borderRadius: 6,
+                        backgroundColor: '#fff',
+                        shadowColor: '#000',
+                        shadowOpacity: 0.03,
+                        shadowRadius: 1,
+                        elevation: 1,
+                        marginRight: 2,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          flex: 1,
+                          color: '#252B37',
+                          fontSize: 15,
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap',
+                        }}
+                        numberOfLines={1}
+                      >
+                        {email}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() =>
+                          setPendingSelection(prev =>
+                            prev.filter(e => e !== email),
+                          )
+                        }
+                        style={{ marginLeft: 8, padding: 2 }}
+                        accessibilityLabel={`Remove ${email}`}
+                      >
+                        <FeatherIcon
+                          name="x-circle"
+                          size={18}
+                          color="#EF4444"
+                        />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              </View>
+            )}
 
             {/* Action Buttons */}
             <View style={styles.modalActions}>
-              <TouchableOpacity style={styles.cancelButton} onPress={handleCancel}>
+              <TouchableOpacity
+                style={styles.cancelButton}
+                onPress={handleCancel}
+              >
                 <Text style={styles.cancelButtonText}>Cancel</Text>
               </TouchableOpacity>
 
