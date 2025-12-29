@@ -222,8 +222,8 @@ const styles = StyleSheet.create({
     borderRadius: moderateScale(12),
     marginBottom: scaleHeight(12),
     height: scaleHeight(42),
-    minWidth: scaleWidth(140),
-    maxWidth: SCREEN_WIDTH * 0.5,
+    minWidth: scaleWidth(180), // Increased minWidth for better text visibility
+    maxWidth: SCREEN_WIDTH > 380 ? scaleWidth(240) : scaleWidth(200), // Increased maxWidth for folding screens
     ...shadows.sm,
   },
   appointmentItem: {
@@ -247,6 +247,8 @@ const styles = StyleSheet.create({
     fontFamily: 'Lato-Medium',
     includeFontPadding: false,
     lineHeight: SCREEN_WIDTH > 380 ? moderateScale(18) : moderateScale(16),
+    flexShrink: 1, // Allow text to shrink if needed
+    flexWrap: 'wrap', // Allow text to wrap to next line
   },
   iconWrapper: {
     width: moderateScale(24),
