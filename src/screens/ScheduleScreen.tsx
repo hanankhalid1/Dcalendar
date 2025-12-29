@@ -764,7 +764,13 @@ const ScheduleScreen = () => {
                     height={scaleHeight(54)}
                     fill={colors.primaryBlue}
                   />
-                ) : null}
+                ) : (
+                  <CalendarIcon
+                    width={scaleWidth(54)}
+                    height={scaleHeight(54)}
+                    fill={colors.primaryBlue}
+                  />
+                )}
               </View>
               <Text style={styles.emptyStateTitle}>
                 {selectedTab === 'All'
