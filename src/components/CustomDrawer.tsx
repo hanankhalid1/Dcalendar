@@ -869,7 +869,16 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             <TouchableOpacity
               style={[styles.createMenuItem, { borderBottomWidth: 0 }]}
               onPress={() => {
-                console.log('>>>>>>>>> Event');
+                setShowCreateMenu(false);
+                doNavigate('AppointmentScheduleScreen');
+                onClose();
+              }}
+            >
+              <Text style={styles.createMenuTextOnly}>Appointment</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.createMenuItem, { borderBottomWidth: 0 }]}
+              onPress={() => {
                 setShowCreateMenu(false);
                 doNavigate('CreateEventScreen');
                 onClose();
@@ -880,7 +889,6 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
             <TouchableOpacity
               style={[styles.createMenuItem, { borderBottomWidth: 0 }]}
               onPress={() => {
-                console.log('>>>>>>>>> Task');
                 setShowCreateMenu(false);
                 doNavigate('CreateTaskScreen');
                 onClose();
