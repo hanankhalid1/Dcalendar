@@ -20,6 +20,8 @@ import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import CrossIcon from '../assets/svgs/crossIcon.svg';
 import AppointmentIcon from '../assets/svgs/appoitnmentIcon.svg';
+import { useNavigation } from '@react-navigation/native';
+import { Screen } from '../navigations/appNavigation.type';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
@@ -38,6 +40,7 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
   onClose,
   onOptionSelect,
 }) => {
+  const navigation = useNavigation();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(20)).current;
 
@@ -90,6 +93,11 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
   }, [isVisible]);
 
   const handleOptionPress = (option: MenuOption) => {
+    if (option.id === 'appointment') {
+      navigation.navigate(Screen.AppointmentScheduleScreen);
+      onClose();
+      return;
+    }
     onOptionSelect(option.id);
     onClose();
   };
@@ -198,8 +206,8 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
-    paddingBottom: SCREEN_HEIGHT > 700 ? scaleHeight(100) : scaleHeight(80),
-    paddingRight: SCREEN_WIDTH > 400 ? scaleWidth(20) : scaleWidth(16),
+    paddingBottom: scaleHeight(24),
+    paddingRight: scaleWidth(16),
   },
   menuContainer: {
     backgroundColor: 'transparent',
