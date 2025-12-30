@@ -8,7 +8,12 @@ import {
   Animated,
   Dimensions,
 } from 'react-native';
-import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
+import {
+  moderateScale,
+  scaleHeight,
+  scaleWidth,
+  screenWidth,
+} from '../utils/dimensions';
 import {
   colors,
   fontSize,
@@ -24,6 +29,11 @@ import { useNavigation } from '@react-navigation/native';
 import { Screen } from '../navigations/appNavigation.type';
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+const isTablet = SCREEN_WIDTH >= 600;
+const isSmallMobile = SCREEN_WIDTH <= 340;
+const isLargeMobile = SCREEN_WIDTH > 400 && SCREEN_WIDTH < 600;
+const isFolding =
+  SCREEN_WIDTH >= 380 && SCREEN_WIDTH <= 500 && SCREEN_HEIGHT > 800;
 
 interface MenuOptionsComponentProps {
   isVisible: boolean;
@@ -35,12 +45,18 @@ interface MenuOptionsComponentProps {
   iconType: 'calendar' | 'task' | 'appointment';
 }
 
+type MenuOption = {
+  id: string;
+  label: string;
+  iconType: 'calendar' | 'task' | 'appointment';
+};
+
 const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
   isVisible,
   onClose,
   onOptionSelect,
 }) => {
-  const navigation = useNavigation();
+  const navigation = useNavigation<any>();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(20)).current;
 
@@ -94,7 +110,7 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
 
   const handleOptionPress = (option: MenuOption) => {
     if (option.id === 'appointment') {
-      navigation.navigate(Screen.AppointmentScheduleScreen);
+      navigation.navigate('AppointmentScheduleScreen');
       onClose();
       return;
     }
@@ -157,20 +173,22 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
           {menuOptions.map((option, index) => {
             let itemStyle = styles.menuItem;
             if (option.id === 'appointment') {
-              itemStyle = [styles.menuItem, styles.appointmentItem];
+              itemStyle = { ...styles.menuItem, ...styles.appointmentItem };
             } else if (option.id === 'event') {
-              itemStyle = [styles.menuItem, styles.eventItem];
+              itemStyle = { ...styles.menuItem, ...styles.eventItem };
             } else if (option.id === 'task') {
-              itemStyle = [styles.menuItem, styles.taskItem];
+              itemStyle = { ...styles.menuItem, ...styles.taskItem };
+            }
+
+            // Add lastMenuItem margin if last item
+            if (index === menuOptions.length - 1) {
+              itemStyle = { ...itemStyle, ...styles.lastMenuItem };
             }
 
             return (
               <TouchableOpacity
                 key={option.id}
-                style={[
-                  itemStyle,
-                  index === menuOptions.length - 1 && styles.lastMenuItem,
-                ]}
+                style={itemStyle}
                 onPress={e => {
                   e.stopPropagation();
                   handleOptionPress(option);
@@ -206,67 +224,120 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
-    paddingBottom: scaleHeight(24),
-    paddingRight: scaleWidth(16),
+    paddingBottom: isTablet
+      ? scaleHeight(48)
+      : isFolding
+      ? scaleHeight(36)
+      : isLargeMobile
+      ? scaleHeight(32)
+      : isSmallMobile
+      ? scaleHeight(16)
+      : scaleHeight(24),
+    paddingRight: isTablet
+      ? scaleWidth(48)
+      : isFolding
+      ? scaleWidth(32)
+      : isLargeMobile
+      ? scaleWidth(24)
+      : isSmallMobile
+      ? scaleWidth(8)
+      : scaleWidth(16),
   },
   menuContainer: {
     backgroundColor: 'transparent',
     alignItems: 'flex-end',
+    padding: isTablet ? scaleWidth(12) : 0,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scaleWidth(16),
-    paddingVertical: scaleHeight(11),
+    paddingHorizontal: isTablet ? scaleWidth(32) : scaleWidth(16),
+    paddingVertical: isTablet ? scaleHeight(18) : scaleHeight(11),
     backgroundColor: colors.white,
-    borderRadius: moderateScale(12),
-    marginBottom: scaleHeight(12),
-    height: scaleHeight(42),
-    minWidth: scaleWidth(180), // Increased minWidth for better text visibility
-    maxWidth: SCREEN_WIDTH > 380 ? scaleWidth(240) : scaleWidth(200), // Increased maxWidth for folding screens
+    borderRadius: isTablet ? moderateScale(20) : moderateScale(12),
+    marginBottom: isTablet ? scaleHeight(20) : scaleHeight(12),
+    height: isTablet ? scaleHeight(60) : scaleHeight(42),
+    minWidth: isTablet ? scaleWidth(300) : scaleWidth(180),
+    maxWidth: isTablet
+      ? scaleWidth(400)
+      : SCREEN_WIDTH > 380
+      ? scaleWidth(240)
+      : scaleWidth(200),
     ...shadows.sm,
   },
   appointmentItem: {
-    width: SCREEN_WIDTH > 380 ? scaleWidth(210) : scaleWidth(195),
+    width: isTablet
+      ? scaleWidth(320)
+      : SCREEN_WIDTH > 380
+      ? scaleWidth(210)
+      : scaleWidth(195),
   },
   eventItem: {
-    width: SCREEN_WIDTH > 380 ? scaleWidth(160) : scaleWidth(145),
+    width: isTablet
+      ? scaleWidth(260)
+      : SCREEN_WIDTH > 380
+      ? scaleWidth(160)
+      : scaleWidth(145),
   },
   taskItem: {
-    width: SCREEN_WIDTH > 380 ? scaleWidth(150) : scaleWidth(140),
+    width: isTablet
+      ? scaleWidth(240)
+      : SCREEN_WIDTH > 380
+      ? scaleWidth(150)
+      : scaleWidth(140),
   },
   lastMenuItem: {
-    marginBottom: scaleHeight(24),
+    marginBottom: isTablet ? scaleHeight(32) : scaleHeight(24),
   },
   menuLabel: {
-    fontSize: SCREEN_WIDTH > 380 ? moderateScale(14) : moderateScale(13),
+    fontSize: isTablet
+      ? moderateScale(20)
+      : SCREEN_WIDTH > 380
+      ? moderateScale(14)
+      : moderateScale(13),
     color: colors.blackText,
     fontWeight: '500',
-    marginLeft: scaleWidth(12),
+    marginLeft: isTablet ? scaleWidth(24) : scaleWidth(12),
     flex: 1,
     fontFamily: 'Lato-Medium',
     includeFontPadding: false,
-    lineHeight: SCREEN_WIDTH > 380 ? moderateScale(18) : moderateScale(16),
-    flexShrink: 1, // Allow text to shrink if needed
-    flexWrap: 'wrap', // Allow text to wrap to next line
+    lineHeight: isTablet
+      ? moderateScale(28)
+      : SCREEN_WIDTH > 380
+      ? moderateScale(18)
+      : moderateScale(16),
+    flexShrink: 1,
+    flexWrap: 'wrap',
   },
   iconWrapper: {
-    width: moderateScale(24),
-    height: moderateScale(24),
+    width: isTablet ? moderateScale(40) : moderateScale(24),
+    height: isTablet ? moderateScale(40) : moderateScale(24),
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
   },
   iconContainer: {
-    width: moderateScale(24),
-    height: moderateScale(24),
+    width: isTablet ? moderateScale(40) : moderateScale(24),
+    height: isTablet ? moderateScale(40) : moderateScale(24),
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeButton: {
-    width: SCREEN_WIDTH > 380 ? scaleWidth(56) : scaleWidth(50),
-    height: SCREEN_WIDTH > 380 ? scaleWidth(56) : scaleWidth(50),
-    borderRadius: SCREEN_WIDTH > 380 ? scaleWidth(28) : scaleWidth(25),
+    width: isTablet
+      ? scaleWidth(80)
+      : SCREEN_WIDTH > 380
+      ? scaleWidth(56)
+      : scaleWidth(50),
+    height: isTablet
+      ? scaleWidth(80)
+      : SCREEN_WIDTH > 380
+      ? scaleWidth(56)
+      : scaleWidth(50),
+    borderRadius: isTablet
+      ? scaleWidth(40)
+      : SCREEN_WIDTH > 380
+      ? scaleWidth(28)
+      : scaleWidth(25),
     backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',

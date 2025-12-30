@@ -17,6 +17,7 @@ export enum Screen {
   SettingsScreen = 'SettingsScreen',
   DeletedEventsScreen = 'DeletedEventsScreen',
   AboutAppScreen = 'AboutAppScreen',
+  AppointmentScheduleScreen = 'AppointmentScheduleScreen',
 }
 
 export type RootStackParamList = {
@@ -34,6 +35,7 @@ export type RootStackParamList = {
   [Screen.SettingsScreen]: { expandIntegration?: boolean } | undefined;
   [Screen.DeletedEventsScreen]: undefined;
   [Screen.AboutAppScreen]: undefined;
+  [Screen.AppointmentScheduleScreen]: { appointmentId?: string; mode?: string } | undefined;
 };
 
 export type AppNavigationProp = NativeStackNavigationProp<RootStackParamList>;

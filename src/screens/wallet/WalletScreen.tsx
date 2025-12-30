@@ -10,7 +10,13 @@ import React, { useEffect, useState } from 'react';
 import { Colors } from '../../constants/Colors';
 import { NcogWallet } from '../../assets/svgs';
 import { Fonts } from '../../constants/Fonts';
-import { scale } from 'react-native-size-matters';
+import {
+  moderateScale,
+  scaleWidth,
+  scaleHeight,
+  screenWidth,
+  screenHeight,
+} from '../../utils/dimensions';
 import NcogIntegration from '../../services/SimpleNcogIntegration';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useNavigation } from '@react-navigation/native';
@@ -74,8 +80,8 @@ const WalletScreen = () => {
           {/* Top Calendar Icon */}
           <View style={styles.topIconContainer}>
             <DIcon
-              width={scale(69.9806900024414)}
-              height={scale(72.00009155273438)}
+              width={scaleWidth(69.9806900024414)}
+              height={scaleHeight(72.00009155273438)}
             />
           </View>
 
@@ -109,6 +115,12 @@ const WalletScreen = () => {
   );
 };
 
+const isTablet = screenWidth >= 600;
+const isSmallMobile = screenWidth <= 340;
+const isLargeMobile = screenWidth > 400 && screenWidth < 600;
+const isFolding =
+  screenWidth >= 380 && screenWidth <= 500 && screenHeight > 800;
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -121,31 +133,87 @@ const styles = StyleSheet.create({
 
   // Main Content Frame - All content inside with exact dimensions
   mainContentFrame: {
-    width: scale(374),
+    width: isTablet
+      ? scaleWidth(500)
+      : isFolding
+      ? scaleWidth(420)
+      : isLargeMobile
+      ? scaleWidth(400)
+      : isSmallMobile
+      ? scaleWidth(320)
+      : scaleWidth(374),
     alignItems: 'center',
-    marginTop: scale(134),
+    marginTop: isTablet
+      ? scaleHeight(180)
+      : isFolding
+      ? scaleHeight(150)
+      : isLargeMobile
+      ? scaleHeight(140)
+      : isSmallMobile
+      ? scaleHeight(80)
+      : scaleHeight(134),
   },
 
   // Top Calendar Icon
   topIconContainer: {
-    width: scale(69.9806900024414),
-    height: scale(72.00009155273438),
+    width: isTablet
+      ? scaleWidth(100)
+      : isFolding
+      ? scaleWidth(80)
+      : scaleWidth(69.9806900024414),
+    height: isTablet
+      ? scaleHeight(110)
+      : isFolding
+      ? scaleHeight(90)
+      : scaleHeight(72.00009155273438),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: scale(16),
+    marginBottom: isTablet
+      ? scaleHeight(24)
+      : isFolding
+      ? scaleHeight(20)
+      : scaleHeight(16),
   },
 
   // Title Container
   titleContainer: {
-    width: scale(326),
+    width: isTablet
+      ? scaleWidth(400)
+      : isFolding
+      ? scaleWidth(340)
+      : isLargeMobile
+      ? scaleWidth(320)
+      : isSmallMobile
+      ? scaleWidth(220)
+      : scaleWidth(326),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: scale(8),
+    marginBottom: isTablet
+      ? scaleHeight(16)
+      : isFolding
+      ? scaleHeight(12)
+      : scaleHeight(8),
   },
   title: {
     fontFamily: Fonts.latoExtraBold,
-    fontSize: 30,
-    lineHeight: 38,
+    fontSize: isTablet
+      ? moderateScale(38)
+      : isFolding
+      ? moderateScale(32)
+      : isLargeMobile
+      ? moderateScale(28)
+      : isSmallMobile
+      ? moderateScale(22)
+      : moderateScale(30),
+    lineHeight: isTablet
+      ? moderateScale(46)
+      : isFolding
+      ? moderateScale(40)
+      : isLargeMobile
+      ? moderateScale(34)
+      : isSmallMobile
+      ? moderateScale(28)
+      : moderateScale(38),
     color: Colors.black,
     textAlign: 'center',
     letterSpacing: 0,
@@ -153,65 +221,201 @@ const styles = StyleSheet.create({
 
   // Subtitle
   subtitle: {
-    width: scale(326),
+    width: isTablet
+      ? scaleWidth(400)
+      : isFolding
+      ? scaleWidth(340)
+      : isLargeMobile
+      ? scaleWidth(320)
+      : isSmallMobile
+      ? scaleWidth(220)
+      : scaleWidth(326),
     fontFamily: Fonts.latoRegular,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: isTablet
+      ? moderateScale(18)
+      : isFolding
+      ? moderateScale(16)
+      : isLargeMobile
+      ? moderateScale(15)
+      : isSmallMobile
+      ? moderateScale(12)
+      : moderateScale(14),
+    lineHeight: isTablet
+      ? moderateScale(26)
+      : isFolding
+      ? moderateScale(22)
+      : isLargeMobile
+      ? moderateScale(20)
+      : isSmallMobile
+      ? moderateScale(16)
+      : moderateScale(20),
     color: Colors.grey,
     textAlign: 'center',
     letterSpacing: 0,
-    marginBottom: scale(20),
+    marginBottom: isTablet
+      ? scaleHeight(32)
+      : isFolding
+      ? scaleHeight(28)
+      : isLargeMobile
+      ? scaleHeight(24)
+      : isSmallMobile
+      ? scaleHeight(16)
+      : scaleHeight(20),
   },
 
   // Wallet Icon Container
   walletIconContainer: {
-    width: scale(134),
+    width: isTablet
+      ? scaleWidth(180)
+      : isFolding
+      ? scaleWidth(150)
+      : scaleWidth(134),
     alignItems: 'center',
-    marginBottom: scale(16),
+    marginBottom: isTablet
+      ? scaleHeight(24)
+      : isFolding
+      ? scaleHeight(20)
+      : scaleHeight(16),
   },
   walletIconWrapper: {
-    width: scale(134),
-    height: scale(134),
-    borderRadius: scale(150),
+    width: isTablet
+      ? scaleWidth(180)
+      : isFolding
+      ? scaleWidth(150)
+      : scaleWidth(134),
+    height: isTablet
+      ? scaleWidth(180)
+      : isFolding
+      ? scaleWidth(150)
+      : scaleWidth(134),
+    borderRadius: isTablet
+      ? scaleWidth(90)
+      : isFolding
+      ? scaleWidth(75)
+      : scaleWidth(67),
     backgroundColor: '#F9FAFB',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: scale(40),
+    padding: isTablet
+      ? scaleWidth(60)
+      : isFolding
+      ? scaleWidth(50)
+      : scaleWidth(40),
   },
   ncogText: {
     fontFamily: Fonts.latoBold,
-    fontSize: scale(14),
+    fontSize: isTablet
+      ? moderateScale(18)
+      : isFolding
+      ? moderateScale(16)
+      : isLargeMobile
+      ? moderateScale(15)
+      : isSmallMobile
+      ? moderateScale(12)
+      : moderateScale(14),
     color: Colors.black,
-    marginTop: 10,
+    marginTop: isTablet
+      ? scaleHeight(16)
+      : isFolding
+      ? scaleHeight(12)
+      : scaleHeight(10),
   },
 
   // Continue Text
   continueText: {
-    width: scale(326),
+    width: isTablet
+      ? scaleWidth(400)
+      : isFolding
+      ? scaleWidth(340)
+      : isLargeMobile
+      ? scaleWidth(320)
+      : isSmallMobile
+      ? scaleWidth(220)
+      : scaleWidth(326),
     fontFamily: Fonts.latoRegular,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: isTablet
+      ? moderateScale(18)
+      : isFolding
+      ? moderateScale(16)
+      : isLargeMobile
+      ? moderateScale(15)
+      : isSmallMobile
+      ? moderateScale(12)
+      : moderateScale(14),
+    lineHeight: isTablet
+      ? moderateScale(26)
+      : isFolding
+      ? moderateScale(22)
+      : isLargeMobile
+      ? moderateScale(20)
+      : isSmallMobile
+      ? moderateScale(16)
+      : moderateScale(20),
     color: Colors.black,
     textAlign: 'center',
     letterSpacing: 0,
-    marginBottom: scale(20),
+    marginBottom: isTablet
+      ? scaleHeight(32)
+      : isFolding
+      ? scaleHeight(28)
+      : isLargeMobile
+      ? scaleHeight(24)
+      : isSmallMobile
+      ? scaleHeight(16)
+      : scaleHeight(20),
   },
 
   // Button
   connectButton: {
-    width: scale(300),
-    minHeight: 44,
+    width: isTablet
+      ? scaleWidth(400)
+      : isFolding
+      ? scaleWidth(340)
+      : isLargeMobile
+      ? scaleWidth(320)
+      : isSmallMobile
+      ? scaleWidth(220)
+      : scaleWidth(300),
+    minHeight: isTablet
+      ? scaleHeight(60)
+      : isFolding
+      ? scaleHeight(50)
+      : isLargeMobile
+      ? scaleHeight(44)
+      : isSmallMobile
+      ? scaleHeight(36)
+      : scaleHeight(44),
     backgroundColor: '#00AEEF',
-    borderRadius: 8,
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    borderRadius: isTablet
+      ? moderateScale(14)
+      : isFolding
+      ? moderateScale(12)
+      : moderateScale(8),
+    paddingVertical: isTablet
+      ? scaleHeight(18)
+      : isFolding
+      ? scaleHeight(14)
+      : isLargeMobile
+      ? scaleHeight(12)
+      : isSmallMobile
+      ? scaleHeight(8)
+      : scaleHeight(10),
+    paddingHorizontal: isTablet
+      ? scaleWidth(32)
+      : isFolding
+      ? scaleWidth(24)
+      : isLargeMobile
+      ? scaleWidth(20)
+      : isSmallMobile
+      ? scaleWidth(10)
+      : scaleWidth(16),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#0A0D12',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: isTablet ? scaleHeight(2) : scaleHeight(1),
     },
     shadowOpacity: 0.05,
     shadowRadius: 2,
@@ -219,8 +423,24 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontFamily: Fonts.latoMedium,
-    fontSize: 16,
-    lineHeight: 24,
+    fontSize: isTablet
+      ? moderateScale(20)
+      : isFolding
+      ? moderateScale(18)
+      : isLargeMobile
+      ? moderateScale(16)
+      : isSmallMobile
+      ? moderateScale(13)
+      : moderateScale(16),
+    lineHeight: isTablet
+      ? moderateScale(28)
+      : isFolding
+      ? moderateScale(24)
+      : isLargeMobile
+      ? moderateScale(22)
+      : isSmallMobile
+      ? moderateScale(18)
+      : moderateScale(24),
     color: Colors.white,
     textAlign: 'center',
     letterSpacing: 0,

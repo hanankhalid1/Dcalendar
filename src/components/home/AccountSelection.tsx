@@ -15,7 +15,13 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Fonts } from '../../constants/Fonts';
 import { Colors } from '../../constants/Colors';
 import { scale } from 'react-native-size-matters';
-import { moderateScale } from '../../utils/dimensions';
+import {
+  moderateScale,
+  scaleWidth,
+  scaleHeight,
+  screenWidth,
+  screenHeight,
+} from '../../utils/dimensions';
 import { BlockchainService } from '../../services/BlockChainService';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useApiClient } from '../../hooks/useApi';
@@ -377,6 +383,12 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
   );
 };
 
+const isTablet = screenWidth >= 600;
+const isSmallMobile = screenWidth <= 340;
+const isLargeMobile = screenWidth > 400 && screenWidth < 600;
+const isFolding =
+  screenWidth >= 380 && screenWidth <= 500 && screenHeight > 800;
+
 const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
@@ -389,7 +401,7 @@ const styles = StyleSheet.create({
   },
 
   accountText: {
-    fontSize: scale(20),
+    fontSize: moderateScale(20),
   },
   closeButton: {
     padding: 4,
@@ -481,16 +493,16 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(255, 255, 255, 0.95)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: scale(20),
+    borderRadius: moderateScale(20),
   },
   loadingContainer: {
     alignItems: 'center',
-    gap: scale(12),
+    gap: moderateScale(12),
   },
   loadingText: {
-    fontSize: scale(14),
+    fontSize: moderateScale(14),
     color: Colors.primaryblue,
-    marginTop: scale(8),
+    marginTop: scaleHeight(8),
   },
   container: {
     flex: 1,
@@ -509,54 +521,130 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   logo: {
-    width: 40,
-    height: 40,
-    marginBottom: 16,
+    width: isTablet
+      ? 64
+      : isFolding
+      ? 48
+      : isLargeMobile
+      ? 44
+      : isSmallMobile
+      ? 32
+      : 40,
+    height: isTablet
+      ? 64
+      : isFolding
+      ? 48
+      : isLargeMobile
+      ? 44
+      : isSmallMobile
+      ? 32
+      : 40,
+    marginBottom: isTablet ? 24 : isFolding ? 20 : 16,
   },
   appName: {
-    fontSize: 42.79,
+    fontSize: isTablet
+      ? 56
+      : isFolding
+      ? 44
+      : isLargeMobile
+      ? 38
+      : isSmallMobile
+      ? 28
+      : 42.79,
     fontFamily: Fonts.latoExtraBold,
     fontWeight: '800',
     color: '#000000',
-    lineHeight: 42.79,
+    lineHeight: isTablet
+      ? 56
+      : isFolding
+      ? 44
+      : isLargeMobile
+      ? 38
+      : isSmallMobile
+      ? 28
+      : 42.79,
     letterSpacing: 0,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 8,
+    marginBottom: isTablet ? 16 : isFolding ? 12 : 8,
   },
   chooseText: {
-    fontSize: moderateScale(30),
+    fontSize: isTablet
+      ? moderateScale(38)
+      : isFolding
+      ? moderateScale(32)
+      : isLargeMobile
+      ? moderateScale(28)
+      : isSmallMobile
+      ? moderateScale(22)
+      : moderateScale(30),
     color: '#181D27',
     textAlign: 'center',
     fontFamily: Fonts.latoExtraBold,
   },
   subtitle: {
-    fontSize: moderateScale(14),
+    fontSize: isTablet
+      ? moderateScale(18)
+      : isFolding
+      ? moderateScale(16)
+      : isLargeMobile
+      ? moderateScale(15)
+      : isSmallMobile
+      ? moderateScale(12)
+      : moderateScale(14),
     color: '#666',
-    marginBottom: 24,
+    marginBottom: isTablet
+      ? 32
+      : isFolding
+      ? 28
+      : isLargeMobile
+      ? 24
+      : isSmallMobile
+      ? 16
+      : 24,
     textAlign: 'center',
     fontFamily: Fonts.latoRegular,
   },
   accountsCard: {
     backgroundColor: Colors.white,
-    borderRadius: 12,
+    borderRadius: isTablet ? 20 : isFolding ? 16 : 12,
     overflow: 'hidden',
-    marginBottom: 20,
+    marginBottom: isTablet ? 32 : isFolding ? 24 : 20,
   },
   accountsHeader: {
     backgroundColor: '#FAFAFA',
-    paddingTop: moderateScale(14),
-    paddingRight: moderateScale(12),
-    paddingBottom: moderateScale(14),
-    paddingLeft: moderateScale(12),
+    paddingTop: isTablet
+      ? moderateScale(20)
+      : isFolding
+      ? moderateScale(16)
+      : moderateScale(14),
+    paddingRight: isTablet
+      ? moderateScale(18)
+      : isFolding
+      ? moderateScale(14)
+      : moderateScale(12),
+    paddingBottom: isTablet
+      ? moderateScale(20)
+      : isFolding
+      ? moderateScale(16)
+      : moderateScale(14),
+    paddingLeft: isTablet
+      ? moderateScale(18)
+      : isFolding
+      ? moderateScale(14)
+      : moderateScale(12),
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E7',
-    borderTopLeftRadius: 12,
-    borderTopRightRadius: 12,
+    borderTopLeftRadius: isTablet ? 20 : isFolding ? 16 : 12,
+    borderTopRightRadius: isTablet ? 20 : isFolding ? 16 : 12,
   },
   accountsLabel: {
-    fontSize: moderateScale(14),
+    fontSize: isTablet
+      ? moderateScale(18)
+      : isFolding
+      ? moderateScale(16)
+      : moderateScale(14),
     color: '#535862',
   },
   accountList: {
@@ -565,8 +653,24 @@ const styles = StyleSheet.create({
   accountItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
+    paddingVertical: isTablet
+      ? 24
+      : isFolding
+      ? 20
+      : isLargeMobile
+      ? 18
+      : isSmallMobile
+      ? 12
+      : 16,
+    paddingHorizontal: isTablet
+      ? 32
+      : isFolding
+      ? 24
+      : isLargeMobile
+      ? 20
+      : isSmallMobile
+      ? 10
+      : 16,
     marginBottom: 0,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
@@ -584,9 +688,9 @@ const styles = StyleSheet.create({
   connectButton: {
     width: '100%',
     backgroundColor: Colors.white,
-    borderRadius: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    borderRadius: isTablet ? 14 : isFolding ? 12 : 8,
+    paddingVertical: isTablet ? 22 : isFolding ? 18 : 14,
+    paddingHorizontal: isTablet ? 36 : isFolding ? 28 : 24,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
@@ -594,7 +698,11 @@ const styles = StyleSheet.create({
     opacity: 1,
   },
   connectButtonText: {
-    fontSize: moderateScale(16),
+    fontSize: isTablet
+      ? moderateScale(20)
+      : isFolding
+      ? moderateScale(18)
+      : moderateScale(16),
     color: '#000',
     fontFamily: Fonts.latoMedium,
   },
@@ -604,24 +712,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primaryBlue,
-    borderRadius: 8,
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    borderRadius: isTablet ? 14 : isFolding ? 12 : 8,
+    paddingVertical: isTablet ? 22 : isFolding ? 18 : 14,
+    paddingHorizontal: isTablet ? 36 : isFolding ? 28 : 24,
     gap: 8,
   },
   useAnotherText: {
-    fontSize: scale(16),
+    fontSize: isTablet ? scale(20) : isFolding ? scale(18) : scale(16),
     color: Colors.primaryblue,
-    marginLeft: 12,
+    marginLeft: isTablet ? 18 : isFolding ? 14 : 12,
     fontFamily: Fonts.medium,
   },
   walletButton: {
-    paddingVertical: 16,
+    paddingVertical: isTablet ? 24 : isFolding ? 20 : 16,
     alignItems: 'center',
-    marginBottom: 20,
+    marginBottom: isTablet ? 32 : isFolding ? 24 : 20,
   },
   walletButtonText: {
-    fontSize: scale(14),
+    fontSize: isTablet ? scale(18) : isFolding ? scale(16) : scale(14),
     color: '#666',
     fontFamily: Fonts.medium,
   },
