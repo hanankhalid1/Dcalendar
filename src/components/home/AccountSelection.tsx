@@ -36,6 +36,7 @@ interface Account {
   id: string;
   name: string;
   email: string;
+  userName: string;
   avatar?: string;
   backgroundColor?: string;
   isSelected?: boolean;
@@ -59,7 +60,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
   onNewAccount,
   selectedAccountId,
 }) => {
-  const [accounts, setaccounts] = useState([]);
+  const [accounts, setaccounts] = useState<Account[]>([]);
   const [loading, setloading] = useState(false);
   const { setAccount, account } = useActiveAccount();
   const { api } = useApiClient();
@@ -101,8 +102,8 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
           if (token && token !== null && token !== undefined) {
             await AsyncStorage.setItem('ac', JSON.stringify(token));
             setToken(token);
-            const selectedAccount = accounts.find(
-              acc => acc.userName === userName,
+            const selectedAccount = (accounts as Account[]).find(
+              (acc: Account) => acc.userName === userName,
             );
             if (selectedAccount) {
               setAccount(selectedAccount); // ⬅️ Set active account
@@ -156,7 +157,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
       const hostContract = new BlockchainService(Config.NECJSPK);
       const stpra = await AsyncStorage.getItem('token');
       console.log('stpra', stpra);
-      const parseData = JSON.parse(stpra);
+      const parseData = stpra ? JSON.parse(stpra) : {};
       console.log('parseData', parseData);
 
       const details = await hostContract.getUserDetailsForWallet(
@@ -184,7 +185,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
   }, [onNewAccount]);
 
   const [tempSelectedId, setTempSelectedId] = useState<string>(
-    account?.userName || '',
+    (account as Account)?.userName || '',
   );
 
   const getInitials = (name: string) => {
@@ -211,7 +212,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
   };
 
   const handleAccountPress = (account: Account) => {
-    setTempSelectedId(account.userName);
+    setTempSelectedId((account as Account).userName);
     // Don't connect immediately - wait for button click
   };
 
@@ -222,15 +223,75 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
     item: Account;
     index: number;
   }) => {
-    const isSelected = tempSelectedId === item.userName;
+    const isSelected = tempSelectedId === (item as Account).userName;
     const backgroundColor =
       item.backgroundColor || getAvatarBackgroundColor(index);
     const isLastItem = index === accounts.length - 1;
+
+    // Responsive adjustments
+    const avatarSize = isTablet
+      ? 48
+      : isFolding
+      ? 40
+      : isLargeMobile
+      ? 36
+      : isSmallMobile
+      ? 28
+      : 32;
+    // Smaller font and radio sizes for better balance
+    const fontSizeName = isTablet
+      ? moderateScale(16)
+      : isFolding
+      ? moderateScale(14)
+      : isLargeMobile
+      ? moderateScale(13)
+      : isSmallMobile
+      ? moderateScale(10)
+      : moderateScale(12);
+    const fontSizeEmail = isTablet
+      ? moderateScale(13)
+      : isFolding
+      ? moderateScale(12)
+      : isLargeMobile
+      ? moderateScale(11)
+      : isSmallMobile
+      ? moderateScale(8)
+      : moderateScale(10);
+    const radioSize = isTablet
+      ? 20
+      : isFolding
+      ? 18
+      : isLargeMobile
+      ? 16
+      : isSmallMobile
+      ? 12
+      : 14;
+    const radioInnerSize = radioSize / 2;
 
     return (
       <TouchableOpacity
         style={[
           styles.accountItem,
+          {
+            paddingVertical: isTablet
+              ? 20
+              : isFolding
+              ? 16
+              : isLargeMobile
+              ? 14
+              : isSmallMobile
+              ? 8
+              : 12,
+            paddingHorizontal: isTablet
+              ? 28
+              : isFolding
+              ? 22
+              : isLargeMobile
+              ? 18
+              : isSmallMobile
+              ? 8
+              : 14,
+          },
           isSelected && styles.selectedAccountItem,
           isLastItem && styles.lastAccountItem,
         ]}
@@ -238,14 +299,50 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
         activeOpacity={0.7}
       >
         {isSelected && <View style={styles.selectedIndicator} />}
-        <View style={styles.accountContent}>
-          <View style={styles.avatarContainer}>
+        <View
+          style={[
+            styles.accountContent,
+            {
+              flexDirection: isSmallMobile ? 'column' : 'row',
+              alignItems: 'center',
+            },
+          ]}
+        >
+          <View
+            style={[
+              styles.avatarContainer,
+              {
+                marginRight: isSmallMobile ? 0 : 8,
+                marginBottom: isSmallMobile ? 4 : 0,
+              },
+            ]}
+          >
             {item.avatar ? (
-              <Image source={{ uri: item.avatar }} style={styles.avatar} />
+              <Image
+                source={{ uri: item.avatar }}
+                style={{
+                  width: avatarSize,
+                  height: avatarSize,
+                  borderRadius: avatarSize / 2,
+                }}
+              />
             ) : (
-              <View style={[styles.avatarPlaceholder, { backgroundColor }]}>
+              <View
+                style={[
+                  styles.avatarPlaceholder,
+                  {
+                    backgroundColor,
+                    width: avatarSize,
+                    height: avatarSize,
+                    borderRadius: avatarSize / 2,
+                  },
+                ]}
+              >
                 <Text
-                  style={[styles.avatarText, { fontFamily: Fonts.latoBold }]}
+                  style={[
+                    styles.avatarText,
+                    { fontFamily: Fonts.latoBold, fontSize: fontSizeName },
+                  ]}
                 >
                   {getInitials(item.name)}
                 </Text>
@@ -253,25 +350,59 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
             )}
           </View>
 
-          <View style={styles.accountInfo}>
+          <View style={[styles.accountInfo, { flex: 1 }]}>
             <Text
-              style={[styles.accountName, { fontFamily: Fonts.latoRegular }]}
+              style={[
+                styles.accountName,
+                { fontFamily: Fonts.latoRegular, fontSize: fontSizeName },
+              ]}
             >
               {item.name}
             </Text>
             <Text
-              style={[styles.accountEmail, { fontFamily: Fonts.latoRegular }]}
+              style={[
+                styles.accountEmail,
+                {
+                  fontFamily: Fonts.latoRegular,
+                  fontSize: fontSizeEmail,
+                  flexWrap: 'wrap',
+                },
+              ]}
+              numberOfLines={isSmallMobile ? 2 : 1}
+              ellipsizeMode="tail"
             >
-              {item.userName}
+              {(item as Account).userName}
             </Text>
           </View>
         </View>
 
-        <View style={styles.radioContainer}>
+        <View
+          style={[
+            styles.radioContainer,
+            { marginLeft: isSmallMobile ? 0 : 16 },
+          ]}
+        >
           <View
-            style={[styles.radioOuter, isSelected && styles.radioOuterSelected]}
+            style={[
+              styles.radioOuter,
+              isSelected && styles.radioOuterSelected,
+              {
+                width: radioSize,
+                height: radioSize,
+                borderRadius: radioSize / 2,
+              },
+            ]}
           >
-            {isSelected && <View style={styles.radioInner} />}
+            {isSelected && (
+              <View
+                style={{
+                  width: radioInnerSize,
+                  height: radioInnerSize,
+                  borderRadius: radioInnerSize / 2,
+                  backgroundColor: Colors.primaryblue,
+                }}
+              />
+            )}
           </View>
         </View>
       </TouchableOpacity>
@@ -330,8 +461,8 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
             style={styles.connectButton}
             onPress={() => {
               if (tempSelectedId) {
-                const selectedAccount = accounts.find(
-                  acc => acc.userName === tempSelectedId,
+                const selectedAccount = (accounts as Account[]).find(
+                  (acc: Account) => acc.userName === tempSelectedId,
                 );
                 if (selectedAccount) {
                   fetchAccountTokenAndSave(selectedAccount.userName);
@@ -392,8 +523,11 @@ const isFolding =
 const styles = StyleSheet.create({
   scrollContent: {
     flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 20,
     paddingBottom: 20,
   },
+  // Removed duplicate scrollContent style
 
   titleContainer: {
     flexDirection: 'row',
@@ -508,12 +642,7 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: '#F5F5F5', // Gray background matching app design
   },
-  scrollContent: {
-    flexGrow: 1,
-    paddingHorizontal: 24,
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
+  // Removed duplicate scrollContent style
   logoSection: {
     alignItems: 'center',
     justifyContent: 'center',
@@ -608,9 +737,11 @@ const styles = StyleSheet.create({
   },
   accountsCard: {
     backgroundColor: Colors.white,
-    borderRadius: isTablet ? 20 : isFolding ? 16 : 12,
+    borderRadius: 12,
     overflow: 'hidden',
-    marginBottom: isTablet ? 32 : isFolding ? 24 : 20,
+    marginBottom: 20,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
   accountsHeader: {
     backgroundColor: '#FAFAFA',
@@ -683,27 +814,24 @@ const styles = StyleSheet.create({
   buttonContainer: {
     flexDirection: 'column',
     gap: 12,
-    marginBottom: 20,
+    marginBottom: 0,
+    marginTop: 8,
+    paddingHorizontal: 8,
   },
   connectButton: {
     width: '100%',
-    backgroundColor: Colors.white,
-    borderRadius: isTablet ? 14 : isFolding ? 12 : 8,
-    paddingVertical: isTablet ? 22 : isFolding ? 18 : 14,
-    paddingHorizontal: isTablet ? 36 : isFolding ? 28 : 24,
+    backgroundColor: '#fff',
+    borderRadius: 8,
+    paddingVertical: 14,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1,
-    borderColor: '#E5E5E7',
-    opacity: 1,
+    borderColor: '#B5B5B5',
+    marginBottom: 0,
   },
   connectButtonText: {
-    fontSize: isTablet
-      ? moderateScale(20)
-      : isFolding
-      ? moderateScale(18)
-      : moderateScale(16),
-    color: '#000',
+    fontSize: 18,
+    color: '#181D27',
     fontFamily: Fonts.latoMedium,
   },
   addAccountButton: {
@@ -712,10 +840,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: Colors.primaryBlue,
-    borderRadius: isTablet ? 14 : isFolding ? 12 : 8,
-    paddingVertical: isTablet ? 22 : isFolding ? 18 : 14,
-    paddingHorizontal: isTablet ? 36 : isFolding ? 28 : 24,
+    borderRadius: 8,
+    paddingVertical: 14,
     gap: 8,
+    marginTop: 8,
   },
   useAnotherText: {
     fontSize: isTablet ? scale(20) : isFolding ? scale(18) : scale(16),
