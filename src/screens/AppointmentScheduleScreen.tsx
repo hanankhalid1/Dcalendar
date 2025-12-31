@@ -2905,8 +2905,8 @@ const styles = StyleSheet.create({
   dayRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: spacing.md,
-    paddingVertical: scaleHeight(4),
+    marginBottom: 4, // reduce gap between day rows
+    paddingVertical: 2, // reduce vertical padding
   },
   dayLabel: {
     width: scaleWidth(48),
@@ -2988,9 +2988,9 @@ const styles = StyleSheet.create({
   modalContent: {
     backgroundColor: colors.white,
     borderRadius: 12,
-    padding: spacing.md,
-    marginHorizontal: spacing.lg,
-    marginTop: scaleHeight(200),
+    padding: 8, // keep reduced padding
+    marginHorizontal: 24, // keep reduced horizontal margin
+    marginTop: 40, // further reduce top margin for general availability modal
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -3003,8 +3003,8 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.lightGrayishBlue,
   },
   modalOptionCustom: {
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingVertical: 4, // further reduce vertical padding for general availability
+    paddingHorizontal: 8, // keep reduced horizontal padding
     backgroundColor: colors.white,
   },
   modalOptionText: {

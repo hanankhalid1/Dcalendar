@@ -3180,6 +3180,9 @@ const CreateEventScreen = () => {
         list: finalList,
       };
 
+      // Log the event payload for debugging/inspection
+      console.log('🟢 Event payload before create:', eventData);
+
       console.log('>>>>>>>> START DATE/TIME <<<<<<<<', {
         startDate: selectedStartDate?.toISOString(),
         startDateFormatted: selectedStartDate?.toLocaleDateString(),
