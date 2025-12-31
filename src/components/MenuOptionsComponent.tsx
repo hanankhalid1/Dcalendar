@@ -56,6 +56,14 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
   onClose,
   onOptionSelect,
 }) => {
+  // Responsive menu item style (media-query-like)
+  const getMenuItemStyle = () => {
+    // Make each menu item fit its content (text + icon)
+    return {
+      width: 'auto',
+      alignSelf: 'flex-end',
+    };
+  };
   const navigation = useNavigation<any>();
   const fadeAnim = React.useRef(new Animated.Value(0)).current;
   const slideAnim = React.useRef(new Animated.Value(20)).current;
@@ -171,20 +179,14 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
           pointerEvents="box-none"
         >
           {menuOptions.map((option, index) => {
-            let itemStyle = styles.menuItem;
-            if (option.id === 'appointment') {
-              itemStyle = { ...styles.menuItem, ...styles.appointmentItem };
-            } else if (option.id === 'event') {
-              itemStyle = { ...styles.menuItem, ...styles.eventItem };
-            } else if (option.id === 'task') {
-              itemStyle = { ...styles.menuItem, ...styles.taskItem };
-            }
-
+            let itemStyle = {
+              ...styles.menuItem,
+              ...getMenuItemStyle(),
+            };
             // Add lastMenuItem margin if last item
             if (index === menuOptions.length - 1) {
               itemStyle = { ...itemStyle, ...styles.lastMenuItem };
             }
-
             return (
               <TouchableOpacity
                 key={option.id}
@@ -245,46 +247,49 @@ const styles = StyleSheet.create({
   },
   menuContainer: {
     backgroundColor: 'transparent',
+    position: 'absolute',
+    right: isTablet
+      ? scaleWidth(48)
+      : isFolding
+      ? scaleWidth(32)
+      : isLargeMobile
+      ? scaleWidth(24)
+      : isSmallMobile
+      ? scaleWidth(8)
+      : scaleWidth(16),
+    bottom: isTablet
+      ? scaleHeight(32)
+      : isFolding
+      ? scaleHeight(24)
+      : isLargeMobile
+      ? scaleHeight(20)
+      : isSmallMobile
+      ? scaleHeight(12)
+      : scaleHeight(16),
+    width: 'auto',
     alignItems: 'flex-end',
-    padding: isTablet ? scaleWidth(12) : 0,
+    zIndex: 1000,
   },
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: isTablet ? scaleWidth(32) : scaleWidth(16),
-    paddingVertical: isTablet ? scaleHeight(18) : scaleHeight(11),
+    paddingHorizontal: scaleWidth(16),
+    paddingVertical: scaleHeight(11),
     backgroundColor: colors.white,
-    borderRadius: isTablet ? moderateScale(20) : moderateScale(12),
-    marginBottom: isTablet ? scaleHeight(20) : scaleHeight(12),
-    height: isTablet ? scaleHeight(60) : scaleHeight(42),
-    minWidth: isTablet ? scaleWidth(300) : scaleWidth(180),
-    maxWidth: isTablet
-      ? scaleWidth(400)
-      : SCREEN_WIDTH > 380
-      ? scaleWidth(240)
-      : scaleWidth(200),
+    borderRadius: moderateScale(12),
+    marginBottom: scaleHeight(12),
+    height: scaleHeight(42),
+    alignSelf: 'flex-end',
     ...shadows.sm,
   },
   appointmentItem: {
-    width: isTablet
-      ? scaleWidth(320)
-      : SCREEN_WIDTH > 380
-      ? scaleWidth(210)
-      : scaleWidth(195),
+    // Remove fixed width for better responsiveness
   },
   eventItem: {
-    width: isTablet
-      ? scaleWidth(260)
-      : SCREEN_WIDTH > 380
-      ? scaleWidth(160)
-      : scaleWidth(145),
+    // Remove fixed width for better responsiveness
   },
   taskItem: {
-    width: isTablet
-      ? scaleWidth(240)
-      : SCREEN_WIDTH > 380
-      ? scaleWidth(150)
-      : scaleWidth(140),
+    // Remove fixed width for better responsiveness
   },
   lastMenuItem: {
     marginBottom: isTablet ? scaleHeight(32) : scaleHeight(24),
@@ -298,7 +303,6 @@ const styles = StyleSheet.create({
     color: colors.blackText,
     fontWeight: '500',
     marginLeft: isTablet ? scaleWidth(24) : scaleWidth(12),
-    flex: 1,
     fontFamily: 'Lato-Medium',
     includeFontPadding: false,
     lineHeight: isTablet

@@ -129,12 +129,13 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
     alignItems: 'center',
+    justifyContent: 'center', // Center content vertically
   },
 
   // Main Content Frame - All content inside with exact dimensions
   mainContentFrame: {
     width: isTablet
-      ? scaleWidth(500)
+      ? Math.min(screenWidth * 0.7, 600)
       : isFolding
       ? scaleWidth(420)
       : isLargeMobile
@@ -144,7 +145,7 @@ const styles = StyleSheet.create({
       : scaleWidth(374),
     alignItems: 'center',
     marginTop: isTablet
-      ? scaleHeight(180)
+      ? scaleHeight(24) // Much smaller margin for tablets
       : isFolding
       ? scaleHeight(150)
       : isLargeMobile
@@ -157,19 +158,19 @@ const styles = StyleSheet.create({
   // Top Calendar Icon
   topIconContainer: {
     width: isTablet
-      ? scaleWidth(100)
+      ? scaleWidth(120)
       : isFolding
       ? scaleWidth(80)
       : scaleWidth(69.9806900024414),
     height: isTablet
-      ? scaleHeight(110)
+      ? scaleHeight(130)
       : isFolding
       ? scaleHeight(90)
       : scaleHeight(72.00009155273438),
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: isTablet
-      ? scaleHeight(24)
+      ? scaleHeight(32)
       : isFolding
       ? scaleHeight(20)
       : scaleHeight(16),
@@ -178,7 +179,7 @@ const styles = StyleSheet.create({
   // Title Container
   titleContainer: {
     width: isTablet
-      ? scaleWidth(400)
+      ? Math.min(screenWidth * 0.6, 500)
       : isFolding
       ? scaleWidth(340)
       : isLargeMobile
@@ -189,7 +190,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: isTablet
-      ? scaleHeight(16)
+      ? scaleHeight(20)
       : isFolding
       ? scaleHeight(12)
       : scaleHeight(8),
@@ -222,7 +223,7 @@ const styles = StyleSheet.create({
   // Subtitle
   subtitle: {
     width: isTablet
-      ? scaleWidth(400)
+      ? Math.min(screenWidth * 0.6, 500)
       : isFolding
       ? scaleWidth(340)
       : isLargeMobile
@@ -266,30 +267,30 @@ const styles = StyleSheet.create({
   // Wallet Icon Container
   walletIconContainer: {
     width: isTablet
-      ? scaleWidth(180)
+      ? scaleWidth(200)
       : isFolding
       ? scaleWidth(150)
       : scaleWidth(134),
     alignItems: 'center',
     marginBottom: isTablet
-      ? scaleHeight(24)
+      ? scaleHeight(32)
       : isFolding
       ? scaleHeight(20)
       : scaleHeight(16),
   },
   walletIconWrapper: {
     width: isTablet
-      ? scaleWidth(180)
+      ? scaleWidth(200)
       : isFolding
       ? scaleWidth(150)
       : scaleWidth(134),
     height: isTablet
-      ? scaleWidth(180)
+      ? scaleWidth(200)
       : isFolding
       ? scaleWidth(150)
       : scaleWidth(134),
     borderRadius: isTablet
-      ? scaleWidth(90)
+      ? scaleWidth(100)
       : isFolding
       ? scaleWidth(75)
       : scaleWidth(67),
@@ -297,7 +298,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     padding: isTablet
-      ? scaleWidth(60)
+      ? scaleWidth(70)
       : isFolding
       ? scaleWidth(50)
       : scaleWidth(40),
@@ -305,7 +306,7 @@ const styles = StyleSheet.create({
   ncogText: {
     fontFamily: Fonts.latoBold,
     fontSize: isTablet
-      ? moderateScale(18)
+      ? moderateScale(22)
       : isFolding
       ? moderateScale(16)
       : isLargeMobile
@@ -315,7 +316,7 @@ const styles = StyleSheet.create({
       : moderateScale(14),
     color: Colors.black,
     marginTop: isTablet
-      ? scaleHeight(16)
+      ? scaleHeight(20)
       : isFolding
       ? scaleHeight(12)
       : scaleHeight(10),
@@ -324,7 +325,7 @@ const styles = StyleSheet.create({
   // Continue Text
   continueText: {
     width: isTablet
-      ? scaleWidth(400)
+      ? Math.min(screenWidth * 0.6, 500)
       : isFolding
       ? scaleWidth(340)
       : isLargeMobile
@@ -334,7 +335,7 @@ const styles = StyleSheet.create({
       : scaleWidth(326),
     fontFamily: Fonts.latoRegular,
     fontSize: isTablet
-      ? moderateScale(18)
+      ? moderateScale(20)
       : isFolding
       ? moderateScale(16)
       : isLargeMobile
@@ -343,7 +344,7 @@ const styles = StyleSheet.create({
       ? moderateScale(12)
       : moderateScale(14),
     lineHeight: isTablet
-      ? moderateScale(26)
+      ? moderateScale(28)
       : isFolding
       ? moderateScale(22)
       : isLargeMobile
@@ -355,7 +356,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     letterSpacing: 0,
     marginBottom: isTablet
-      ? scaleHeight(32)
+      ? scaleHeight(36)
       : isFolding
       ? scaleHeight(28)
       : isLargeMobile
