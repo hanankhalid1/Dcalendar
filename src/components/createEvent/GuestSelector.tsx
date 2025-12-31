@@ -11,14 +11,15 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
-import {
-  getLocalContacts,
-  addEmailsToLocalContacts,
-  Guest as LocalGuest,
-} from '../../utils/dcontactsUtils';
-import { getAllContacts, Guest as BackendGuest } from '../../utils/gueastUtils';
 import { useActiveAccount } from '../../stores/useActiveAccount';
 import { debugLogDcontacts } from '../../utils/debugDcontacts';
+import {
+  updateAndGetUnifiedContacts,
+  Guest,
+  extractNameFromEmail,
+  extractUsernameFromEmail,
+} from '../../utils/unifiedContacts';
+import { addEmailsToLocalContacts } from '../../utils/dcontactsUtils';
 import { Fonts } from '../../constants/Fonts';
 import { scaleHeight, scaleWidth } from '../../utils/dimensions';
 import {
@@ -59,7 +60,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   onSearchQueryChange,
   disabled = false,
 }) => {
-  const [guests, setGuests] = useState<(LocalGuest | BackendGuest)[]>([]);
+  const [guests, setGuests] = useState<any[]>([]);
   const [pendingSelection, setPendingSelection] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -72,34 +73,11 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
     setIsLoading(true);
     setError(null);
     try {
-      // Fetch both backend and local contacts
-      let backendGuests: BackendGuest[] = [];
-      try {
-        const backendResult = await getAllContacts(account?.userName);
-        if (backendResult.success && Array.isArray(backendResult.data)) {
-          backendGuests = backendResult.data;
-        }
-      } catch (e) {
-        // Ignore backend error, fallback to local only
-      }
-      let localGuests: LocalGuest[] = [];
-      try {
-        localGuests = await getLocalContacts();
-        console.log('[GuestSelector] DContacts fetched:', localGuests);
-      } catch (e) {
-        // Ignore local error
-      }
-      // Merge and deduplicate by email
-      const allGuests = [...backendGuests, ...localGuests];
-      const seen = new Set<string>();
-      const deduped = allGuests.filter(g => {
-        if (!g.email) return false;
-        const em = g.email.toLowerCase();
-        if (seen.has(em)) return false;
-        seen.add(em);
-        return true;
-      });
-      setGuests(deduped);
+      // Always use the persistent, merged, deduplicated, filtered contact store
+      const unifiedGuests = await updateAndGetUnifiedContacts(
+        account?.userName,
+      );
+      setGuests(unifiedGuests);
     } catch (err) {
       setError('Failed to load contacts');
       setGuests([]);
@@ -411,7 +389,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                             <Text style={styles.avatarInitialsText}>
                               {item.name
                                 .split(' ')
-                                .map(n => n[0])
+                                .map((n: string) => n[0])
                                 .join('')}
                             </Text>
                           </View>
@@ -489,8 +467,6 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                           color: '#252B37',
                           fontSize: 15,
                           overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
                         }}
                         numberOfLines={1}
                       >
