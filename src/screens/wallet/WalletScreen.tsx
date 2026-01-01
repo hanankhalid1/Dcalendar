@@ -121,6 +121,35 @@ const isLargeMobile = screenWidth > 400 && screenWidth < 600;
 const isFolding =
   screenWidth >= 380 && screenWidth <= 500 && screenHeight > 800;
 
+// Helper to cap font sizes for tablets
+const getTabletSafeFontSize = (mobileSize: number, tabletSize: number, maxSize: number) => {
+  if (isTablet) {
+    return Math.min(tabletSize, maxSize);
+  }
+  return mobileSize;
+};
+
+// Helper to cap dimensions for tablets
+const getTabletSafeDimension = (
+  mobileValue: number,
+  foldingValue: number,
+  largeMobileValue: number,
+  smallMobileValue: number,
+  tabletValue: number,
+  maxValue: number
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  } else if (isFolding) {
+    return foldingValue;
+  } else if (isLargeMobile) {
+    return largeMobileValue;
+  } else if (isSmallMobile) {
+    return smallMobileValue;
+  }
+  return mobileValue;
+};
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -157,29 +186,38 @@ const styles = StyleSheet.create({
 
   // Top Calendar Icon
   topIconContainer: {
-    width: isTablet
-      ? scaleWidth(120)
-      : isFolding
-      ? scaleWidth(80)
-      : scaleWidth(69.9806900024414),
-    height: isTablet
-      ? scaleHeight(130)
-      : isFolding
-      ? scaleHeight(90)
-      : scaleHeight(72.00009155273438),
+    width: getTabletSafeDimension(
+      scaleWidth(69.9806900024414),
+      scaleWidth(80),
+      scaleWidth(80),
+      scaleWidth(70),
+      scaleWidth(90),
+      100
+    ),
+    height: getTabletSafeDimension(
+      scaleHeight(72.00009155273438),
+      scaleHeight(90),
+      scaleHeight(85),
+      scaleHeight(70),
+      scaleHeight(100),
+      110
+    ),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: isTablet
-      ? scaleHeight(32)
-      : isFolding
-      ? scaleHeight(20)
-      : scaleHeight(16),
+    marginBottom: getTabletSafeDimension(
+      scaleHeight(16),
+      scaleHeight(20),
+      scaleHeight(20),
+      scaleHeight(16),
+      scaleHeight(24),
+      28
+    ),
   },
 
   // Title Container
   titleContainer: {
     width: isTablet
-      ? Math.min(screenWidth * 0.6, 500)
+      ? Math.min(screenWidth * 0.65, 450)
       : isFolding
       ? scaleWidth(340)
       : isLargeMobile
@@ -189,32 +227,27 @@ const styles = StyleSheet.create({
       : scaleWidth(326),
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: isTablet
-      ? scaleHeight(20)
-      : isFolding
-      ? scaleHeight(12)
-      : scaleHeight(8),
+    marginBottom: getTabletSafeDimension(
+      scaleHeight(8),
+      scaleHeight(12),
+      scaleHeight(12),
+      scaleHeight(8),
+      scaleHeight(16),
+      18
+    ),
   },
   title: {
     fontFamily: Fonts.latoExtraBold,
-    fontSize: isTablet
-      ? moderateScale(38)
-      : isFolding
-      ? moderateScale(32)
-      : isLargeMobile
-      ? moderateScale(28)
-      : isSmallMobile
-      ? moderateScale(22)
-      : moderateScale(30),
-    lineHeight: isTablet
-      ? moderateScale(46)
-      : isFolding
-      ? moderateScale(40)
-      : isLargeMobile
-      ? moderateScale(34)
-      : isSmallMobile
-      ? moderateScale(28)
-      : moderateScale(38),
+    fontSize: getTabletSafeFontSize(
+      moderateScale(30),
+      moderateScale(32),
+      32
+    ),
+    lineHeight: getTabletSafeFontSize(
+      moderateScale(38),
+      moderateScale(40),
+      40
+    ),
     color: Colors.black,
     textAlign: 'center',
     letterSpacing: 0,
@@ -223,7 +256,7 @@ const styles = StyleSheet.create({
   // Subtitle
   subtitle: {
     width: isTablet
-      ? Math.min(screenWidth * 0.6, 500)
+      ? Math.min(screenWidth * 0.65, 450)
       : isFolding
       ? scaleWidth(340)
       : isLargeMobile
@@ -232,100 +265,108 @@ const styles = StyleSheet.create({
       ? scaleWidth(220)
       : scaleWidth(326),
     fontFamily: Fonts.latoRegular,
-    fontSize: isTablet
-      ? moderateScale(18)
-      : isFolding
-      ? moderateScale(16)
-      : isLargeMobile
-      ? moderateScale(15)
-      : isSmallMobile
-      ? moderateScale(12)
-      : moderateScale(14),
-    lineHeight: isTablet
-      ? moderateScale(26)
-      : isFolding
-      ? moderateScale(22)
-      : isLargeMobile
-      ? moderateScale(20)
-      : isSmallMobile
-      ? moderateScale(16)
-      : moderateScale(20),
+    fontSize: getTabletSafeFontSize(
+      moderateScale(14),
+      moderateScale(16),
+      16
+    ),
+    lineHeight: getTabletSafeFontSize(
+      moderateScale(20),
+      moderateScale(24),
+      24
+    ),
     color: Colors.grey,
     textAlign: 'center',
     letterSpacing: 0,
-    marginBottom: isTablet
-      ? scaleHeight(32)
-      : isFolding
-      ? scaleHeight(28)
-      : isLargeMobile
-      ? scaleHeight(24)
-      : isSmallMobile
-      ? scaleHeight(16)
-      : scaleHeight(20),
+    marginBottom: getTabletSafeDimension(
+      scaleHeight(20),
+      scaleHeight(28),
+      scaleHeight(24),
+      scaleHeight(16),
+      scaleHeight(28),
+      32
+    ),
   },
 
   // Wallet Icon Container
   walletIconContainer: {
-    width: isTablet
-      ? scaleWidth(200)
-      : isFolding
-      ? scaleWidth(150)
-      : scaleWidth(134),
+    width: getTabletSafeDimension(
+      scaleWidth(134),
+      scaleWidth(150),
+      scaleWidth(140),
+      scaleWidth(120),
+      scaleWidth(160),
+      180
+    ),
     alignItems: 'center',
-    marginBottom: isTablet
-      ? scaleHeight(32)
-      : isFolding
-      ? scaleHeight(20)
-      : scaleHeight(16),
+    marginBottom: getTabletSafeDimension(
+      scaleHeight(16),
+      scaleHeight(20),
+      scaleHeight(20),
+      scaleHeight(16),
+      scaleHeight(24),
+      28
+    ),
   },
   walletIconWrapper: {
-    width: isTablet
-      ? scaleWidth(200)
-      : isFolding
-      ? scaleWidth(150)
-      : scaleWidth(134),
-    height: isTablet
-      ? scaleWidth(200)
-      : isFolding
-      ? scaleWidth(150)
-      : scaleWidth(134),
-    borderRadius: isTablet
-      ? scaleWidth(100)
-      : isFolding
-      ? scaleWidth(75)
-      : scaleWidth(67),
+    width: getTabletSafeDimension(
+      scaleWidth(134),
+      scaleWidth(150),
+      scaleWidth(140),
+      scaleWidth(120),
+      scaleWidth(160),
+      180
+    ),
+    height: getTabletSafeDimension(
+      scaleWidth(134),
+      scaleWidth(150),
+      scaleWidth(140),
+      scaleWidth(120),
+      scaleWidth(160),
+      180
+    ),
+    borderRadius: getTabletSafeDimension(
+      scaleWidth(67),
+      scaleWidth(75),
+      scaleWidth(70),
+      scaleWidth(60),
+      scaleWidth(80),
+      90
+    ),
     backgroundColor: '#F9FAFB',
     alignItems: 'center',
     justifyContent: 'center',
-    padding: isTablet
-      ? scaleWidth(70)
-      : isFolding
-      ? scaleWidth(50)
-      : scaleWidth(40),
+    padding: getTabletSafeDimension(
+      scaleWidth(40),
+      scaleWidth(50),
+      scaleWidth(45),
+      scaleWidth(35),
+      scaleWidth(55),
+      65
+    ),
   },
   ncogText: {
     fontFamily: Fonts.latoBold,
-    fontSize: isTablet
-      ? moderateScale(22)
-      : isFolding
-      ? moderateScale(16)
-      : isLargeMobile
-      ? moderateScale(15)
-      : isSmallMobile
-      ? moderateScale(12)
-      : moderateScale(14),
+    fontSize: getTabletSafeFontSize(
+      moderateScale(14),
+      moderateScale(16),
+      16
+    ),
     color: Colors.black,
-    marginTop: isTablet
-      ? scaleHeight(20)
-      : isFolding
-      ? scaleHeight(12)
-      : scaleHeight(10),
+    marginTop: getTabletSafeDimension(
+      scaleHeight(10),
+      scaleHeight(12),
+      scaleHeight(12),
+      scaleHeight(10),
+      scaleHeight(16),
+      18
+    ),
   },
 
   // Continue Text
   continueText: {
     width: isTablet
-      ? Math.min(screenWidth * 0.6, 500)
+      ? Math.min(screenWidth * 0.65, 450)
       : isFolding
       ? scaleWidth(340)
       : isLargeMobile
@@ -334,42 +375,33 @@ const styles = StyleSheet.create({
       ? scaleWidth(220)
       : scaleWidth(326),
     fontFamily: Fonts.latoRegular,
-    fontSize: isTablet
-      ? moderateScale(20)
-      : isFolding
-      ? moderateScale(16)
-      : isLargeMobile
-      ? moderateScale(15)
-      : isSmallMobile
-      ? moderateScale(12)
-      : moderateScale(14),
-    lineHeight: isTablet
-      ? moderateScale(28)
-      : isFolding
-      ? moderateScale(22)
-      : isLargeMobile
-      ? moderateScale(20)
-      : isSmallMobile
-      ? moderateScale(16)
-      : moderateScale(20),
+    fontSize: getTabletSafeFontSize(
+      moderateScale(14),
+      moderateScale(16),
+      16
+    ),
+    lineHeight: getTabletSafeFontSize(
+      moderateScale(20),
+      moderateScale(24),
+      24
+    ),
     color: Colors.black,
     textAlign: 'center',
     letterSpacing: 0,
-    marginBottom: isTablet
-      ? scaleHeight(36)
-      : isFolding
-      ? scaleHeight(28)
-      : isLargeMobile
-      ? scaleHeight(24)
-      : isSmallMobile
-      ? scaleHeight(16)
-      : scaleHeight(20),
+    marginBottom: getTabletSafeDimension(
+      scaleHeight(20),
+      scaleHeight(28),
+      scaleHeight(24),
+      scaleHeight(16),
+      scaleHeight(32),
+      36
+    ),
   },
 
   // Button
   connectButton: {
     width: isTablet
-      ? scaleWidth(400)
+      ? Math.min(scaleWidth(400), 350)
       : isFolding
       ? scaleWidth(340)
       : isLargeMobile
@@ -377,39 +409,36 @@ const styles = StyleSheet.create({
       : isSmallMobile
       ? scaleWidth(220)
       : scaleWidth(300),
-    minHeight: isTablet
-      ? scaleHeight(60)
-      : isFolding
-      ? scaleHeight(50)
-      : isLargeMobile
-      ? scaleHeight(44)
-      : isSmallMobile
-      ? scaleHeight(36)
-      : scaleHeight(44),
+    minHeight: getTabletSafeDimension(
+      scaleHeight(44),
+      scaleHeight(50),
+      scaleHeight(44),
+      scaleHeight(36),
+      scaleHeight(52),
+      56
+    ),
     backgroundColor: '#00AEEF',
-    borderRadius: isTablet
-      ? moderateScale(14)
-      : isFolding
-      ? moderateScale(12)
-      : moderateScale(8),
-    paddingVertical: isTablet
-      ? scaleHeight(18)
-      : isFolding
-      ? scaleHeight(14)
-      : isLargeMobile
-      ? scaleHeight(12)
-      : isSmallMobile
-      ? scaleHeight(8)
-      : scaleHeight(10),
-    paddingHorizontal: isTablet
-      ? scaleWidth(32)
-      : isFolding
-      ? scaleWidth(24)
-      : isLargeMobile
-      ? scaleWidth(20)
-      : isSmallMobile
-      ? scaleWidth(10)
-      : scaleWidth(16),
+    borderRadius: getTabletSafeFontSize(
+      moderateScale(8),
+      moderateScale(10),
+      12
+    ),
+    paddingVertical: getTabletSafeDimension(
+      scaleHeight(10),
+      scaleHeight(14),
+      scaleHeight(12),
+      scaleHeight(8),
+      scaleHeight(14),
+      16
+    ),
+    paddingHorizontal: getTabletSafeDimension(
+      scaleWidth(16),
+      scaleWidth(24),
+      scaleWidth(20),
+      scaleWidth(10),
+      scaleWidth(24),
+      28
+    ),
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
