@@ -1,0 +1,4 @@
+<resources>
+    <string name="app_name">DCalendar</string>
+        <color name="ic_launcher_background">#FFFFFF</color>
+</resources>
