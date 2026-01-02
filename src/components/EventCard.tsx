@@ -41,6 +41,17 @@ import TaskIcon from '../assets/svgs/taskIcon.svg';
 import { Fonts } from '../constants/Fonts';
 import { parseCustomRecurrence } from '../utils/recurrence';
 
+// Tablet detection
+const isTablet = screenWidth >= 600;
+
+// Helper function for tablet-safe dimensions
+const getTabletSafeDimension = (mobileValue: number, tabletValue: number, maxValue: number) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
+
 interface EventTag {
   id: string;
   label: string;
@@ -736,10 +747,10 @@ const styles = StyleSheet.create({
   // Original standalone styles
   container: {
     backgroundColor: colors.white,
-    borderRadius: borderRadius.lg,
-    padding: spacing.md,
-    marginVertical: spacing.xs,
-    marginLeft: spacing.md,
+    borderRadius: getTabletSafeDimension(borderRadius.lg, 14, 16),
+    padding: getTabletSafeDimension(spacing.md, 16, 20),
+    marginVertical: getTabletSafeDimension(spacing.xs, 8, 12),
+    marginLeft: getTabletSafeDimension(spacing.md, 16, 20),
     borderLeftWidth: 4,
     ...shadows.sm,
   },
@@ -747,7 +758,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: getTabletSafeDimension(spacing.xs, 8, 12),
   },
   titleContainer: {
     flexDirection: 'row',
@@ -755,61 +766,61 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   colorIndicator: {
-    width: moderateScale(12),
-    height: moderateScale(12),
-    borderRadius: moderateScale(6),
-    marginRight: spacing.sm,
+    width: moderateScale(getTabletSafeDimension(12, 14, 16)),
+    height: moderateScale(getTabletSafeDimension(12, 14, 16)),
+    borderRadius: moderateScale(getTabletSafeDimension(6, 7, 8)),
+    marginRight: getTabletSafeDimension(spacing.sm, 12, 14),
   },
   title: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 18, 20),
     fontWeight: 'bold',
     color: colors.textPrimary,
     flex: 1,
   },
 
   timeDate: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     color: colors.textSecondary,
-    marginBottom: spacing.sm,
+    marginBottom: getTabletSafeDimension(spacing.sm, 12, 14),
   },
   expandedContent: {
     borderTopWidth: 1,
     borderTopColor: colors.grey20,
-    paddingTop: spacing.md,
+    paddingTop: getTabletSafeDimension(spacing.md, 16, 20),
   },
   tagsContainer: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: spacing.md,
+    marginBottom: getTabletSafeDimension(spacing.md, 16, 20),
   },
   tag: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingTop: 4,
-    paddingRight: 6,
-    paddingBottom: 4,
-    paddingLeft: 6,
-    borderRadius: 8,
-    marginRight: spacing.xs,
-    marginBottom: spacing.xs,
-    gap: 6,
+    paddingTop: getTabletSafeDimension(4, 6, 8),
+    paddingRight: getTabletSafeDimension(6, 8, 10),
+    paddingBottom: getTabletSafeDimension(4, 6, 8),
+    paddingLeft: getTabletSafeDimension(6, 8, 10),
+    borderRadius: getTabletSafeDimension(8, 10, 12),
+    marginRight: getTabletSafeDimension(spacing.xs, 8, 10),
+    marginBottom: getTabletSafeDimension(spacing.xs, 8, 10),
+    gap: getTabletSafeDimension(6, 8, 10),
   },
 
   tagLabel: {
-    fontSize: fontSize.textSize12,
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 14, 16),
     fontWeight: '500',
   },
   actionIcons: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: getTabletSafeDimension(spacing.md, 16, 20),
   },
   actionIcon: {
-    width: moderateScale(32),
-    height: moderateScale(32),
+    width: moderateScale(getTabletSafeDimension(32, 40, 44)),
+    height: moderateScale(getTabletSafeDimension(32, 40, 44)),
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: borderRadius.md,
+    borderRadius: getTabletSafeDimension(borderRadius.md, 8, 10),
   },
 
   inviteButton: {
@@ -817,17 +828,17 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-    width: 170,
-    height: 40,
-    borderRadius: 80, // 80px radius for pill shape
+    width: getTabletSafeDimension(170, 200, 220),
+    height: getTabletSafeDimension(40, 48, 52),
+    borderRadius: getTabletSafeDimension(80, 100, 120),
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.2)', // 20% opacity black border
-    gap: spacing.xs,
+    gap: getTabletSafeDimension(spacing.xs, 8, 10),
     alignSelf: 'center',
   },
 
   inviteButtonText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     color: colors.textPrimary,
     fontWeight: '500',
   },
@@ -835,19 +846,19 @@ const styles = StyleSheet.create({
   // Compact styles for single-border layout - matching DeletedEventsScreen design
   compactContainer: {
     backgroundColor: '#fff',
-    borderRadius: moderateScale(12),
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(12),
+    borderRadius: moderateScale(getTabletSafeDimension(12, 14, 16)),
+    paddingVertical: scaleHeight(getTabletSafeDimension(10, 12, 14)),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(12, 16, 20)),
     borderLeftWidth: 4,
     borderLeftColor: '#00AEEF',
     ...shadows.sm,
-    marginBottom: scaleHeight(12),
+    marginBottom: scaleHeight(getTabletSafeDimension(12, 14, 16)),
   },
   // Expanded container style for when event is expanded
   compactContainerExpanded: {
     paddingVertical: screenWidth < 375 ? scaleHeight(4) : scaleHeight(6), // Same as collapsed
-    paddingHorizontal: screenWidth < 375 ? spacing.xs : spacing.sm, // Same as collapsed
-    borderRadius: borderRadius.lg,
+    paddingHorizontal: screenWidth < 375 ? spacing.xs : getTabletSafeDimension(spacing.sm, 12, 14), // Scaled on tablets
+    borderRadius: getTabletSafeDimension(borderRadius.lg, 14, 16),
     overflow: 'visible', // Allow content to be visible
     alignSelf: 'stretch', // Stretch to full width when expanded
     width: '100%', // Take full width when expanded
@@ -859,20 +870,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginHorizontal: scaleWidth(4), // Reduced margin
-    minHeight: scaleHeight(28), // Reduced height
+    marginHorizontal: scaleWidth(getTabletSafeDimension(4, 6, 8)), // Scaled on tablets
+    minHeight: scaleHeight(getTabletSafeDimension(28, 32, 36)), // Increased on tablets
   },
   compactHeader2: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    minHeight: scaleHeight(28), // Reduced height
+    minHeight: scaleHeight(getTabletSafeDimension(28, 32, 36)), // Increased on tablets
   },
   compactTitleContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
-    marginRight: spacing.xs, // Reduced margin to give more space to title
+    marginRight: getTabletSafeDimension(spacing.xs, 8, 10), // Scaled
     minWidth: 0, // Allow flex shrinking
   },
   compactTitleRow: {
@@ -881,7 +892,7 @@ const styles = StyleSheet.create({
     flex: 1,
     flexWrap: 'wrap', // Allow wrapping to next line
     minWidth: 0, // Allow flex shrinking
-    gap: spacing.xs, // Add gap between title and edit button
+    gap: getTabletSafeDimension(spacing.xs, 8, 10), // Scaled
   },
   compactTimeTitleRow: {
     flexDirection: 'row',
@@ -896,54 +907,54 @@ const styles = StyleSheet.create({
     minWidth: 0, // Allow flex shrinking
   },
   chevronContainer: {
-    width: screenWidth < 375 ? scaleWidth(14) : scaleWidth(16), // Even smaller to give more space to title
-    height: screenWidth < 375 ? scaleHeight(14) : scaleHeight(16), // Even smaller to give more space to title
+    width: screenWidth < 375 ? scaleWidth(14) : getTabletSafeDimension(scaleWidth(16), 18, 20), // Scaled on tablets
+    height: screenWidth < 375 ? scaleHeight(14) : getTabletSafeDimension(scaleHeight(16), 18, 20), // Scaled on tablets
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0, // Prevent chevron from shrinking
-    marginLeft: spacing.xs, // Small margin to separate from title
+    marginLeft: getTabletSafeDimension(spacing.xs, 8, 10), // Scaled
   },
   compactColorIndicator: {
-    width: moderateScale(16), // Slightly smaller
-    height: moderateScale(16), // Slightly smaller
-    borderRadius: moderateScale(4), // Adjusted border radius
-    marginRight: spacing.md, // Reduced margin
+    width: moderateScale(getTabletSafeDimension(16, 18, 20)), // Scaled
+    height: moderateScale(getTabletSafeDimension(16, 18, 20)), // Scaled
+    borderRadius: moderateScale(getTabletSafeDimension(4, 5, 6)), // Scaled
+    marginRight: getTabletSafeDimension(spacing.md, 12, 14), // Scaled
   },
   compactTime: {
-    fontSize: screenWidth < 375 ? fontSize.textSize12 : fontSize.textSize14, // Smaller font on small screens
+    fontSize: screenWidth < 375 ? fontSize.textSize12 : getTabletSafeDimension(fontSize.textSize14, 8, 18), // Scaled
     color: colors.textSecondary,
-    marginBottom: spacing.xs, // Margin below time for column layout
+    marginBottom: getTabletSafeDimension(spacing.xs, 8, 10), // Scaled
     flexShrink: 0, // Prevent time from shrinking
   },
   compactTitle: {
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(getTabletSafeDimension(14, 8, 18)),
     fontWeight: '600',
     color: '#000',
-    marginBottom: scaleHeight(6),
+    marginBottom: scaleHeight(getTabletSafeDimension(6, 4, 10)),
     fontFamily: Fonts.latoBold,
     flexWrap: 'wrap',
-    lineHeight: moderateScale(18),
+    lineHeight: moderateScale(getTabletSafeDimension(18, 14, 22)),
   },
   compactEditButton: {
-    padding: spacing.xs,
+    padding: getTabletSafeDimension(spacing.xs, 6, 8),
     flexShrink: 0, // Prevent button from shrinking
-    marginLeft: spacing.xs,
+    marginLeft: getTabletSafeDimension(spacing.xs, 8, 10),
   },
   compactTitleExpanded: {
-    fontSize: fontSize.textSize20,
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 22, 24),
     fontWeight: 'bold',
     color: colors.textPrimary,
     flexShrink: 1,
   },
   compactTimeDate: {
-    fontSize: fontSize.textSize18,
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 16, 22),
     color: colors.black,
     fontWeight: '400',
-    marginBottom: moderateScale(10),
+    marginBottom: moderateScale(getTabletSafeDimension(10, 8, 14)),
     alignItems: 'center',
     justifyContent: 'center',
-    marginTop: spacing.xs,
-    paddingHorizontal: scaleWidth(10),
+    marginTop: getTabletSafeDimension(spacing.xs, 6, 10),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(10, 8, 14)),
   },
 
   compactTagsContainer: {
@@ -954,31 +965,31 @@ const styles = StyleSheet.create({
   compactTag: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: moderateScale(4), // Use consistent vertical padding
-    paddingHorizontal: moderateScale(8), // Use consistent horizontal padding
-    borderRadius: moderateScale(16), // A common, rounded style
-    marginRight: moderateScale(8), // Space between tags
-    gap: moderateScale(4), // Space between the icon and the text
+    paddingVertical: moderateScale(getTabletSafeDimension(4, 6, 8)), // Scaled
+    paddingHorizontal: moderateScale(getTabletSafeDimension(8, 10, 12)), // Scaled
+    borderRadius: moderateScale(getTabletSafeDimension(16, 18, 20)), // Scaled
+    marginRight: moderateScale(getTabletSafeDimension(8, 10, 12)), // Scaled
+    gap: moderateScale(getTabletSafeDimension(4, 6, 8)), // Scaled
     backgroundColor: '#0000001A',
-    height: moderateScale(28),
+    height: moderateScale(getTabletSafeDimension(28, 32, 36)), // Scaled
   },
   compactTagLabel: {
-    fontSize: fontSize.textSize12,
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 7, 16),
     fontWeight: '500',
     color: '#000000', // Set a default text color for consistency
   },
   compactActionIcons: {
     flexDirection: 'row',
     justifyContent: 'center',
-    paddingHorizontal: spacing.sm,
-    marginTop: spacing.sm,
+    paddingHorizontal: getTabletSafeDimension(spacing.sm, 14, 16),
+    marginTop: getTabletSafeDimension(spacing.sm, 12, 14),
   },
   compactActionIcon: {
-    width: moderateScale(32),
-    height: moderateScale(32),
+    width: moderateScale(getTabletSafeDimension(32, 40, 44)),
+    height: moderateScale(getTabletSafeDimension(32, 40, 44)),
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: borderRadius.md,
+    borderRadius: getTabletSafeDimension(borderRadius.md, 8, 10),
   },
 
   compactInviteButton: {
@@ -986,29 +997,29 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     backgroundColor: 'transparent',
-    width: scaleWidth(170),
-    height: scaleHeight(40),
-    borderRadius: borderRadius.xxl,
+    width: scaleWidth(getTabletSafeDimension(170, 200, 220)),
+    height: scaleHeight(getTabletSafeDimension(40, 48, 52)),
+    borderRadius: getTabletSafeDimension(borderRadius.xxl, 100, 120),
     borderWidth: 1,
     borderColor: 'rgba(0, 0, 0, 0.2)', // 20% opacity black border
-    gap: spacing.xs,
+    gap: getTabletSafeDimension(spacing.xs, 8, 10),
     alignSelf: 'center', // Center the button horizontally
-    marginTop: spacing.sm, // Positive margin instead of negative
-    marginBottom: spacing.sm, // Add bottom margin to prevent cutoff
+    marginTop: getTabletSafeDimension(spacing.sm, 12, 14), // Scaled
+    marginBottom: getTabletSafeDimension(spacing.sm, 12, 14), // Add bottom margin to prevent cutoff
   },
 
   compactInviteButtonText: {
-    fontSize: fontSize.textSize18,
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 20, 22),
     color: colors.black,
     fontWeight: '400',
   },
   expandedScrollView: {
-    maxHeight: scaleHeight(250), // Limit height to prevent cutoff
+    maxHeight: scaleHeight(getTabletSafeDimension(250, 300, 350)), // Increased on tablets
     flexGrow: 0, // Don't grow beyond content
     width: '100%', // Ensure full width
   },
   expandedContentContainer: {
-    paddingBottom: spacing.sm, // Add bottom padding for better spacing
+    paddingBottom: getTabletSafeDimension(spacing.sm, 12, 14), // Scaled
     width: '100%', // Ensure full width
   },
   // New styles for card design matching DeletedEventsScreen
@@ -1018,22 +1029,22 @@ const styles = StyleSheet.create({
   compactBadgesRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scaleWidth(6),
-    marginTop: scaleHeight(6),
+    gap: scaleWidth(getTabletSafeDimension(6, 8, 10)), // Scaled
+    marginTop: scaleHeight(getTabletSafeDimension(6, 8, 10)), // Scaled
   },
   compactBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scaleWidth(6),
-    paddingVertical: scaleHeight(3),
-    borderRadius: moderateScale(12),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(6, 8, 10)), // Scaled
+    paddingVertical: scaleHeight(getTabletSafeDimension(3, 4, 5)), // Scaled
+    borderRadius: moderateScale(getTabletSafeDimension(12, 14, 16)), // Scaled
     backgroundColor: 'transparent',
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
-    gap: scaleWidth(3),
+    gap: scaleWidth(getTabletSafeDimension(3, 4, 5)), // Scaled
   },
   compactBadgeText: {
-    fontSize: moderateScale(10),
+    fontSize: moderateScale(getTabletSafeDimension(10, 8, 14)),
     fontWeight: '500',
     color: '#717680',
     fontFamily: Fonts.latoBold,
@@ -1041,12 +1052,12 @@ const styles = StyleSheet.create({
   compactGuestsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: scaleHeight(6),
+    marginTop: scaleHeight(getTabletSafeDimension(6, 8, 10)), // Scaled
   },
   compactGuestAvatar: {
-    width: moderateScale(30),
-    height: moderateScale(30),
-    borderRadius: moderateScale(15),
+    width: moderateScale(getTabletSafeDimension(30, 36, 40)), // Scaled
+    height: moderateScale(getTabletSafeDimension(30, 36, 40)), // Scaled
+    borderRadius: moderateScale(getTabletSafeDimension(15, 18, 20)), // Scaled
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',
@@ -1065,7 +1076,7 @@ const styles = StyleSheet.create({
   compactGuestInitials: {
     color: colors.white,
     fontWeight: '600',
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(getTabletSafeDimension(12, 10, 16)), // Scaled
     fontFamily: Fonts.latoBold,
   },
   compactGuestRemaining: {
@@ -1076,29 +1087,29 @@ const styles = StyleSheet.create({
   compactGuestRemainingText: {
     color: colors.white,
     fontWeight: '600',
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(getTabletSafeDimension(12, 10, 16)), // Scaled
     fontFamily: Fonts.latoBold,
   },
   compactProgressContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: scaleHeight(8),
-    gap: scaleWidth(8),
+    marginTop: scaleHeight(getTabletSafeDimension(8, 10, 12)), // Scaled
+    gap: scaleWidth(getTabletSafeDimension(8, 10, 12)), // Scaled
   },
   compactProgressBar: {
     flex: 1,
-    height: scaleHeight(8),
+    height: scaleHeight(getTabletSafeDimension(8, 10, 12)), // Scaled
     backgroundColor: '#E0E0E0',
-    borderRadius: moderateScale(4),
+    borderRadius: moderateScale(getTabletSafeDimension(4, 5, 6)), // Scaled
     overflow: 'hidden',
   },
   compactProgressFill: {
     height: '100%',
     backgroundColor: '#00AEEF',
-    borderRadius: moderateScale(4),
+    borderRadius: moderateScale(getTabletSafeDimension(4, 5, 6)), // Scaled
   },
   compactProgressText: {
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(getTabletSafeDimension(12, 10, 16)),
     fontWeight: '500',
     color: '#717680',
     fontFamily: Fonts.latoMedium,

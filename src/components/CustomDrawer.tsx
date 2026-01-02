@@ -21,6 +21,7 @@ import {
   scaleHeight,
   scaleWidth,
   screenHeight,
+  screenWidth,
 } from '../utils/dimensions';
 import {
   colors,
@@ -31,6 +32,21 @@ import {
 } from '../utils/LightTheme';
 import { Fonts } from '../constants/Fonts';
 import { useActiveAccount } from '../stores/useActiveAccount';
+
+// Tablet detection
+const isTablet = screenWidth >= 600;
+
+// Helper function for tablet-safe dimensions
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+): number => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { BlockchainService } from '../services/BlockChainService';
 import Config from '../config';
@@ -71,7 +87,9 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
   onClose,
   onLogout,
 }) => {
-  const slideAnim = useRef(new Animated.Value(-scaleWidth(280))).current;
+  const slideAnim = useRef(
+    new Animated.Value(-scaleWidth(getTabletSafeDimension(273, 180, 200))),
+  ).current;
   const backdropOpacity = useRef(new Animated.Value(0)).current;
   const navigation = useNavigation<any>();
 
@@ -353,7 +371,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
       // Animate drawer slide out and backdrop fade out
       Animated.parallel([
         Animated.timing(slideAnim, {
-          toValue: -scaleWidth(280),
+          toValue: -scaleWidth(getTabletSafeDimension(273, 180, 200)),
           duration: 300,
           easing: Easing.in(Easing.cubic),
           useNativeDriver: true,
@@ -466,7 +484,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
           <View style={styles.topSection}>
             <View style={styles.headerRow}>
               <View style={styles.logoContainer}>
-                <DIcon width={scaleWidth(24)} height={scaleHeight(24)} />
+                <DIcon width={scaleWidth(isTablet ? 26 : 24)} height={scaleHeight(isTablet ? 26 : 24)} />
                 <Text style={styles.logoText}>DCalendar</Text>
               </View>
               <TouchableOpacity
@@ -474,7 +492,7 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                 onPress={onClose}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
-                <CrossIcon width={12} height={12} />
+                <CrossIcon width={isTablet ? 14 : 12} height={isTablet ? 14 : 12} />
               </TouchableOpacity>
             </View>
           </View>
@@ -859,9 +877,16 @@ const CustomDrawer: React.FC<CustomDrawerProps> = ({
                   (createBtnWindowLayout?.y || 0) +
                   (createBtnWindowLayout?.height || 0) +
                   scaleHeight(8),
-                left: spacing.md,
+                left: isTablet
+                  ? scaleWidth(getTabletSafeDimension(12, 10, 12))
+                  : spacing.md,
                 right: undefined,
-                width: scaleWidth(273) - spacing.md * 2,
+                width: scaleWidth(
+                  getTabletSafeDimension(273, 180, 200),
+                ) -
+                  (isTablet
+                    ? scaleWidth(getTabletSafeDimension(12, 10, 12)) * 2
+                    : spacing.md * 2),
               },
             ]}
             pointerEvents="auto"
@@ -928,7 +953,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
   },
   drawer: {
-    width: scaleWidth(273), // Responsive width
+    width: scaleWidth(getTabletSafeDimension(273, 180, 200)), // Further narrowed on tablets
     height: screenHeight, // Responsive height
     backgroundColor: '#F5F5F5', // Light gray background
     ...shadows.lg,
@@ -956,16 +981,16 @@ const styles = StyleSheet.create({
     paddingBottom: scaleHeight(100), // Add more space at bottom of scroll content
   },
   topSection: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: isTablet ? 0 : spacing.md,
     paddingTop: scaleHeight(20),
-    paddingBottom: spacing.md,
+    paddingBottom: isTablet ? spacing.xs : spacing.md,
     position: 'relative',
     backgroundColor: '#F5F5F5', // Gray background like drawer
     // Removed borderBottomWidth and borderBottomColor
   },
   createButtonSection: {
-    paddingHorizontal: spacing.md,
-    paddingBottom: spacing.md,
+    paddingHorizontal: isTablet ? spacing.sm : spacing.md,
+    paddingBottom: isTablet ? spacing.xs : spacing.md,
   },
   createButton: {
     borderRadius: 8,
@@ -976,18 +1001,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     width: '100%',
+    paddingHorizontal: 0, // topSection already provides horizontal padding
   },
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scaleWidth(8),
+    gap: scaleWidth(isTablet ? 2 : 8),
   },
   logoText: {
-    fontSize: 16, // 16px
+    fontSize: getTabletSafeDimension(16, 18, 20), // Slightly larger on tablets
     color: '#000000', // Black
     fontWeight: '800', // ExtraBold
     fontFamily: Fonts.latoExtraBold,
-    lineHeight: 16, // 100% of font size
+    lineHeight: isTablet ? 24 : 16, // Match icon height for alignment
     letterSpacing: 0, // 0%
   },
   closeButton: {
@@ -995,9 +1021,10 @@ const styles = StyleSheet.create({
     height: scaleHeight(32),
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: isTablet ? spacing.xs : 0,
   },
   createButtonText: {
-    fontSize: moderateScale(16),
+    fontSize: getTabletSafeDimension(14, 16, 18),
     color: Colors.white,
     fontFamily: Fonts.latoMedium,
     fontWeight: '500',
@@ -1006,8 +1033,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: 14,
-    paddingHorizontal: 24,
+    paddingVertical: isTablet ? spacing.sm : spacing.md,
+    paddingHorizontal: isTablet ? spacing.sm : spacing.md,
     borderRadius: 8,
     gap: 8,
   },
@@ -1015,10 +1042,10 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   createButtonLabel: {
-    fontSize: 17,
+    fontSize: getTabletSafeDimension(17, 19, 21),
     color: colors.white,
     fontFamily: Fonts.semiBold,
-    marginLeft: 12,
+    marginLeft: getTabletSafeDimension(12, 14, 16),
   },
   createMenuContainer: {
     position: 'absolute',
@@ -1032,8 +1059,8 @@ const styles = StyleSheet.create({
   createMenuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
+    paddingVertical: isTablet ? spacing.xs : spacing.sm,
+    paddingHorizontal: isTablet ? spacing.xs : spacing.md,
     borderBottomWidth: 1,
     borderBottomColor: colors.drawerBorder,
   },
@@ -1043,35 +1070,35 @@ const styles = StyleSheet.create({
   },
   createMenuText: {
     color: '#111827',
-    fontSize: fontSize.textSize15,
+    fontSize: getTabletSafeDimension(15, 17, 19),
     fontWeight: '600',
   },
   createMenuTextOnly: {
     color: '#111827',
-    fontSize: moderateScale(14),
+    fontSize: getTabletSafeDimension(14, 14, 16),
     fontFamily: Fonts.latoMedium,
     fontWeight: '500',
-    marginLeft: spacing.lg,
+    marginLeft: isTablet ? spacing.sm : spacing.lg,
   },
   section: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    gap: scaleHeight(8), // Consistent gap between navigation items
+    paddingHorizontal: isTablet ? spacing.sm : spacing.md,
+    paddingVertical: isTablet ? spacing.xs : spacing.sm,
+    gap: scaleHeight(isTablet ? 8 : 8), // Larger gap on tablets
   },
   navItemContainer: {
     backgroundColor: colors.white,
     borderRadius: 8, // Rounded corners
-    marginBottom: scaleHeight(8), // Consistent margin bottom
+    marginBottom: scaleHeight(isTablet ? 8 : 8), // Same margin on tablets
     overflow: 'hidden',
   },
   sectionTitle: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(16, 18, 20),
     color: colors.white,
     fontWeight: '600',
-    marginBottom: spacing.md,
+    marginBottom: isTablet ? spacing.sm : spacing.md,
   },
   sectionHeaderText: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(16, 18, 20),
     color: colors.white,
     fontWeight: '600',
     marginLeft: spacing.sm,
@@ -1079,8 +1106,8 @@ const styles = StyleSheet.create({
   navItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingVertical: isTablet ? spacing.sm : spacing.md,
+    paddingHorizontal: isTablet ? spacing.sm : spacing.md,
     gap: scaleWidth(12),
     backgroundColor: colors.white,
   },
@@ -1088,18 +1115,18 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white, // Keep white background
   },
   navText: {
-    fontSize: 14, // 14px
+    fontSize: getTabletSafeDimension(14, 16, 18), // Larger on tablets
     color: '#414651', // Default black color
     fontWeight: '400', // Regular
     fontFamily: Fonts.latoRegular,
-    lineHeight: 18, // Increased from 14 to prevent text cutoff
+    lineHeight: getTabletSafeDimension(18, 22, 24), // Increased line height for tablet
     letterSpacing: 0, // 0%
   },
   navTextActive: {
     color: colors.primaryBlue, // Blue when selected
     fontWeight: '400', // Keep Regular
     fontFamily: Fonts.latoRegular,
-    lineHeight: 18, // Increased from 14 to prevent text cutoff
+    lineHeight: getTabletSafeDimension(18, 22, 24), // Increased line height for tablet
     letterSpacing: 0,
   },
   profileSection: {
@@ -1113,9 +1140,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   avatarContainer: {
-    width: scaleWidth(32),
-    height: scaleWidth(32),
-    borderRadius: scaleWidth(16),
+    width: scaleWidth(getTabletSafeDimension(32, 40, 48)),
+    height: scaleWidth(getTabletSafeDimension(32, 40, 48)),
+    borderRadius: scaleWidth(getTabletSafeDimension(16, 20, 24)),
     backgroundColor: colors.grey200,
     alignItems: 'center',
     justifyContent: 'center',
@@ -1123,17 +1150,17 @@ const styles = StyleSheet.create({
   avatarText: {
     color: colors.blackText,
     fontWeight: '700',
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(14, 16, 18),
     fontFamily: Fonts.latoBold,
   },
   profileName: {
-    fontSize: fontSize.textSize18,
+    fontSize: getTabletSafeDimension(18, 20, 24),
     color: colors.blackText,
     fontWeight: '600',
     fontFamily: Fonts.latoBold,
   },
   profileUsername: {
-    fontSize: fontSize.textSize12,
+    fontSize: getTabletSafeDimension(12, 14, 16),
     color: colors.mediumlightgray,
     fontWeight: '500',
     fontFamily: Fonts.latoRegular,
@@ -1190,7 +1217,7 @@ const styles = StyleSheet.create({
     width: scaleWidth(20),
   },
   calendarText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(14, 16, 18),
     color: colors.white,
     fontWeight: '500',
     marginLeft: spacing.sm,
@@ -1220,29 +1247,29 @@ const styles = StyleSheet.create({
     alignItems: 'center', // Vertical alignment
     justifyContent: 'center', // Start content from the left
 
-    minHeight: scaleHeight(50), // Re-apply the desired min height
-    paddingVertical: 10, // A balanced vertical padding for flexibility (or use 15/13 if you know the exact numbers)
+    minHeight: scaleHeight(getTabletSafeDimension(50, 52, 56)), // Slightly larger on tablets
+    paddingVertical: getTabletSafeDimension(10, 11, 12), // Slightly larger padding on tablets
 
     // --- Horizontal Space Correction (from prior specs) ---
 
-    paddingRight: 20,
+    paddingRight: getTabletSafeDimension(20, 22, 24),
   },
   plusIcon: {
-    fontSize: 24, // Size of the plus icon
+    fontSize: getTabletSafeDimension(24, 26, 30), // Larger on tablets
     color: Colors.white,
-    marginRight: 12, // Gap: 12px
+    marginRight: getTabletSafeDimension(12, 14, 16), // Gap: 12px
     // Center the icon vertically relative to the text
-    lineHeight: 24,
+    lineHeight: getTabletSafeDimension(24, 26, 30),
     fontWeight: 'bold',
   },
   buttonText: {
     // style={styles.createButtonText} from your original TouchableOpacity reference
     color: Colors.white,
-    fontSize: 18, // Estimated based on appearance/context
+    fontSize: getTabletSafeDimension(18, 16, 18), // Smaller on tablets
     fontFamily: Fonts.bold, // Use your custom font
     fontWeight: '600', // Matches the semi-bold look
     // Ensure text isn't clipped from custom font
-    lineHeight: 24,
+    lineHeight: getTabletSafeDimension(24, 22, 24),
   },
 });
 

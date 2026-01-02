@@ -46,6 +46,19 @@ import { Fonts } from '../constants/Fonts';
 import { convertToSelectedTimezone } from '../utils/timezone';
 import Icon from 'react-native-vector-icons/AntDesign';
 
+const screenWidth = Dimensions.get('window').width;
+const isTablet = screenWidth >= 600;
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
+
 const WeekScreen = () => {
   const navigation = useNavigation();
   const { currentMonth, setCurrentMonthByIndex } = useCalendarStore();
@@ -1998,17 +2011,17 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   weekTitleText: {
-    fontSize: 16,
+    fontSize: getTabletSafeDimension(16, 14, 18),
     fontFamily: Fonts.latoBold,
     color: '#181D27',
   },
   weekNavigationButtons: {
     flexDirection: 'row',
-    gap: spacing.xs,
+    gap: getTabletSafeDimension(spacing.xs, 6, 10),
   },
   iconNavButton: {
-    width: 32,
-    height: 32,
+    width: getTabletSafeDimension(32, 28, 36),
+    height: getTabletSafeDimension(32, 28, 36),
     justifyContent: 'center',
     alignItems: 'center',
     borderRadius: 4,
@@ -2024,16 +2037,16 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   thisWeekText: {
-    fontSize: 16,
+    fontSize: getTabletSafeDimension(16, 14, 18),
     fontFamily: Fonts.latoBold,
     color: '#181D27',
   },
   calendarWrapper: {
-    borderRadius: 12,
+    borderRadius: getTabletSafeDimension(12, 10, 14),
     overflow: 'hidden',
     backgroundColor: '#ffffff',
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
+    paddingVertical: getTabletSafeDimension(spacing.md, 10, 16),
+    paddingHorizontal: getTabletSafeDimension(spacing.md, 10, 16),
   },
   weekSliderContent: {
     paddingHorizontal: 0,
@@ -2056,15 +2069,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   weekDayName: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 10, 14),
     fontFamily: Fonts.latoRegular,
     color: '#b6c1cd',
-    marginBottom: spacing.xs,
+    marginBottom: getTabletSafeDimension(spacing.xs, 4, 8),
   },
   weekDayNumber: {
-    width: 36,
-    height: 36,
-    borderRadius: 8,
+    width: getTabletSafeDimension(36, 32, 40),
+    height: getTabletSafeDimension(36, 32, 40),
+    borderRadius: getTabletSafeDimension(8, 7, 10),
     backgroundColor: 'transparent',
     justifyContent: 'center',
     alignItems: 'center',
@@ -2081,7 +2094,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
   weekDayNumberText: {
-    fontSize: 14,
+    fontSize: getTabletSafeDimension(14, 12, 16),
     fontFamily: Fonts.latoRegular,
     color: '#181D27',
   },
@@ -2094,13 +2107,13 @@ const styles = StyleSheet.create({
     fontFamily: Fonts.latoBold,
   },
   eventsContainer: {
-    marginHorizontal: spacing.md,
-    paddingHorizontal: 4,
+    marginHorizontal: getTabletSafeDimension(spacing.md, 12, 18),
+    paddingHorizontal: getTabletSafeDimension(4, 3, 6),
   },
   eventsTitle: {
-    fontSize: 14,
+    fontSize: getTabletSafeDimension(14, 12, 16),
     fontFamily: Fonts.bold,
-    marginBottom: spacing.md,
+    marginBottom: getTabletSafeDimension(spacing.md, 10, 16),
     color: '#202020',
   },
   eventsList: {
@@ -2108,26 +2121,26 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    paddingVertical: 8,
-    paddingHorizontal: 12,
-    marginBottom: spacing.sm,
+    borderRadius: getTabletSafeDimension(12, 10, 14),
+    paddingVertical: getTabletSafeDimension(8, 12, 16),
+    paddingHorizontal: getTabletSafeDimension(12, 16, 20),
+    marginBottom: getTabletSafeDimension(spacing.sm, 8, 12),
     borderColor: '#D5D7DA',
     borderWidth: 1,
     borderLeftColor: '#D5D7DA',
     borderLeftWidth: 1,
   },
   eventContent: {
-    gap: 12,
+    gap: getTabletSafeDimension(12, 10, 14),
   },
   eventTitle: {
-    fontSize: 14,
+    fontSize: getTabletSafeDimension(14, 16, 16),
     fontFamily: Fonts.latoRegular,
     color: '#000',
     marginBottom: 0,
   },
   eventTime: {
-    fontSize: 10,
+    fontSize: getTabletSafeDimension(10, 12, 12),
     fontFamily: Fonts.bold,
     textAlign: 'left',
     color: '#717680',
@@ -2135,21 +2148,21 @@ const styles = StyleSheet.create({
   eventBadges: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: getTabletSafeDimension(8, 6, 10),
   },
   badge: {
     display: 'flex',
     flexDirection: 'row',
-    gap: 4,
+    gap: getTabletSafeDimension(4, 3, 6),
     backgroundColor: '#fff',
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: getTabletSafeDimension(8, 6, 10),
+    paddingVertical: getTabletSafeDimension(4, 3, 6),
     borderRadius: 100,
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
   },
   badgeText: {
-    fontSize: 10,
+    fontSize: getTabletSafeDimension(10, 12, 12),
     fontFamily: Fonts.bold,
     color: '#717680',
     fontWeight: '500',

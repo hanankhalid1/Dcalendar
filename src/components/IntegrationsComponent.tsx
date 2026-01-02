@@ -23,10 +23,23 @@ import { useAuthStore } from '../stores/useAuthStore';
 import { useApiClient } from '../hooks/useApi';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { colors } from '../utils/LightTheme';
-import { scaleWidth } from '../utils/dimensions';
+import { scaleWidth, screenWidth } from '../utils/dimensions';
 import { Colors } from '../constants/Colors';
 import { Fonts } from '../constants/Fonts';
 import { fontSize } from '../utils/LightTheme';
+
+// Tablet detection and sizing helper
+const isTablet = screenWidth >= 600;
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 interface IntegrationsComponentProps {
   initialExpanded?: boolean;
@@ -774,8 +787,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingHorizontal: getTabletSafeDimension(16, 14, 18),
+    paddingVertical: getTabletSafeDimension(12, 10, 14),
   },
   compactLeft: {
     flexDirection: 'row',
@@ -783,29 +796,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   compactLogoContainer: {
-    width: 32,
-    height: 32,
-    borderRadius: 6,
+    width: getTabletSafeDimension(32, 28, 36),
+    height: getTabletSafeDimension(32, 28, 36),
+    borderRadius: getTabletSafeDimension(6, 6, 8),
     backgroundColor: '#F9FAFB',
     justifyContent: 'center',
     alignItems: 'center',
-    marginRight: 12,
+    marginRight: getTabletSafeDimension(12, 10, 14),
   },
   compactName: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
     fontFamily: Fonts.latoRegular,
     color: Colors.black,
   },
   compactButton: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
+    paddingHorizontal: getTabletSafeDimension(8, 10, 12),
+    paddingVertical: getTabletSafeDimension(4, 6, 8),
     alignItems: 'center',
     justifyContent: 'center',
   },
   compactConnect: {},
   compactConnected: {},
   compactButtonText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
     fontFamily: Fonts.latoBold,
     fontWeight: '700',
   },
@@ -819,12 +832,12 @@ const styles = StyleSheet.create({
 
   integrationCard: {
     backgroundColor: Colors.white,
-    borderRadius: 10,
+    borderRadius: getTabletSafeDimension(10, 10, 12),
     borderWidth: 1,
     borderColor: '#E8E8E8',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 8,
+    paddingHorizontal: getTabletSafeDimension(12, 14, 16),
+    paddingVertical: getTabletSafeDimension(10, 9, 12),
+    marginBottom: getTabletSafeDimension(8, 10, 12),
   },
   buttonDisabled: {
     opacity: 0.6,
@@ -834,14 +847,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.35)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 24,
+    paddingHorizontal: getTabletSafeDimension(24, 28, 32),
   },
   confirmCard: {
     width: '100%',
-    maxWidth: 360,
+    maxWidth: getTabletSafeDimension(360, 420, 460),
     backgroundColor: Colors.white,
-    borderRadius: 12,
-    padding: 20,
+    borderRadius: getTabletSafeDimension(12, 12, 14),
+    padding: getTabletSafeDimension(20, 22, 24),
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.14,
@@ -850,41 +863,41 @@ const styles = StyleSheet.create({
   },
   confirmTitle: {
     fontFamily: Fonts.latoSemiBold,
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 15, 17),
     color: Colors.black,
-    marginBottom: 6,
+    marginBottom: getTabletSafeDimension(6, 6, 8),
   },
   confirmMessage: {
     fontFamily: Fonts.latoRegular,
-    fontSize: fontSize.textSize13,
+    fontSize: getTabletSafeDimension(fontSize.textSize13, 12, 14),
     color: '#555',
-    marginBottom: 18,
-    lineHeight: 18,
+    marginBottom: getTabletSafeDimension(18, 16, 22),
+    lineHeight: getTabletSafeDimension(18, 18, 20),
   },
   confirmButtons: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     alignItems: 'center',
-    gap: 12,
+    gap: getTabletSafeDimension(12, 14, 16),
   },
   confirmCancel: {
-    paddingVertical: 10,
-    paddingHorizontal: 14,
+    paddingVertical: getTabletSafeDimension(10, 9, 12),
+    paddingHorizontal: getTabletSafeDimension(14, 14, 18),
   },
   confirmCancelText: {
     fontFamily: Fonts.latoSemiBold,
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
     color: '#555',
   },
   confirmPrimary: {
-    paddingVertical: 10,
-    paddingHorizontal: 16,
+    paddingVertical: getTabletSafeDimension(10, 9, 12),
+    paddingHorizontal: getTabletSafeDimension(16, 16, 20),
     backgroundColor: Colors.primaryBlue,
-    borderRadius: 8,
+    borderRadius: getTabletSafeDimension(8, 10, 12),
   },
   confirmPrimaryText: {
     fontFamily: Fonts.latoSemiBold,
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
     color: Colors.white,
   },
 });

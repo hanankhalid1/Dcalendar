@@ -32,13 +32,31 @@ import {
   shadows,
   borderRadius,
 } from '../utils/LightTheme';
-import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
+import {
+  moderateScale,
+  scaleHeight,
+  scaleWidth,
+  screenWidth,
+} from '../utils/dimensions';
 import { Fonts } from '../constants/Fonts';
 import ClockIcon from '../assets/svgs/clock.svg';
 import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import { useSettingsStore } from '../stores/useSetting';
 import EventCard from '../components/EventCard';
+
+// Tablet detection and safe dimension helper
+const isTablet = screenWidth >= 600;
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 const DailyCalendarScreen = () => {
   const navigation = useNavigation();
@@ -616,29 +634,29 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingHorizontal: scaleWidth(20),
-    paddingTop: scaleHeight(20),
-    paddingBottom: scaleHeight(100),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(20, 12, 24)),
+    paddingTop: scaleHeight(getTabletSafeDimension(20, 12, 24)),
+    paddingBottom: scaleHeight(getTabletSafeDimension(100, 80, 120)),
   },
   sectionTitle: {
-    fontSize: fontSize.textSize18,
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 14, 20),
     fontFamily: Fonts.latoBold,
     color: '#000',
-    marginBottom: scaleHeight(20),
+    marginBottom: scaleHeight(getTabletSafeDimension(20, 10, 24)),
   },
   timeGroup: {
-    marginBottom: scaleHeight(16),
+    marginBottom: scaleHeight(getTabletSafeDimension(16, 8, 20)),
   },
   timeHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginBottom: scaleHeight(12),
+    marginBottom: scaleHeight(getTabletSafeDimension(12, 6, 14)),
   },
   timeLabelText: {
-    fontSize: moderateScale(16),
+    fontSize: moderateScale(getTabletSafeDimension(16, 9, 18)),
     fontFamily: Fonts.latoBold,
     color: '#000',
-    marginRight: scaleWidth(12),
+    marginRight: scaleWidth(getTabletSafeDimension(12, 6, 12)),
   },
   timeDivider: {
     flex: 1,
@@ -646,15 +664,17 @@ const styles = StyleSheet.create({
     backgroundColor: '#E0E0E0',
   },
   eventCardWrapper: {
-    marginBottom: scaleHeight(12),
+    marginBottom: scaleHeight(getTabletSafeDimension(12, 8, 16)),
+    alignSelf: 'flex-start',
+    width: '100%',
   },
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: scaleHeight(40),
+    paddingVertical: scaleHeight(getTabletSafeDimension(40, 28, 48)),
   },
   emptyText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 16),
     fontFamily: Fonts.latoRegular,
     color: '#717680',
   },

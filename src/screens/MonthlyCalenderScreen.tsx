@@ -41,7 +41,20 @@ import { Fonts } from '../constants/Fonts';
 import { convertToSelectedTimezone } from '../utils/timezone';
 import * as DimensionsUtils from '../utils/dimensions';
 
-const { scaleWidth, scaleHeight, moderateScale } = DimensionsUtils;
+const { scaleWidth, scaleHeight, moderateScale, screenWidth, screenHeight } = DimensionsUtils;
+
+// Tablet detection constants
+const isTablet = screenWidth >= 600;
+const isSmallMobile = screenWidth <= 340;
+const isLargeMobile = screenWidth > 400 && screenWidth < 600;
+
+// Helper function for tablet-safe dimensions
+const getTabletSafeDimension = (mobileValue: number, tabletValue: number, maxValue: number) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 interface MonthlyCalendarProps {
   onDateSelect?: (date: string) => void;
@@ -1706,22 +1719,22 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   scrollContent: {
-    paddingBottom: 100, // Add extra padding to prevent content from being cut off by FloatingActionButton
+    paddingBottom: getTabletSafeDimension(100, 120, 140),
   },
   calendarWrapper: {
-    marginHorizontal: spacing.md,
-    marginVertical: spacing.lg,
-    borderRadius: 14,
+    marginHorizontal: getTabletSafeDimension(spacing.md, spacing.lg, 24),
+    marginVertical: getTabletSafeDimension(spacing.lg, spacing.xl, 32),
+    borderRadius: getTabletSafeDimension(14, 16, 20),
     overflow: 'hidden',
   },
   eventsContainer: {
-    marginHorizontal: spacing.md,
-    paddingHorizontal: 4,
+    marginHorizontal: getTabletSafeDimension(spacing.md, spacing.lg, 24),
+    paddingHorizontal: getTabletSafeDimension(4, 8, 12),
   },
   eventsTitle: {
-    fontSize: 14,
+    fontSize: getTabletSafeDimension(14, 16, 18),
     fontFamily: Fonts.bold,
-    marginBottom: spacing.md,
+    marginBottom: getTabletSafeDimension(spacing.md, spacing.lg, 24),
     color: '#202020',
   },
   eventsList: {
@@ -1729,10 +1742,10 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     backgroundColor: '#ffffff',
-    borderRadius: moderateScale(12),
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(14),
-    marginBottom: spacing.sm,
+    borderRadius: getTabletSafeDimension(moderateScale(12), moderateScale(14), 18),
+    paddingVertical: getTabletSafeDimension(scaleHeight(10), 12, 16),
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(14), 16, 20),
+    marginBottom: getTabletSafeDimension(spacing.sm, spacing.md, 16),
     borderColor: '#D5D7DA',
     borderWidth: 1,
     borderLeftColor: '#D5D7DA',
@@ -1740,31 +1753,31 @@ const styles = StyleSheet.create({
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 1,
+      height: isTablet ? 2 : 1,
     },
-    shadowOpacity: 0.04,
-    shadowRadius: 2,
-    elevation: 1,
+    shadowOpacity: isTablet ? 0.06 : 0.04,
+    shadowRadius: getTabletSafeDimension(2, 4, 6),
+    elevation: isTablet ? 2 : 1,
   },
   eventContent: {
-    gap: scaleHeight(10),
+    gap: getTabletSafeDimension(scaleHeight(10), 12, 14),
   },
   eventTitle: {
-    fontSize: moderateScale(14),
+    fontSize: getTabletSafeDimension(moderateScale(14), moderateScale(16), 18),
     fontFamily: Fonts.latoRegular,
     color: '#252B37',
     marginBottom: 0,
     fontWeight: '500',
   },
   eventTime: {
-    fontSize: moderateScale(11),
+    fontSize: getTabletSafeDimension(moderateScale(11), moderateScale(13), 15),
     fontFamily: Fonts.latoMedium,
     textAlign: 'left',
     color: '#717680',
     fontWeight: '600',
   },
   eventStartTime: {
-    fontSize: 10,
+    fontSize: getTabletSafeDimension(10, 12, 14),
     fontWeight: '600',
     textAlign: 'left',
     borderWidth: 1,
@@ -1772,21 +1785,21 @@ const styles = StyleSheet.create({
   eventBadges: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: scaleWidth(8),
+    gap: getTabletSafeDimension(scaleWidth(8), 10, 12),
   },
   badge: {
     display: 'flex',
     flexDirection: 'row',
-    gap: scaleWidth(4),
+    gap: getTabletSafeDimension(scaleWidth(4), 6, 8),
     backgroundColor: '#fff',
-    paddingHorizontal: scaleWidth(8),
-    paddingVertical: scaleHeight(5),
-    borderRadius: moderateScale(100),
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(8), 10, 12),
+    paddingVertical: getTabletSafeDimension(scaleHeight(5), 6, 8),
+    borderRadius: getTabletSafeDimension(moderateScale(100), 120, 140),
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
   },
   badgeText: {
-    fontSize: moderateScale(10),
+    fontSize: getTabletSafeDimension(moderateScale(10), moderateScale(12), 14),
     fontFamily: Fonts.latoMedium,
     color: '#717680',
     fontWeight: '600',

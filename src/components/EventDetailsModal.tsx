@@ -22,6 +22,17 @@ import MeetIcon from '../assets/svgs/meet.svg';
 const { width: screenWidth } = Dimensions.get('window');
 const { scaleWidth, scaleHeight, moderateScale } = DimensionsUtils;
 
+// Tablet detection
+const isTablet = screenWidth >= 600;
+
+// Helper function for tablet-safe dimensions
+const getTabletSafeDimension = (mobileValue: number, tabletValue: number, maxValue: number) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
+
 interface EventDetailsModalProps {
   visible: boolean;
   onClose: () => void;
@@ -497,8 +508,8 @@ const styles = StyleSheet.create({
     backgroundColor: Colors.white,
     borderRadius: moderateScale(14),
     width: '100%',
-    maxWidth: scaleWidth(340),
-    maxHeight: '80%',
+    maxWidth: scaleWidth(isTablet ? 280 : 340),
+    maxHeight: isTablet ? '70%' : '80%',
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -512,9 +523,9 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'flex-start',
-    paddingHorizontal: scaleWidth(20),
-    paddingTop: scaleHeight(18),
-    paddingBottom: scaleHeight(12),
+    paddingHorizontal: scaleWidth(isTablet ? 12 : 20),
+    paddingTop: scaleHeight(isTablet ? 12 : 18),
+    paddingBottom: scaleHeight(isTablet ? 8 : 12),
     borderBottomWidth: 1,
     borderBottomColor: '#E8EAED',
   },
@@ -523,30 +534,30 @@ const styles = StyleSheet.create({
     marginRight: scaleWidth(12),
   },
   eventTitle: {
-    fontSize: moderateScale(18),
+    fontSize: moderateScale(getTabletSafeDimension(18, 11, 20)),
     fontFamily: Fonts.bold,
     color: Colors.black,
-    lineHeight: moderateScale(26),
+    lineHeight: moderateScale(getTabletSafeDimension(26, 17, 28)),
   },
   headerActions: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: scaleWidth(8),
+    gap: scaleWidth(isTablet ? 4 : 8),
   },
   actionButton: {
-    padding: scaleWidth(6),
+    padding: scaleWidth(isTablet ? 4 : 6),
   },
   content: {
-    paddingHorizontal: scaleWidth(20),
-    paddingVertical: scaleHeight(14),
+    paddingHorizontal: scaleWidth(isTablet ? 12 : 20),
+    paddingVertical: scaleHeight(isTablet ? 8 : 14),
   },
   detailRow: {
     flexDirection: 'row',
     alignItems: 'flex-start',
-    marginBottom: scaleHeight(20),
+    marginBottom: scaleHeight(isTablet ? 12 : 20),
   },
   iconWrapper: {
-    marginRight: scaleWidth(12),
+    marginRight: scaleWidth(isTablet ? 10 : 12),
     marginTop: scaleHeight(2),
   },
   iconContainer: {
@@ -568,16 +579,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   detailLabel: {
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(getTabletSafeDimension(12, 6, 13)),
     fontFamily: Fonts.latoMedium,
     color: '#717680',
     marginBottom: scaleHeight(4),
   },
   detailValue: {
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(getTabletSafeDimension(14, 9, 15)),
     fontFamily: Fonts.latoRegular,
     color: '#252B37',
-    lineHeight: moderateScale(20),
+    lineHeight: moderateScale(getTabletSafeDimension(20, 15, 22)),
   },
   guestsContainer: {
     flexDirection: 'row',
@@ -603,11 +614,11 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: Colors.white,
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(getTabletSafeDimension(14, 10, 15)),
     fontFamily: Fonts.bold,
   },
   guestEmail: {
-    fontSize: moderateScale(11),
+    fontSize: moderateScale(getTabletSafeDimension(11, 9, 12)),
     fontFamily: Fonts.latoRegular,
     color: '#717680',
     textAlign: 'center',
@@ -619,12 +630,12 @@ const styles = StyleSheet.create({
     marginTop: scaleHeight(4),
   },
   meetingLinkText: {
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(getTabletSafeDimension(14, 9, 15)),
     fontFamily: Fonts.latoRegular,
     color: '#0B6DE0',
     flex: 1,
     marginRight: scaleWidth(8),
-    lineHeight: moderateScale(20),
+    lineHeight: moderateScale(getTabletSafeDimension(20, 15, 22)),
   },
   copyButton: {
     padding: scaleWidth(4),
@@ -654,7 +665,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   guestListTitle: {
-    fontSize: moderateScale(16),
+    fontSize: moderateScale(getTabletSafeDimension(16, 11, 18)),
     fontFamily: Fonts.latoBold,
     color: Colors.black,
   },
@@ -680,11 +691,11 @@ const styles = StyleSheet.create({
   },
   guestListAvatarText: {
     color: Colors.white,
-    fontSize: moderateScale(12),
+    fontSize: moderateScale(getTabletSafeDimension(12, 8, 13)),
     fontFamily: Fonts.latoBold,
   },
   guestListEmail: {
-    fontSize: moderateScale(14),
+    fontSize: moderateScale(getTabletSafeDimension(14, 9, 15)),
     fontFamily: Fonts.latoRegular,
     color: '#252B37',
     flex: 1,
