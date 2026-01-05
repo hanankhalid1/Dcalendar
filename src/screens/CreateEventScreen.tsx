@@ -99,7 +99,7 @@ const CreateEventScreen = () => {
   const { mode, eventData: editEventData } = route.params || {};
   const { getUserEvents, setUserEvents, userEvents } = useEventsStore();
   const { googleIntegration, zoomIntegration } = useAuthStore();
-  const currentTimezone = useSettingsStore();
+  const currentTimezone = useSettingsStore((state) => state.selectedTimeZone);
   const toast = useToast();
   // Initialize blockchain service and get contract instance
   // Form state
