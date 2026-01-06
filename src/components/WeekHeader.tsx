@@ -8,7 +8,7 @@ import {
   Image,
   Dimensions,
 } from 'react-native';
-import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
+import { moderateScale, scaleHeight, scaleWidth, screenWidth, screenHeight } from '../utils/dimensions';
 import {
   colors,
   fontSize,
@@ -25,6 +25,27 @@ import DIcon from '../assets/svgs/DIcon.svg';
 import Icon from 'react-native-vector-icons/AntDesign';
 import { Fonts } from '../constants/Fonts';
 // import CalendarIconHeader from '../assets/svgs/calendarHeader.svg';
+
+// Tablet detection constants
+const isTablet = screenWidth >= 600;
+const isSmallMobile = screenWidth <= 340;
+const isLargeMobile = screenWidth > 400 && screenWidth < 600;
+
+// Helper function for tablet-safe font sizes
+const getTabletSafeFontSize = (mobileSize: number, tabletSize: number, maxSize: number) => {
+  if (isTablet) {
+    return Math.min(tabletSize, maxSize);
+  }
+  return mobileSize;
+};
+
+// Helper function for tablet-safe dimensions
+const getTabletSafeDimension = (mobileValue: number, tabletValue: number, maxValue: number) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 interface WeekHeaderProps {
   onMenuPress: () => void;
@@ -99,6 +120,7 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
       });
     }
     setIsCalendarVisible(!isCalendarVisible);
+    setIsMonthDropdownVisible(false); // Close month slider if open
     onMonthPress();
   };
 
@@ -221,7 +243,7 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
             </View>
           )}
 
-          {/* Month Selector - Hidden in Schedule screen */}
+          {/* Month Selector - Show month text and dropdown on all devices */}
           {showMonthSelector && (
             <View style={styles.monthSelectorContainer}>
               <TouchableOpacity
@@ -253,7 +275,7 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
         )}
       </View>
 
-      {/* Month Slider - Full width horizontal slider */}
+      {/* Month Slider - Show on all devices */}
       {isMonthDropdownVisible &&
         (() => {
           // Generate dynamic months centered around current month
@@ -487,20 +509,21 @@ const WeekHeader: React.FC<WeekHeaderProps> = ({
 const styles = StyleSheet.create({
   container: {
     backgroundColor: colors.white,
-    paddingTop: scaleHeight(10),
-    paddingBottom: spacing.md,
+    paddingTop: getTabletSafeDimension(scaleHeight(10), scaleHeight(16), 20),
+    paddingBottom: getTabletSafeDimension(spacing.md, spacing.lg, 24),
     ...shadows.sm,
     position: 'relative',
     zIndex: 1,
+    overflow: 'visible',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    backgroundColor: colors.white, // ← ADD THIS LINE
-    zIndex: 1004, // ensure header stays above backdrop if needed
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.lg, 32),
+    paddingTop: getTabletSafeDimension(spacing.sm, spacing.md, 16),
+    backgroundColor: colors.white,
+    zIndex: 1004,
   },
   headerNoBorder: {
     shadowOpacity: 0,
@@ -511,12 +534,12 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   menuButton: {
-    width: moderateScale(40),
-    height: moderateScale(40),
+    width: getTabletSafeDimension(moderateScale(40), moderateScale(48), 56),
+    height: getTabletSafeDimension(moderateScale(40), moderateScale(48), 56),
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: borderRadius.md,
-    marginRight: spacing.md,
+    borderRadius: getTabletSafeDimension(borderRadius.md, borderRadius.lg, 12),
+    marginRight: getTabletSafeDimension(spacing.md, spacing.lg, 24),
   },
   menuIcon: {
     width: 24,
@@ -525,14 +548,14 @@ const styles = StyleSheet.create({
   logoContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginRight: spacing.md,
+    marginRight: getTabletSafeDimension(spacing.md, spacing.lg, 24),
   },
   logoText: {
-    fontSize: fontSize.textSize18,
+    fontSize: getTabletSafeFontSize(fontSize.textSize18, fontSize.textSize20, 24),
     fontWeight: '600',
     fontFamily: Fonts.latoBold,
     color: colors.blackText,
-    marginLeft: spacing.xs,
+    marginLeft: getTabletSafeDimension(spacing.xs, 0, 12),
   },
   monthSelectorContainer: {
     position: 'relative',
@@ -542,10 +565,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   monthText: {
-    fontSize: moderateScale(18),
+    fontSize: getTabletSafeFontSize(moderateScale(18), moderateScale(22), 26),
     fontFamily: Fonts.latoBold,
     color: '#181D27',
-    marginRight: spacing.xs,
+    marginRight: getTabletSafeDimension(spacing.xs, spacing.sm, 12),
   },
   dropdownArrow: {
     marginLeft: 4,
@@ -557,39 +580,38 @@ const styles = StyleSheet.create({
   monthSliderWrapper: {
     width: '100%',
     backgroundColor: 'transparent',
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    minHeight: 50,
+    paddingVertical: getTabletSafeDimension(spacing.sm, spacing.md, 16),
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.lg, 32),
+    minHeight: isTablet ? 60 : 50,
     zIndex: 1003,
-    elevation: 0,
+    elevation: 10,
   },
   rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: spacing.sm,
+    gap: getTabletSafeDimension(spacing.sm, spacing.md, 16),
   },
   iconButton: {
-    width: moderateScale(40),
-    height: moderateScale(40),
+    width: getTabletSafeDimension(moderateScale(40), moderateScale(48), 56),
+    height: getTabletSafeDimension(moderateScale(40), moderateScale(48), 56),
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: borderRadius.md,
+    borderRadius: getTabletSafeDimension(borderRadius.md, borderRadius.lg, 12),
   },
   calendarButton: {
-    width: moderateScale(40),
-    height: moderateScale(40),
+    width: getTabletSafeDimension(moderateScale(40), moderateScale(48), 56),
+    height: getTabletSafeDimension(moderateScale(40), moderateScale(48), 56),
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: borderRadius.md,
+    borderRadius: getTabletSafeDimension(borderRadius.md, borderRadius.lg, 12),
   },
   backdrop: {
     position: 'absolute',
-    top: 0, // Change from -Dimensions.get('window').height
-    left: 0, // Change from -Dimensions.get('window').width
-    right: 0, // Add
-    bottom: 0, // Add
-
-    zIndex: 999, // Backdrop Z-Index
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: 999,
   },
   monthDropdown: {
     position: 'absolute',
@@ -619,48 +641,57 @@ const styles = StyleSheet.create({
   },
   calendarContainer: {
     position: 'absolute',
-    top: '100%',
-    left: spacing.md,
-    right: spacing.md,
+    top: isTablet ? 120 : '100%',
+    left: isTablet ? undefined : getTabletSafeDimension(spacing.md, spacing.lg, 32),
+    right: isTablet ? getTabletSafeDimension(spacing.md, spacing.lg, 32) : getTabletSafeDimension(spacing.md, spacing.lg, 32),
+    width: isTablet ? scaleWidth(280) : undefined,
+    height: isTablet ? 360 : undefined,
+    maxWidth: isTablet ? scaleWidth(280) : undefined,
     zIndex: 1000,
     elevation: 10,
   },
   monthScrollViewStyle: {
-    flex: 1,
     width: '100%',
+    minHeight: isTablet ? 60 : 50,
   },
   monthScrollContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.xs,
+    justifyContent: 'flex-start',
+    paddingHorizontal: getTabletSafeDimension(spacing.xs, spacing.sm, 12),
     flexWrap: 'nowrap',
+    minHeight: isTablet ? 60 : 50,
   },
   monthScrollItem: {
     backgroundColor: '#F9F9F9',
-    borderRadius: 20,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs,
-    marginHorizontal: 4,
+    borderRadius: getTabletSafeDimension(20, 24, 28),
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.lg, 24),
+    paddingVertical: getTabletSafeDimension(spacing.xs, spacing.sm, 12),
+    marginHorizontal: isTablet ? 8 : 5,
     borderWidth: 0,
+    minHeight: isTablet ? 50 : 40,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   monthScrollItemSelected: {
-    backgroundColor: '#00AEEF', // App's primary green for selected
+    backgroundColor: '#00AEEF',
   },
   monthScrollText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeFontSize(fontSize.textSize14, fontSize.textSize16, 18),
     color: colors.textPrimary,
     fontWeight: '500',
+    textAlign: 'center',
   },
   monthScrollTextSelected: {
     color: colors.white,
     fontWeight: '700',
   },
   yearContainer: {
-    marginHorizontal: spacing.xs,
-    paddingHorizontal: spacing.sm,
+    marginHorizontal: getTabletSafeDimension(spacing.xs, spacing.sm, 12),
+    paddingHorizontal: getTabletSafeDimension(spacing.sm, spacing.md, 16),
   },
   yearText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeFontSize(fontSize.textSize14, fontSize.textSize16, 18),
     color: colors.textPrimary,
     fontWeight: '500',
   },
@@ -671,10 +702,10 @@ const styles = StyleSheet.create({
 
   monthDropdownWrapper: {
     position: 'absolute',
-    top: moderateScale(30), // Adjust this value to be just below the 'November' text
+    top: moderateScale(30),
     left: 0,
     right: 0,
-    zIndex: 1002, // Higher than backdrop (999) and calendar (1000)
+    zIndex: 1002,
     elevation: 12,
   },
 });

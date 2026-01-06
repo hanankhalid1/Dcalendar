@@ -16,6 +16,22 @@ import {
   shadows,
 } from '../utils/LightTheme';
 import TrashIcon from '../assets/svgs/trash.svg';
+import { Dimensions } from 'react-native';
+
+const screenWidth = Dimensions.get('window').width;
+const isTablet = screenWidth >= 600;
+
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  const currentScreenWidth = Dimensions.get('window').width;
+  if (currentScreenWidth >= 600) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 interface Reminder {
   id: string;
@@ -109,38 +125,38 @@ const styles = StyleSheet.create({
   },
   scrollContainer: {
     flex: 1,
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingHorizontal: getTabletSafeDimension(spacing.lg, 16, 24),
+    paddingTop: getTabletSafeDimension(spacing.lg, 16, 24),
   },
   warningContainer: {
-    marginBottom: spacing.lg,
+    marginBottom: getTabletSafeDimension(spacing.lg, 14, 20),
   },
   warningText: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 13, 18),
     fontWeight: '600',
     color: colors.black,
   },
   section: {
-    marginBottom: spacing.xl,
+    marginBottom: getTabletSafeDimension(spacing.xl, 20, 28),
   },
   reminderCard: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     backgroundColor: '#337E890F', // Very light gray background like in the image
-    borderRadius: borderRadius.md,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
+    borderRadius: getTabletSafeDimension(borderRadius.md, 8, 10),
+    padding: getTabletSafeDimension(spacing.md, 10, 14),
+    marginBottom: getTabletSafeDimension(spacing.sm, 6, 10),
     borderWidth: 1,
     borderColor: '#EEEEEE',
   },
   checkbox: {
-    marginRight: spacing.md,
-    marginTop: spacing.xs,
+    marginRight: getTabletSafeDimension(spacing.md, 8, 12),
+    marginTop: getTabletSafeDimension(spacing.xs, 4, 6),
   },
   checkboxEmpty: {
-    width: moderateScale(11),
-    height: moderateScale(11),
-    borderRadius: moderateScale(5.5),
+    width: moderateScale(getTabletSafeDimension(11, 9, 13)),
+    height: moderateScale(getTabletSafeDimension(11, 9, 13)),
+    borderRadius: moderateScale(getTabletSafeDimension(5.5, 4.5, 7)),
     borderWidth: 0.4,
     borderColor: colors.black,
     backgroundColor: 'transparent', // Transparent background like in the image
@@ -149,14 +165,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   reminderTitle: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 12, 18),
     fontWeight: '600',
     color: colors.mediumgray, // Faded text for deleted items
-    marginBottom: spacing.xs,
+    marginBottom: getTabletSafeDimension(spacing.xs, 3, 6),
     textDecorationLine: 'line-through',
   },
   reminderTime: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 11, 16),
     color: colors.grey400,
     textDecorationLine: 'line-through',
   },
@@ -173,26 +189,26 @@ const styles = StyleSheet.create({
     gap: spacing.sm,
   },
   emptyStateIcon: {
-    width: scaleWidth(72),
-    height: scaleWidth(72),
-    borderRadius: scaleWidth(36),
+    width: getTabletSafeDimension(scaleWidth(72), 60, 80),
+    height: getTabletSafeDimension(scaleWidth(72), 60, 80),
+    borderRadius: getTabletSafeDimension(scaleWidth(36), 30, 40),
     backgroundColor: '#E5F2FB',
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: getTabletSafeDimension(spacing.xs, 4, 8),
   },
   emptyStateTitle: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 13, 18),
     color: colors.black,
     fontWeight: '700',
     textAlign: 'center',
   },
   emptyStateSubtitle: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 11, 16),
     color: '#717680',
     fontWeight: '400',
     textAlign: 'center',
-    lineHeight: fontSize.textSize18,
+    lineHeight: getTabletSafeDimension(fontSize.textSize18, 14, 20),
   },
   emptyContentContainer: {
     flexGrow: 1,
@@ -200,37 +216,37 @@ const styles = StyleSheet.create({
   },
   actionButtonsContainer: {
     flexDirection: 'row',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    gap: spacing.md,
+    paddingHorizontal: getTabletSafeDimension(spacing.lg, 16, 24),
+    paddingVertical: getTabletSafeDimension(spacing.md, 10, 14),
+    gap: getTabletSafeDimension(spacing.md, 10, 14),
   },
   restoreButton: {
     flex: 1,
     backgroundColor: colors.grey100,
-    borderRadius: borderRadius.md,
-    paddingVertical: spacing.md,
+    borderRadius: getTabletSafeDimension(borderRadius.md, 8, 10),
+    paddingVertical: getTabletSafeDimension(spacing.md, 10, 14),
     alignItems: 'center',
     justifyContent: 'center',
     ...shadows.sm,
   },
   restoreButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 12, 18),
     fontWeight: '600',
     color: colors.blackText,
   },
   deleteButton: {
     flex: 1,
-    borderRadius: borderRadius.md,
+    borderRadius: getTabletSafeDimension(borderRadius.md, 8, 10),
     overflow: 'hidden',
     ...shadows.sm,
   },
   deleteButtonGradient: {
-    paddingVertical: spacing.md,
+    paddingVertical: getTabletSafeDimension(spacing.md, 10, 14),
     alignItems: 'center',
     justifyContent: 'center',
   },
   deleteButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 12, 18),
     fontWeight: '600',
     color: colors.white,
   },

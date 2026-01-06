@@ -4,7 +4,20 @@ import { Colors } from '../constants/Colors';
 import { Fonts } from '../constants/Fonts';
 import * as DimensionsUtils from '../utils/dimensions';
 
-const { scaleWidth, scaleHeight, moderateScale } = DimensionsUtils;
+const { scaleWidth, scaleHeight, moderateScale, screenWidth } = DimensionsUtils;
+
+// Tablet-aware sizing helper to keep the modal balanced on larger screens
+const isTablet = screenWidth >= 600;
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 interface LogoutConfirmModalProps {
   visible: boolean;
@@ -62,15 +75,15 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: scaleWidth(20),
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(20), 32, 40),
   },
   container: {
     width: '100%',
-    maxWidth: scaleWidth(340),
+    maxWidth: getTabletSafeDimension(scaleWidth(340), 460, 500),
     backgroundColor: Colors.white,
-    borderRadius: moderateScale(14),
-    paddingHorizontal: moderateScale(20),
-    paddingVertical: moderateScale(18),
+    borderRadius: getTabletSafeDimension(moderateScale(14), 12, 16),
+    paddingHorizontal: getTabletSafeDimension(moderateScale(20), 18, 22),
+    paddingVertical: getTabletSafeDimension(moderateScale(18), 16, 20),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -82,48 +95,48 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Fonts.latoBold,
-    fontSize: moderateScale(18),
+    fontSize: getTabletSafeDimension(moderateScale(18), 16, 20),
     color: Colors.black,
     textAlign: 'left',
-    marginBottom: scaleHeight(10),
+    marginBottom: getTabletSafeDimension(scaleHeight(10), 8, 12),
   },
   message: {
     fontFamily: Fonts.latoRegular,
-    fontSize: moderateScale(14),
+    fontSize: getTabletSafeDimension(moderateScale(14), 13, 15),
     color: Colors.grey,
     textAlign: 'left',
-    marginBottom: scaleHeight(18),
-    lineHeight: moderateScale(20),
+    marginBottom: getTabletSafeDimension(scaleHeight(18), 14, 20),
+    lineHeight: getTabletSafeDimension(moderateScale(20), 18, 22),
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: scaleWidth(12),
+    gap: getTabletSafeDimension(scaleWidth(12), 14, 16),
   },
   cancelBtn: {
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(18),
-    borderRadius: moderateScale(8),
+    paddingVertical: getTabletSafeDimension(scaleHeight(10), 9, 12),
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(18), 16, 20),
+    borderRadius: getTabletSafeDimension(moderateScale(8), 8, 10),
     backgroundColor: '#F0F0F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   cancelText: {
     fontFamily: Fonts.latoSemiBold,
-    fontSize: moderateScale(14),
+    fontSize: getTabletSafeDimension(moderateScale(14), 13, 15),
     color: Colors.black,
   },
   logoutBtn: {
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(18),
-    borderRadius: moderateScale(8),
+    paddingVertical: getTabletSafeDimension(scaleHeight(10), 9, 12),
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(18), 16, 20),
+    borderRadius: getTabletSafeDimension(moderateScale(8), 8, 10),
     backgroundColor: '#FF3B30', // Red for logout action
     justifyContent: 'center',
     alignItems: 'center',
   },
   logoutText: {
     fontFamily: Fonts.latoSemiBold,
-    fontSize: moderateScale(14),
+    fontSize: getTabletSafeDimension(moderateScale(14), 13, 15),
     color: Colors.white,
   },
 });

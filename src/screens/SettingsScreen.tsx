@@ -73,7 +73,18 @@ import { spacing, fontSize, colors as themeColors } from '../utils/LightTheme';
 import * as DimensionsUtils from '../utils/dimensions';
 import { generateEventUID } from '../utils/eventUtils';
 
-const { height: SCREEN_HEIGHT } = Dimensions.get('window');
+const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
+const isTablet = SCREEN_WIDTH >= 600;
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 // Extract scaling functions
 
@@ -1238,9 +1249,9 @@ const styles = StyleSheet.create({
 
     alignItems: 'center',
 
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: getTabletSafeDimension(spacing.md, 14, spacing.lg),
 
-    paddingVertical: spacing.sm,
+    paddingVertical: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
 
     backgroundColor: Colors.white,
 
@@ -1256,11 +1267,11 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: fontSize.textSize18,
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 16, 20),
 
     fontWeight: '600',
 
-    marginLeft: scaleWidth(12),
+    marginLeft: getTabletSafeDimension(scaleWidth(12), 10, 14),
 
     color: Colors.black,
 
@@ -1272,13 +1283,13 @@ const styles = StyleSheet.create({
 
     backgroundColor: 'transparent',
 
-    paddingTop: spacing.sm,
+    paddingTop: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
   },
 
   scrollContent: {
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: getTabletSafeDimension(spacing.md, 14, spacing.lg),
 
-    paddingBottom: spacing.lg,
+    paddingBottom: getTabletSafeDimension(spacing.lg, spacing.md, spacing.lg),
   },
 
   section: {
@@ -1286,7 +1297,7 @@ const styles = StyleSheet.create({
   },
 
   sectionLabel: {
-    fontSize: fontSize.textSize12,
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 10, 12),
 
     color: themeColors.grey400,
 
@@ -1300,7 +1311,7 @@ const styles = StyleSheet.create({
   card: {
     backgroundColor: Colors.white,
 
-    borderRadius: 12,
+    borderRadius: getTabletSafeDimension(12, 10, 12),
 
     overflow: 'hidden',
 
@@ -1330,9 +1341,9 @@ const styles = StyleSheet.create({
 
     backgroundColor: Colors.white,
 
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: getTabletSafeDimension(spacing.md, 14, spacing.lg),
 
-    paddingVertical: scaleHeight(16),
+    paddingVertical: getTabletSafeDimension(scaleHeight(16), 12, 18),
   },
 
   settingContent: {
@@ -1340,7 +1351,7 @@ const styles = StyleSheet.create({
   },
 
   settingTitle: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 14),
 
     color: Colors.black,
 
@@ -1350,7 +1361,7 @@ const styles = StyleSheet.create({
   },
 
   settingSubtitle: {
-    fontSize: fontSize.textSize12,
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 10, 12),
 
     color: themeColors.grey400,
 
@@ -1362,7 +1373,7 @@ const styles = StyleSheet.create({
   settingButtonText: {
     color: Colors.primaryBlue,
 
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 14),
 
     fontWeight: '700',
 
@@ -1397,11 +1408,11 @@ const styles = StyleSheet.create({
   },
 
   modalHeader: {
-    paddingHorizontal: moderateScale(20),
+    paddingHorizontal: getTabletSafeDimension(moderateScale(20), 16, 22),
 
-    paddingTop: scaleHeight(20),
+    paddingTop: getTabletSafeDimension(scaleHeight(20), 16, 22),
 
-    paddingBottom: scaleHeight(16),
+    paddingBottom: getTabletSafeDimension(scaleHeight(16), 12, 18),
 
     borderBottomWidth: 1,
 
@@ -1409,7 +1420,7 @@ const styles = StyleSheet.create({
   },
 
   modalTitle: {
-    fontSize: fontSize.textSize20,
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 17, 20),
 
     fontWeight: '600',
 
@@ -1419,7 +1430,7 @@ const styles = StyleSheet.create({
   },
 
   modalBody: {
-    paddingVertical: scaleHeight(8),
+    paddingVertical: getTabletSafeDimension(scaleHeight(8), 6, 10),
   },
 
   radioOption: {
@@ -1427,25 +1438,25 @@ const styles = StyleSheet.create({
 
     alignItems: 'center',
 
-    paddingHorizontal: moderateScale(20),
+    paddingHorizontal: getTabletSafeDimension(moderateScale(20), 16, 22),
 
-    paddingVertical: scaleHeight(14),
+    paddingVertical: getTabletSafeDimension(scaleHeight(14), 12, 16),
 
-    minHeight: scaleHeight(48), // Minimum touch target size
+    minHeight: getTabletSafeDimension(scaleHeight(48), 44, 52), // Minimum touch target size
   },
 
   radioButton: {
-    width: moderateScale(22),
+    width: getTabletSafeDimension(moderateScale(22), 18, 24),
 
-    height: moderateScale(22),
+    height: getTabletSafeDimension(moderateScale(22), 18, 24),
 
-    borderRadius: moderateScale(11),
+    borderRadius: getTabletSafeDimension(moderateScale(11), 9, 12),
 
     borderWidth: 2,
 
     borderColor: Colors.primaryBlue,
 
-    marginRight: moderateScale(14),
+    marginRight: getTabletSafeDimension(moderateScale(14), 12, 16),
 
     alignItems: 'center',
 
@@ -1453,17 +1464,17 @@ const styles = StyleSheet.create({
   },
 
   radioButtonSelected: {
-    width: moderateScale(12),
+    width: getTabletSafeDimension(moderateScale(12), 10, 14),
 
-    height: moderateScale(12),
+    height: getTabletSafeDimension(moderateScale(12), 10, 14),
 
-    borderRadius: moderateScale(6),
+    borderRadius: getTabletSafeDimension(moderateScale(6), 5, 7),
 
     backgroundColor: Colors.primaryBlue,
   },
 
   radioText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 14),
 
     color: Colors.black,
 
@@ -1479,7 +1490,7 @@ const styles = StyleSheet.create({
 
     borderTopColor: themeColors.grey20,
 
-    minHeight: scaleHeight(56),
+    minHeight: getTabletSafeDimension(scaleHeight(56), 50, 60),
 
     width: '100%',
   },
@@ -1487,7 +1498,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
 
-    paddingVertical: scaleHeight(18),
+    paddingVertical: getTabletSafeDimension(scaleHeight(18), 14, 20),
 
     alignItems: 'center',
 
@@ -1497,7 +1508,7 @@ const styles = StyleSheet.create({
 
     borderRightColor: themeColors.grey20,
 
-    minHeight: scaleHeight(56),
+    minHeight: getTabletSafeDimension(scaleHeight(56), 50, 60),
 
     backgroundColor: Colors.white,
   },
@@ -1505,19 +1516,19 @@ const styles = StyleSheet.create({
   confirmButton: {
     flex: 1,
 
-    paddingVertical: scaleHeight(18),
+    paddingVertical: getTabletSafeDimension(scaleHeight(18), 14, 20),
 
     alignItems: 'center',
 
     justifyContent: 'center',
 
-    minHeight: scaleHeight(56),
+    minHeight: getTabletSafeDimension(scaleHeight(56), 50, 60),
 
     backgroundColor: Colors.primaryBlue,
   },
 
   cancelButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 16),
 
     color: Colors.black,
 
@@ -1527,7 +1538,7 @@ const styles = StyleSheet.create({
   },
 
   confirmButtonText: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 16),
 
     color: Colors.white,
 
@@ -1541,13 +1552,13 @@ const styles = StyleSheet.create({
 
     alignItems: 'center',
 
-    gap: 12,
+    gap: getTabletSafeDimension(12, 10, 14),
 
-    paddingTop: 13,
+    paddingTop: getTabletSafeDimension(13, 11, 15),
 
-    paddingBottom: 13,
+    paddingBottom: getTabletSafeDimension(13, 11, 15),
 
-    paddingHorizontal: 20,
+    paddingHorizontal: getTabletSafeDimension(20, 16, 22),
 
     borderRadius: 32,
   },
@@ -1559,7 +1570,7 @@ const styles = StyleSheet.create({
   titleStyle: {
     fontFamily: Fonts.semiBold,
 
-    fontSize: 16,
+    fontSize: getTabletSafeDimension(16, 14, 16),
 
     color: Colors.white,
 
@@ -1567,14 +1578,14 @@ const styles = StyleSheet.create({
   },
 
   logoutRow: {
-    paddingVertical: scaleHeight(16),
-    paddingHorizontal: scaleWidth(20),
+    paddingVertical: getTabletSafeDimension(scaleHeight(16), 12, 18),
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(20), 16, 22),
     justifyContent: 'center',
     alignItems: 'center',
   },
 
   logoutText: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 16),
     color: '#FF3B30', // Red color for logout
     fontFamily: Fonts.regular,
     fontWeight: '400',

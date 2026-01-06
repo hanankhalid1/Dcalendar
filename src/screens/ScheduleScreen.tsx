@@ -53,6 +53,18 @@ import { Fonts } from '../constants/Fonts';
 import CalendarIcon from '../assets/svgs/calendar.svg';
 import TaskCompleteIcon from '../assets/svgs/taskComplete.svg';
 
+const isTablet = screenWidth >= 600;
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
+
 const ScheduleScreen = () => {
   const navigation = useNavigation<AppNavigationProp>();
   const { setCurrentMonthByIndex } = useCalendarStore();
@@ -863,33 +875,33 @@ const styles = StyleSheet.create({
   segmentedControlContainer: {
     width: screenWidth,
     alignItems: 'center',
-    paddingHorizontal: scaleWidth(18),
-    paddingTop: scaleHeight(12),
-    paddingBottom: scaleHeight(12),
-    marginTop: scaleHeight(8), // Gap between header and navigation
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(18), 14, 20),
+    paddingTop: getTabletSafeDimension(scaleHeight(12), 10, 14),
+    paddingBottom: getTabletSafeDimension(scaleHeight(12), 10, 14),
+    marginTop: getTabletSafeDimension(scaleHeight(8), 6, 10),
     // No background color - transparent to show gray home screen background
   },
   segmentedControl: {
-    width: scaleWidth(339),
-    height: scaleHeight(48),
+    width: getTabletSafeDimension(scaleWidth(339), screenWidth * 0.9, screenWidth - 20),
+    height: getTabletSafeDimension(scaleHeight(48), 40, 52),
     flexDirection: 'row',
     backgroundColor: colors.white, // White navigation container
-    borderRadius: 10,
-    padding: 4,
-    gap: 3,
+    borderRadius: getTabletSafeDimension(10, 8, 12),
+    padding: getTabletSafeDimension(4, 3, 5),
+    gap: getTabletSafeDimension(3, 2, 4),
   },
   segmentButton: {
     flex: 1,
     height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    borderRadius: 8,
+    borderRadius: getTabletSafeDimension(8, 6, 10),
   },
   segmentButtonActive: {
     backgroundColor: colors.primaryBlue, // Using the same blue as calendar icon
   },
   segmentText: {
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 16),
     fontWeight: '500',
     fontFamily: Fonts.latoMedium,
     color: colors.grey400,
@@ -901,68 +913,68 @@ const styles = StyleSheet.create({
   },
   // Empty State
   emptyStateContainer: {
-    width: scaleWidth(375),
+    width: getTabletSafeDimension(scaleWidth(375), 280, 360),
     alignItems: 'center',
     justifyContent: 'center',
-    paddingTop: scaleHeight(80),
-    paddingBottom: scaleHeight(80),
+    paddingTop: getTabletSafeDimension(scaleHeight(80), 60, 100),
+    paddingBottom: getTabletSafeDimension(scaleHeight(80), 60, 100),
   },
   emptyStateIllustration: {
-    width: scaleWidth(331),
-    height: scaleHeight(456),
+    width: getTabletSafeDimension(scaleWidth(331), 240, 340),
+    height: getTabletSafeDimension(scaleHeight(456), 350, 480),
     alignItems: 'center',
     justifyContent: 'center',
-    gap: scaleHeight(20),
+    gap: getTabletSafeDimension(scaleHeight(20), 16, 24),
   },
   emptyStateIcon: {
-    width: scaleWidth(134),
-    height: scaleHeight(134),
-    borderRadius: scaleWidth(150),
+    width: getTabletSafeDimension(scaleWidth(134), 100, 140),
+    height: getTabletSafeDimension(scaleHeight(134), 100, 140),
+    borderRadius: getTabletSafeDimension(scaleWidth(150), 110, 160),
     backgroundColor: '#E5F1FF',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: scaleHeight(8), // Reduced gap
+    marginBottom: getTabletSafeDimension(scaleHeight(8), 6, 10), // Reduced gap
   },
   emptyStateIconText: {
-    fontSize: scaleWidth(60),
+    fontSize: getTabletSafeDimension(scaleWidth(60), 48, 64),
   },
   emptyStateTitle: {
-    fontSize: fontSize.textSize20,
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 16, 22),
     fontWeight: '700',
     fontFamily: Fonts.latoBold,
     color: colors.blackText,
-    marginTop: scaleHeight(8), // Reduced gap
+    marginTop: getTabletSafeDimension(scaleHeight(8), 6, 10),
     textAlign: 'center',
   },
   emptyStateDescription: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 11, 16),
     fontFamily: Fonts.latoRegular,
     color: colors.grey400,
     textAlign: 'center',
-    paddingHorizontal: scaleWidth(40),
-    lineHeight: fontSize.textSize20,
-    marginTop: scaleHeight(4), // Reduced gap
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(40), 30, 50),
+    lineHeight: getTabletSafeDimension(fontSize.textSize20, 16, 24),
+    marginTop: getTabletSafeDimension(scaleHeight(4), 3, 6),
   },
   // Date Group Styles (matching DeletedEventsScreen)
   dateGroup: {
-    marginBottom: scaleHeight(24),
-    paddingHorizontal: scaleWidth(20),
+    marginBottom: getTabletSafeDimension(scaleHeight(24), 18, 28),
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(20), 16, 24),
   },
   dateHeader: {
-    fontSize: moderateScale(16),
+    fontSize: getTabletSafeDimension(moderateScale(16), 13, 18),
     fontWeight: '600',
     color: '#000',
-    marginBottom: scaleHeight(12),
+    marginBottom: getTabletSafeDimension(scaleHeight(12), 10, 14),
     fontFamily: Fonts.latoBold,
     flexDirection: 'row',
     alignItems: 'center',
   },
   dateHeaderText: {
-    fontSize: moderateScale(16),
+    fontSize: getTabletSafeDimension(moderateScale(16), 13, 18),
     fontWeight: '600',
     color: '#000',
     fontFamily: Fonts.latoBold,
-    marginRight: scaleWidth(12),
+    marginRight: getTabletSafeDimension(scaleWidth(12), 10, 14),
   },
   dateDivider: {
     flex: 1,

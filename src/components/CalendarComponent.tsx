@@ -1,10 +1,10 @@
-import { StyleSheet, Text, View, TouchableOpacity } from 'react-native';
+import { StyleSheet, Text, View, TouchableOpacity, Dimensions } from 'react-native';
 import React, { useState, useEffect, useMemo, memo } from 'react';
 import LinearGradient from 'react-native-linear-gradient';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { useSettingsStore } from '../stores/useSetting';
 import { Fonts } from '../constants/Fonts';
-import { moderateScale } from '../utils/dimensions';
+import { moderateScale, screenWidth, scaleWidth } from '../utils/dimensions';
 
 interface CalendarComponentProps {
   onDateSelect?: (date: Date) => void;
@@ -12,6 +12,17 @@ interface CalendarComponentProps {
   selectedDate?: Date | null;
   isVisible?: boolean; // Add this to know when calendar becomes visible
 }
+
+// Tablet detection
+const isTablet = screenWidth >= 600;
+
+// Helper function for tablet-safe dimensions
+const getTabletSafeDimension = (mobileValue: number, tabletValue: number, maxValue: number) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 const CalendarComponent: React.FC<CalendarComponentProps> = ({
   onDateSelect,
@@ -477,37 +488,39 @@ export default memo(CalendarComponent);
 const styles = StyleSheet.create({
   container: {
     backgroundColor: '#ffffff',
-    borderRadius: 12,
-    padding: 16,
+    borderRadius: getTabletSafeDimension(12, 14, 18),
+    padding: getTabletSafeDimension(16, 14, 18),
     marginHorizontal: 0,
-    marginVertical: 8,
+    marginVertical: getTabletSafeDimension(8, 8, 12),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
-      height: 6,
+      height: getTabletSafeDimension(6, 8, 10),
     },
     shadowOpacity: 0.2,
-    shadowRadius: 12,
-    elevation: 12,
+    shadowRadius: getTabletSafeDimension(12, 16, 20),
+    elevation: getTabletSafeDimension(12, 16, 20),
     borderWidth: 1,
     borderColor: '#e0e0e0',
+    width: isTablet ? scaleWidth(260) : undefined,
+    height: isTablet ? 340 : undefined,
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 20,
+    marginBottom: getTabletSafeDimension(16, 14, 18),
   },
   navButton: {
-    width: 32,
-    height: 32,
+    width: getTabletSafeDimension(32, 40, 48),
+    height: getTabletSafeDimension(32, 40, 48),
     backgroundColor: '#e9ecef',
-    borderRadius: 8,
+    borderRadius: getTabletSafeDimension(8, 10, 12),
     justifyContent: 'center',
     alignItems: 'center',
   },
   monthYear: {
-    fontSize: moderateScale(16),
+    fontSize: getTabletSafeDimension(moderateScale(16), moderateScale(20), 24),
     fontFamily: Fonts.latoBold,
     color: '#252B37',
     fontWeight: '700',
@@ -515,15 +528,15 @@ const styles = StyleSheet.create({
   weekdayRow: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    marginBottom: 12,
+    marginBottom: getTabletSafeDimension(10, 8, 10),
   },
   weekdayText: {
-    fontSize: moderateScale(13),
+    fontSize: getTabletSafeDimension(moderateScale(13), moderateScale(15), 18),
     fontFamily: Fonts.latoMedium,
     color: '#717680',
     width: '13%',
     textAlign: 'center',
-    minWidth: 40,
+    minWidth: getTabletSafeDimension(40, 50, 60),
     fontWeight: '600',
   },
   calendarGrid: {
@@ -534,14 +547,14 @@ const styles = StyleSheet.create({
   },
   dayCell: {
     width: '13%',
-    height: 40,
+    height: getTabletSafeDimension(36, 30, 36),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 8,
-    minWidth: 40,
+    marginBottom: getTabletSafeDimension(8, 6, 8),
+    minWidth: getTabletSafeDimension(36, 30, 36),
   },
   dayText: {
-    fontSize: moderateScale(12),
+    fontSize: getTabletSafeDimension(moderateScale(12), moderateScale(14), 16),
     fontFamily: Fonts.latoRegular,
     color: '#202020',
     fontWeight: '400',
@@ -550,28 +563,28 @@ const styles = StyleSheet.create({
     color: '#D0D5DD',
   },
   selectedDay: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: getTabletSafeDimension(32, 40, 48),
+    height: getTabletSafeDimension(32, 40, 48),
+    borderRadius: getTabletSafeDimension(8, 10, 12),
     backgroundColor: '#00AEEF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   selectedDayText: {
-    fontSize: moderateScale(12),
+    fontSize: getTabletSafeDimension(moderateScale(12), moderateScale(14), 16),
     fontFamily: Fonts.latoRegular,
     color: '#ffffff',
     fontWeight: '400',
   },
   todayDay: {
-    width: 32,
-    height: 32,
-    borderRadius: 8,
+    width: getTabletSafeDimension(32, 40, 48),
+    height: getTabletSafeDimension(32, 40, 48),
+    borderRadius: getTabletSafeDimension(8, 10, 12),
     justifyContent: 'center',
     alignItems: 'center',
   },
   todayDayText: {
-    fontSize: moderateScale(12),
+    fontSize: getTabletSafeDimension(moderateScale(12), moderateScale(14), 16),
     fontFamily: Fonts.latoRegular,
     color: '#00AEEF',
     fontWeight: '400',

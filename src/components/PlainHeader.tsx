@@ -14,7 +14,25 @@ import {
   borderRadius,
   shadows,
 } from '../utils/LightTheme';
-import { moderateScale, scaleHeight, scaleWidth } from '../utils/dimensions';
+import {
+  moderateScale,
+  scaleHeight,
+  scaleWidth,
+  screenWidth,
+} from '../utils/dimensions';
+
+// Tablet detection
+const isTablet = screenWidth >= 600;
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 const PlainHeader: React.FC<{ onMenuPress: () => void; title: string }> = ({
   onMenuPress,
@@ -54,26 +72,28 @@ const headerStyles = StyleSheet.create({
   header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    height: scaleHeight(60),
+    paddingHorizontal: getTabletSafeDimension(spacing.md, 14, spacing.lg),
+    paddingTop: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
+    paddingBottom: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
+    height: getTabletSafeDimension(scaleHeight(60), 52, 60),
   },
   spacer: {
     flex: 1,
   },
   menuButton: {
-    width: moderateScale(40),
-    height: moderateScale(40),
+    width: getTabletSafeDimension(moderateScale(40), 36, 44),
+    height: getTabletSafeDimension(moderateScale(40), 36, 44),
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xs,
   },
   // --- NEW STYLE FOR THE TITLE ---
   titleText: {
-    fontSize: fontSize.textSize20,
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 18, 20),
+    lineHeight: getTabletSafeDimension(fontSize.textSize20, 20, 22),
     fontWeight: '700',
     color: colors.blackText,
-    marginLeft: scaleWidth(12),
+    marginLeft: getTabletSafeDimension(scaleWidth(12), 8, 12),
     flex: 1,
   },
   // The original `title` style from your snippet, renamed to `titleText` for usage

@@ -35,6 +35,27 @@ const isLargeMobile = SCREEN_WIDTH > 400 && SCREEN_WIDTH < 600;
 const isFolding =
   SCREEN_WIDTH >= 380 && SCREEN_WIDTH <= 500 && SCREEN_HEIGHT > 800;
 
+// Helper function for tablet-safe dimensions
+const getTabletSafeDimension = (
+  mobileValue: number,
+  foldingValue: number,
+  largeMobileValue: number,
+  smallMobileValue: number,
+  tabletValue: number,
+  maxValue: number
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  } else if (isFolding) {
+    return foldingValue;
+  } else if (isLargeMobile) {
+    return largeMobileValue;
+  } else if (isSmallMobile) {
+    return smallMobileValue;
+  }
+  return mobileValue;
+};
+
 interface MenuOptionsComponentProps {
   isVisible: boolean;
   onClose: () => void;
@@ -127,7 +148,14 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
   };
 
   const renderIcon = (option: MenuOption) => {
-    const iconSize = moderateScale(20);
+    const iconSize = getTabletSafeDimension(
+      moderateScale(20),
+      moderateScale(18),
+      moderateScale(18),
+      moderateScale(18),
+      moderateScale(20),
+      22
+    );
     const iconColor = '#717680'; // Light gray color to match event and birthday icons
 
     switch (option.iconType) {
@@ -212,7 +240,10 @@ const MenuOptionsComponent: React.FC<MenuOptionsComponentProps> = ({
             }}
             activeOpacity={0.7}
           >
-            <CrossIcon width={moderateScale(20)} height={moderateScale(20)} />
+            <CrossIcon 
+              width={getTabletSafeDimension(moderateScale(18), moderateScale(20), moderateScale(18), moderateScale(16), moderateScale(20), 22)} 
+              height={getTabletSafeDimension(moderateScale(18), moderateScale(20), moderateScale(18), moderateScale(16), moderateScale(20), 22)} 
+            />
           </TouchableOpacity>
         </Animated.View>
       </TouchableOpacity>
@@ -226,46 +257,42 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)',
     justifyContent: 'flex-end',
     alignItems: 'flex-end',
-    paddingBottom: isTablet
-      ? scaleHeight(48)
-      : isFolding
-      ? scaleHeight(36)
-      : isLargeMobile
-      ? scaleHeight(32)
-      : isSmallMobile
-      ? scaleHeight(16)
-      : scaleHeight(24),
-    paddingRight: isTablet
-      ? scaleWidth(48)
-      : isFolding
-      ? scaleWidth(32)
-      : isLargeMobile
-      ? scaleWidth(24)
-      : isSmallMobile
-      ? scaleWidth(8)
-      : scaleWidth(16),
+    paddingBottom: getTabletSafeDimension(
+      scaleHeight(24),
+      scaleHeight(36),
+      scaleHeight(32),
+      scaleHeight(16),
+      scaleHeight(56),
+      64
+    ),
+    paddingRight: getTabletSafeDimension(
+      scaleWidth(16),
+      scaleWidth(32),
+      scaleWidth(24),
+      scaleWidth(8),
+      scaleWidth(56),
+      64
+    ),
   },
   menuContainer: {
     backgroundColor: 'transparent',
     position: 'absolute',
-    right: isTablet
-      ? scaleWidth(48)
-      : isFolding
-      ? scaleWidth(32)
-      : isLargeMobile
-      ? scaleWidth(24)
-      : isSmallMobile
-      ? scaleWidth(8)
-      : scaleWidth(16),
-    bottom: isTablet
-      ? scaleHeight(32)
-      : isFolding
-      ? scaleHeight(24)
-      : isLargeMobile
-      ? scaleHeight(20)
-      : isSmallMobile
-      ? scaleHeight(12)
-      : scaleHeight(16),
+    right: getTabletSafeDimension(
+      scaleWidth(16),
+      scaleWidth(32),
+      scaleWidth(24),
+      scaleWidth(8),
+      scaleWidth(56),
+      64
+    ),
+    bottom: getTabletSafeDimension(
+      scaleHeight(16),
+      scaleHeight(24),
+      scaleHeight(20),
+      scaleHeight(12),
+      scaleHeight(40),
+      48
+    ),
     width: 'auto',
     alignItems: 'flex-end',
     zIndex: 1000,
@@ -273,12 +300,12 @@ const styles = StyleSheet.create({
   menuItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scaleWidth(16),
-    paddingVertical: scaleHeight(11),
+    paddingHorizontal: getTabletSafeDimension(scaleWidth(16), scaleWidth(20), scaleWidth(18), scaleWidth(14), scaleWidth(20), 24),
+    paddingVertical: getTabletSafeDimension(scaleHeight(11), scaleHeight(14), scaleHeight(12), scaleHeight(10), scaleHeight(14), 18),
     backgroundColor: colors.white,
-    borderRadius: moderateScale(12),
-    marginBottom: scaleHeight(12),
-    height: scaleHeight(42),
+    borderRadius: getTabletSafeDimension(moderateScale(12), moderateScale(14), moderateScale(12), moderateScale(10), moderateScale(14), 18),
+    marginBottom: getTabletSafeDimension(scaleHeight(12), scaleHeight(16), scaleHeight(14), scaleHeight(10), scaleHeight(16), 20),
+    height: getTabletSafeDimension(scaleHeight(42), scaleHeight(48), scaleHeight(44), scaleHeight(36), scaleHeight(50), 56),
     alignSelf: 'flex-end',
     ...shadows.sm,
   },
@@ -292,56 +319,50 @@ const styles = StyleSheet.create({
     // Remove fixed width for better responsiveness
   },
   lastMenuItem: {
-    marginBottom: isTablet ? scaleHeight(32) : scaleHeight(24),
+    marginBottom: getTabletSafeDimension(scaleHeight(24), scaleHeight(32), scaleHeight(28), scaleHeight(20), scaleHeight(40), 48),
   },
   menuLabel: {
-    fontSize: isTablet
-      ? moderateScale(20)
-      : SCREEN_WIDTH > 380
-      ? moderateScale(14)
-      : moderateScale(13),
+    fontSize: getTabletSafeDimension(
+      moderateScale(13),
+      moderateScale(14),
+      moderateScale(14),
+      moderateScale(12),
+      moderateScale(16),
+      18
+    ),
     color: colors.blackText,
     fontWeight: '500',
-    marginLeft: isTablet ? scaleWidth(24) : scaleWidth(12),
+    marginLeft: getTabletSafeDimension(scaleWidth(12), scaleWidth(14), scaleWidth(12), scaleWidth(10), scaleWidth(14), 16),
     fontFamily: 'Lato-Medium',
     includeFontPadding: false,
-    lineHeight: isTablet
-      ? moderateScale(28)
-      : SCREEN_WIDTH > 380
-      ? moderateScale(18)
-      : moderateScale(16),
+    lineHeight: getTabletSafeDimension(
+      moderateScale(16),
+      moderateScale(18),
+      moderateScale(18),
+      moderateScale(14),
+      moderateScale(20),
+      22
+    ),
     flexShrink: 1,
     flexWrap: 'wrap',
   },
   iconWrapper: {
-    width: isTablet ? moderateScale(40) : moderateScale(24),
-    height: isTablet ? moderateScale(40) : moderateScale(24),
+    width: getTabletSafeDimension(moderateScale(24), moderateScale(28), moderateScale(26), moderateScale(22), moderateScale(28), 32),
+    height: getTabletSafeDimension(moderateScale(24), moderateScale(28), moderateScale(26), moderateScale(22), moderateScale(28), 32),
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0,
   },
   iconContainer: {
-    width: isTablet ? moderateScale(40) : moderateScale(24),
-    height: isTablet ? moderateScale(40) : moderateScale(24),
+    width: getTabletSafeDimension(moderateScale(24), moderateScale(28), moderateScale(26), moderateScale(22), moderateScale(28), 32),
+    height: getTabletSafeDimension(moderateScale(24), moderateScale(28), moderateScale(26), moderateScale(22), moderateScale(28), 32),
     justifyContent: 'center',
     alignItems: 'center',
   },
   closeButton: {
-    width: isTablet
-      ? scaleWidth(80)
-      : SCREEN_WIDTH > 380
-      ? scaleWidth(56)
-      : scaleWidth(50),
-    height: isTablet
-      ? scaleWidth(80)
-      : SCREEN_WIDTH > 380
-      ? scaleWidth(56)
-      : scaleWidth(50),
-    borderRadius: isTablet
-      ? scaleWidth(40)
-      : SCREEN_WIDTH > 380
-      ? scaleWidth(28)
-      : scaleWidth(25),
+    width: getTabletSafeDimension(scaleWidth(50), scaleWidth(56), scaleWidth(54), scaleWidth(48), scaleWidth(56), 64),
+    height: getTabletSafeDimension(scaleWidth(50), scaleWidth(56), scaleWidth(54), scaleWidth(48), scaleWidth(56), 64),
+    borderRadius: getTabletSafeDimension(scaleWidth(25), scaleWidth(28), scaleWidth(27), scaleWidth(24), scaleWidth(28), 32),
     backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',

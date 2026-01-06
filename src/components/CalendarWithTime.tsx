@@ -8,11 +8,25 @@ import {
   ScrollView,
   StatusBar,
   Alert,
+  Dimensions,
 } from 'react-native';
 import Icon from 'react-native-vector-icons/Ionicons';
 import { moderateScale, scaleWidth } from '../utils/dimensions';
 import { colors, fontSize, spacing, borderRadius } from '../utils/LightTheme';
 import { Fonts } from '../constants/Fonts';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isTablet = SCREEN_WIDTH >= 600;
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 interface CalendarWithTimeProps {
   isVisible: boolean;
@@ -427,22 +441,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 20,
+    minHeight: getTabletSafeDimension('100%', '100%', '100%'),
+    flex: getTabletSafeDimension(0, 1, 1),
   },
   modalContainer: {
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
-    width: 574,
-    height: 374,
+    width: getTabletSafeDimension(574, SCREEN_WIDTH * 0.80, SCREEN_WIDTH * 0.85),
+    height: getTabletSafeDimension(374, 560, 580),
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,
     borderColor: colors.grey20,
-    padding: 16,
-    gap: 8,
+    padding: getTabletSafeDimension(16, 10, 14),
+    gap: getTabletSafeDimension(8, 12, 16),
   },
   calendarSection: {
     flex: 1,
-    paddingRight: spacing.md,
+    paddingRight: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
     borderRightWidth: 1,
     borderRightColor: colors.grey20,
   },
@@ -450,12 +466,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: spacing.md,
+    marginBottom: getTabletSafeDimension(spacing.md, 0, 2),
   },
   navButton: {
-    width: moderateScale(32),
-    height: moderateScale(32),
-    borderRadius: moderateScale(8),
+    width: getTabletSafeDimension(moderateScale(32), moderateScale(20), moderateScale(22)),
+    height: getTabletSafeDimension(moderateScale(32), moderateScale(20), moderateScale(22)),
+    borderRadius: getTabletSafeDimension(moderateScale(8), moderateScale(4), moderateScale(5)),
     backgroundColor: colors.white,
     justifyContent: 'center',
     alignItems: 'center',
@@ -466,21 +482,21 @@ const styles = StyleSheet.create({
     opacity: 0.5,
   },
   monthYearText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 13, 14),
     color: colors.black,
     fontFamily: Fonts.latoMedium,
-    lineHeight: 12,
+    lineHeight: getTabletSafeDimension(12, 14, 16),
     letterSpacing: 0,
   },
   daysHeader: {
     flexDirection: 'row',
-    marginBottom: spacing.sm,
+    marginBottom: getTabletSafeDimension(spacing.sm, 0, 2),
   },
   dayHeaderText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 12, 13),
     color: '#6F7C8E',
     fontFamily: Fonts.latoMedium,
-    lineHeight: 12,
+    lineHeight: getTabletSafeDimension(12, 13, 14),
     letterSpacing: 0,
     width: '14.28%', // Match dateButton width for perfect alignment
     textAlign: 'center',
@@ -488,28 +504,28 @@ const styles = StyleSheet.create({
   calendarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    marginBottom: spacing.md,
+    marginBottom: getTabletSafeDimension(spacing.md, 0, spacing.xs),
   },
   dateButton: {
     width: '14.28%', // 100% / 7 days = 14.28% per column
-    height: moderateScale(32),
+    height: getTabletSafeDimension(moderateScale(32), moderateScale(26), moderateScale(28)),
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: spacing.xs,
+    marginBottom: getTabletSafeDimension(spacing.xs, 0, 0),
   },
   selectedDateContainer: {
-    width: moderateScale(36),
-    height: moderateScale(36),
-    borderRadius: moderateScale(8),
+    width: getTabletSafeDimension(moderateScale(36), moderateScale(20), moderateScale(22)),
+    height: getTabletSafeDimension(moderateScale(36), moderateScale(20), moderateScale(22)),
+    borderRadius: getTabletSafeDimension(moderateScale(8), moderateScale(4), moderateScale(5)),
     backgroundColor: '#00AEEF',
     justifyContent: 'center',
     alignItems: 'center',
   },
   dateText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 12, 13),
     color: colors.blackText,
     fontFamily: Fonts.latoRegular,
-    lineHeight: 18,
+    lineHeight: getTabletSafeDimension(18, 18, 20),
     letterSpacing: 0,
   },
   inactiveDateText: {
@@ -544,17 +560,17 @@ const styles = StyleSheet.create({
   },
   timeSection: {
     flex: 1,
-    paddingLeft: spacing.md,
+    paddingLeft: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
   },
   timeHeader: {
     marginBottom: spacing.sm,
     alignItems: 'center',
   },
   timeHeaderText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 13, 14),
     color: colors.black,
     fontFamily: Fonts.latoMedium,
-    lineHeight: 12,
+    lineHeight: getTabletSafeDimension(12, 14, 16),
     letterSpacing: 0,
     textAlign: 'center',
   },
@@ -565,9 +581,9 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   timeSlot: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.md,
-    marginVertical: spacing.xs,
+    paddingVertical: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
+    marginVertical: getTabletSafeDimension(spacing.xs, 2, spacing.xs),
     borderRadius: borderRadius.sm,
     borderWidth: 1,
     borderColor: 'transparent',
@@ -578,11 +594,11 @@ const styles = StyleSheet.create({
     backgroundColor: '#00AEEF1A',
   },
   timeText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 12, 13),
     color: colors.textPrimary,
     textAlign: 'center',
     fontFamily: Fonts.latoRegular,
-    lineHeight: 18,
+    lineHeight: getTabletSafeDimension(18, 18, 20),
     letterSpacing: 0,
   },
   selectedTimeText: {
@@ -596,26 +612,26 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.lg,
+    paddingHorizontal: getTabletSafeDimension(spacing.xl, spacing.lg, spacing.xl),
+    paddingVertical: getTabletSafeDimension(spacing.lg, spacing.md, spacing.lg),
     backgroundColor: colors.white,
     borderTopWidth: 1,
     borderTopColor: colors.grey20,
-    width: scaleWidth(300),
+    width: getTabletSafeDimension(scaleWidth(300), SCREEN_WIDTH * 0.80, SCREEN_WIDTH * 0.85),
     borderRadius: borderRadius.md,
-    marginTop: spacing.md,
+    marginTop: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
   },
   cancelButton: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: getTabletSafeDimension(spacing.sm, spacing.sm, spacing.sm),
+    paddingHorizontal: getTabletSafeDimension(spacing.lg, spacing.lg, spacing.lg),
     flex: 1,
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 13, 14),
     color: colors.grey400,
     fontFamily: Fonts.latoMedium,
-    lineHeight: 18,
+    lineHeight: getTabletSafeDimension(18, 18, 20),
     letterSpacing: 0,
   },
   doneButton: {
@@ -625,17 +641,17 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   doneButtonContainer: {
-    paddingVertical: spacing.sm,
-    paddingHorizontal: spacing.lg,
+    paddingVertical: getTabletSafeDimension(spacing.sm, spacing.sm, spacing.sm),
+    paddingHorizontal: getTabletSafeDimension(spacing.lg, spacing.lg, spacing.lg),
     alignItems: 'center',
     backgroundColor: '#00AEEF',
     borderRadius: borderRadius.md,
   },
   doneButtonText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 13, 14),
     color: colors.white,
     fontFamily: Fonts.latoRegular,
-    lineHeight: 18,
+    lineHeight: getTabletSafeDimension(18, 18, 20),
     letterSpacing: 0,
   },
 });
