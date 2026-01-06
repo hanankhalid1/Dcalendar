@@ -1805,8 +1805,9 @@ const CreateTaskScreen = () => {
             </View>
             <ScrollView
               style={{ flexGrow: 0 }}
-              showsVerticalScrollIndicator={false}
-              contentContainerStyle={{ paddingBottom: spacing.lg }}
+              showsVerticalScrollIndicator={true}
+              scrollEnabled={true}
+              contentContainerStyle={{ paddingBottom: getTabletSafeDimension(spacing.lg, spacing.sm, spacing.md) }}
             >
               <View style={styles.customRecurrenceContent}>
                 {/* Repeat every section */}
@@ -2095,6 +2096,7 @@ const CreateTaskScreen = () => {
                           !customRecurrence.endsDate &&
                             styles.customEndsInputPlaceholder,
                         ]}
+                        numberOfLines={1}
                       >
                         {customRecurrence.endsDate
                           ? (() => {
@@ -2158,6 +2160,7 @@ const CreateTaskScreen = () => {
                       }
                       keyboardType="numeric"
                       editable={customRecurrence.endsType === endsOptions[2]}
+                      numberOfLines={1}
                     />
                     <Text style={styles.customEndsOccurrencesText}>
                       occurrences
@@ -2381,11 +2384,11 @@ const styles = StyleSheet.create({
     minHeight: getTabletSafeDimension(scaleHeight(44), 40, 48),
   },
   fieldErrorText: {
-    fontSize: fontSize.textSize12,
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 10, 11),
     color: '#FF3B30',
     fontWeight: '400',
-    marginTop: spacing.xs,
-    marginLeft: spacing.xs,
+    marginTop: getTabletSafeDimension(spacing.xs, 2, spacing.xs),
+    marginLeft: getTabletSafeDimension(spacing.xs, 2, spacing.xs),
   },
   descriptionInput: {
     backgroundColor: colors.white,
@@ -2555,53 +2558,56 @@ const styles = StyleSheet.create({
   customRecurrenceModalContainer: {
     backgroundColor: colors.white,
     borderRadius: 20,
-    width: '92%',
-    maxWidth: getTabletSafeDimension(scaleWidth(480), 520, 560),
-    maxHeight: '75%',
-    paddingVertical: getTabletSafeDimension(spacing.lg, spacing.md, spacing.lg),
+    width: getTabletSafeDimension('92%', SCREEN_WIDTH * 0.75, SCREEN_WIDTH * 0.80),
+    maxWidth: getTabletSafeDimension(scaleWidth(480), 520, 580),
+    maxHeight: getTabletSafeDimension('75%', '55%', '60%'),
+    paddingVertical: getTabletSafeDimension(spacing.lg, spacing.sm, spacing.md),
     paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
+    flexDirection: 'column',
   },
   customRecurrenceContent: {
     flex: 1,
-    overflow: 'visible',
-    paddingHorizontal: spacing.md,
+    overflow: 'scroll',
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.xs, spacing.xs),
+    paddingBottom: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.xs),
   },
   customModalHeader: {
-    marginBottom: getTabletSafeDimension(spacing.lg, spacing.md, spacing.lg),
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
+    marginBottom: getTabletSafeDimension(spacing.lg, spacing.sm, spacing.md),
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.xs, spacing.sm),
   },
   customModalTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize18, 16, 20),
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 16, 18),
     fontWeight: '600',
     color: '#252B37',
+    marginBottom: getTabletSafeDimension(spacing.sm, 2, 4),
     fontFamily: Fonts.latoBold,
   },
-  customRecurrenceSection: {
+  customRepeatOnSection: {
     marginBottom: getTabletSafeDimension(spacing.lg, spacing.md, spacing.lg),
     overflow: 'visible',
   },
   customRecurrenceSectionTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 14),
     fontWeight: '600',
     color: '#414651',
-    marginBottom: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
+    marginBottom: getTabletSafeDimension(spacing.md, 2, 4),
     fontFamily: Fonts.latoSemiBold,
   },
   customRepeatEveryColumn: {
     flexDirection: 'column',
     width: '100%',
-    gap: spacing.sm,
+    gap: getTabletSafeDimension(spacing.sm, 2, 4),
   },
   customRepeatEveryInput: {
     width: '100%',
-    height: getTabletSafeDimension(scaleHeight(40), 38, 44),
+    height: getTabletSafeDimension(scaleHeight(40), 44, 48),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
     textAlign: 'left',
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 14, 15),
     color: '#252B37',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
     paddingVertical: 0,
     backgroundColor: colors.white,
     fontFamily: Fonts.latoRegular,
@@ -2628,9 +2634,9 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
-    paddingVertical: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
-    height: getTabletSafeDimension(scaleHeight(40), 38, 44),
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
+    paddingVertical: getTabletSafeDimension(spacing.sm, spacing.sm, spacing.md),
+    height: getTabletSafeDimension(scaleHeight(40), 44, 48),
     width: '100%',
     backgroundColor: colors.white,
   },
@@ -2659,13 +2665,13 @@ const styles = StyleSheet.create({
     maxHeight: getTabletSafeDimension(scaleHeight(180), 200, 220),
   },
   customUnitDropdownItem: {
-    paddingVertical: getTabletSafeDimension(scaleHeight(10), 12, 14),
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
+    paddingVertical: getTabletSafeDimension(scaleHeight(10), 14, 16),
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
   customUnitDropdownItemText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 14, 15),
     color: '#252B37',
     fontFamily: Fonts.latoRegular,
   },
@@ -2700,30 +2706,31 @@ const styles = StyleSheet.create({
   },
   customDaysList: {
     flexDirection: 'column',
-    gap: spacing.xs,
+    gap: getTabletSafeDimension(spacing.xs, 2, 4),
   },
   customDayOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: scaleHeight(8),
+    paddingVertical: getTabletSafeDimension(scaleHeight(8), 4, 6),
+    paddingHorizontal: getTabletSafeDimension(0, spacing.sm, spacing.md),
   },
   customDayCheckbox: {
-    width: getTabletSafeDimension(scaleWidth(20), 22, 24),
-    height: getTabletSafeDimension(scaleHeight(20), 22, 24),
+    width: getTabletSafeDimension(scaleWidth(20), 24, 26),
+    height: getTabletSafeDimension(scaleHeight(20), 24, 26),
     borderRadius: 4,
     borderWidth: 2,
     borderColor: '#A4A7AE',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.white,
-    marginRight: spacing.md,
+    marginRight: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
   },
   customDayCheckboxSelected: {
     backgroundColor: colors.white,
     borderColor: '#000000',
   },
   customDayOptionText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 11, 12),
     fontWeight: '400',
     color: '#A4A7AE',
     fontFamily: Fonts.latoRegular,
@@ -2734,53 +2741,57 @@ const styles = StyleSheet.create({
   customEndsOption: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: spacing.sm,
-    gap: spacing.sm,
+    paddingVertical: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.xs),
+    gap: getTabletSafeDimension(spacing.sm, 4, 6),
     flexWrap: 'nowrap',
+    flex: 1,
   },
   customCheckbox: {
-    width: scaleWidth(20),
-    height: scaleHeight(20),
-    borderRadius: 4,
-    borderWidth: 2,
+    width: getTabletSafeDimension(scaleWidth(20), 18, 20),
+    height: getTabletSafeDimension(scaleHeight(20), 18, 20),
+    borderRadius: 3,
+    borderWidth: 1.5,
     borderColor: '#A4A7AE',
     justifyContent: 'center',
     alignItems: 'center',
     backgroundColor: colors.white,
+    minWidth: getTabletSafeDimension(scaleWidth(20), 18, 20),
   },
   customCheckboxSelected: {
     backgroundColor: colors.white,
     borderColor: '#000000',
   },
   customEndsOptionText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 11, 12),
     color: '#A4A7AE',
     fontWeight: '400',
-    minWidth: getTabletSafeDimension(scaleWidth(40), 44, 50),
+    minWidth: getTabletSafeDimension(scaleWidth(40), 25, 30),
     fontFamily: Fonts.latoRegular,
+    flexShrink: 0,
   },
   customEndsOptionTextSelected: {
     color: '#000000',
   },
   customEndsInput: {
-    minWidth: scaleWidth(80),
-    maxWidth: scaleWidth(100),
+    minWidth: getTabletSafeDimension(scaleWidth(80), 60, 75),
+    maxWidth: getTabletSafeDimension(scaleWidth(100), 100, 120),
     borderWidth: 1,
     borderColor: '#DCE0E5',
-    borderRadius: borderRadius.sm,
-    paddingHorizontal: spacing.xs,
-    fontSize: fontSize.textSize12,
+    borderRadius: 3,
+    paddingHorizontal: getTabletSafeDimension(spacing.xs, 4, 6),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 9, 10),
     color: colors.blackText,
-    paddingVertical: spacing.sm,
-    lineHeight: scaleHeight(13),
+    paddingVertical: getTabletSafeDimension(spacing.sm, 3, 4),
+    lineHeight: getTabletSafeDimension(scaleHeight(13), 12, 14),
     justifyContent: 'center',
     flexShrink: 1,
+    flex: 0.8,
   },
   customEndsInputDisabled: {
     backgroundColor: '#F5F5F5',
   },
   customEndsInputText: {
-    fontSize: fontSize.textSize12,
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 9, 10),
     color: colors.blackText,
     flexShrink: 0,
     fontFamily: Fonts.latoRegular,
@@ -2820,42 +2831,47 @@ const styles = StyleSheet.create({
     color: colors.blackText,
   },
   customEndsOccurrencesText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 9, 10),
     color: colors.blackText,
-    marginLeft: spacing.xs,
+    marginLeft: getTabletSafeDimension(spacing.xs, 2, 3),
     fontFamily: Fonts.latoRegular,
+    flexShrink: 0,
   },
   customModalActions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
-    gap: spacing.md,
-    paddingVertical: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.lg,
+    gap: getTabletSafeDimension(spacing.md, 4, 6),
+    paddingVertical: getTabletSafeDimension(spacing.md, 4, 6),
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.xs, spacing.xs),
+    paddingTop: getTabletSafeDimension(spacing.lg, 4, 6),
     backgroundColor: colors.white,
   },
   customCancelButton: {
-    paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 14),
-    paddingHorizontal: getTabletSafeDimension(spacing.lg, spacing.md, spacing.lg),
+    flex: 1,
+    paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 12),
+    paddingHorizontal: getTabletSafeDimension(spacing.lg, 4, 6),
     borderRadius: borderRadius.md,
     backgroundColor: '#F3F4F6',
+    height: getTabletSafeDimension(scaleHeight(45), 42, 48),
   },
   customCancelButtonText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 10, 11),
     fontWeight: '500',
     color: '#6B7280',
     fontFamily: Fonts.latoMedium,
   },
   customDoneButton: {
+    flex: 1,
     borderRadius: borderRadius.md,
     backgroundColor: colors.primaryBlue,
-    paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 14),
-    paddingHorizontal: getTabletSafeDimension(spacing.lg, spacing.md, spacing.lg),
+    paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 12),
+    paddingHorizontal: getTabletSafeDimension(spacing.lg, 4, 6),
+    height: getTabletSafeDimension(scaleHeight(45), 42, 48),
     alignItems: 'center',
     justifyContent: 'center',
   },
   customDoneButtonText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 10, 11),
     fontWeight: '600',
     color: colors.white,
     fontFamily: Fonts.latoSemiBold,
