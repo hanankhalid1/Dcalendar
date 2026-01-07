@@ -10,6 +10,7 @@ import {
   TextInput,
   KeyboardAvoidingView,
   Platform,
+  Dimensions,
 } from 'react-native';
 import { useActiveAccount } from '../../stores/useActiveAccount';
 import { debugLogDcontacts } from '../../utils/debugDcontacts';
@@ -35,6 +36,19 @@ const emailRegex =
   /^(([^<>()\[\]\\.,;:\s@"]+(\.[^<>()\[\]\\.,;:\s@"]+)*)|(".+"))@((\[[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}])|(([a-zA-Z\-0-9]+\.)+[a-zA-Z]{2,}))$/;
 const isValidEmail = (email: string): boolean => {
   return emailRegex.test(String(email).toLowerCase());
+};
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const isTablet = SCREEN_WIDTH >= 600;
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
 };
 
 interface GuestSelectorProps {
@@ -545,18 +559,18 @@ const styles = StyleSheet.create({
     borderColor: '#DCE0E5',
     backgroundColor: colors.white,
     borderRadius: 8,
-    paddingVertical: scaleHeight(12),
-    paddingHorizontal: spacing.sm,
-    minHeight: scaleHeight(44),
+    paddingVertical: getTabletSafeDimension(scaleHeight(12), scaleHeight(8), scaleHeight(10)),
+    paddingHorizontal: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
+    minHeight: getTabletSafeDimension(scaleHeight(44), scaleHeight(36), scaleHeight(40)),
   },
   guestInput: {
     flex: 1,
-    fontSize: 14,
+    fontSize: getTabletSafeDimension(14, 9, 10),
     color: '#A4A7AE',
     fontWeight: '400',
-    marginLeft: spacing.sm,
+    marginLeft: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
     fontFamily: Fonts.latoRegular,
-    lineHeight: 18,
+    lineHeight: getTabletSafeDimension(18, 12, 13),
     letterSpacing: 0,
   },
   // Modal Styles
@@ -590,7 +604,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   modalTitle: {
-    fontSize: fontSize.textSize20,
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 16, 18),
     fontWeight: '600',
     color: colors.blackText,
     fontFamily: Fonts.latoBold,
@@ -613,9 +627,9 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: fontSize.textSize16,
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 15),
     color: '#252B37',
-    marginLeft: spacing.sm,
+    marginLeft: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
     padding: 0,
     fontFamily: Fonts.latoRegular,
   },
@@ -749,21 +763,21 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     backgroundColor: '#F3F4F6',
-    borderRadius: borderRadius.md,
-    paddingVertical: scaleHeight(12),
+    borderRadius: getTabletSafeDimension(borderRadius.md, 4, 5),
+    paddingVertical: getTabletSafeDimension(scaleHeight(12), scaleHeight(14), scaleHeight(14)),
     alignItems: 'center',
   },
   cancelButtonText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 13),
     fontWeight: '500',
     color: '#6B7280',
     fontFamily: Fonts.latoMedium,
   },
   addButton: {
     flex: 2,
-    borderRadius: borderRadius.md,
+    borderRadius: getTabletSafeDimension(borderRadius.md, 4, 5),
     backgroundColor: colors.primaryBlue,
-    paddingVertical: scaleHeight(12),
+    paddingVertical: getTabletSafeDimension(scaleHeight(12), scaleHeight(14), scaleHeight(14)),
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -772,7 +786,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   addButtonText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 13),
     fontWeight: '600',
     color: colors.white,
     fontFamily: Fonts.latoSemiBold,
