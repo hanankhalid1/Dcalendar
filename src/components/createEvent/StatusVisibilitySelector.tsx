@@ -5,6 +5,7 @@ import {
   StyleSheet,
   TouchableOpacity,
   Platform,
+  Dimensions,
 } from 'react-native';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { scaleHeight } from '../../utils/dimensions';
@@ -15,6 +16,20 @@ import {
   borderRadius,
 } from '../../utils/LightTheme';
 import { Fonts } from '../../constants/Fonts';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const getTabletSafeDimension = (
+  defaultValue: number,
+  tabletValue: number,
+  largeTabletValue: number,
+): number => {
+  if (SCREEN_WIDTH >= 600 && SCREEN_WIDTH < 900) {
+    return tabletValue;
+  } else if (SCREEN_WIDTH >= 900) {
+    return largeTabletValue;
+  }
+  return defaultValue;
+};
 
 interface StatusVisibilitySelectorProps {
   status?: string;
@@ -177,11 +192,11 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   label: {
-    fontSize: fontSize.textSize12,
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 10, 11),
     color: '#414651',
     fontFamily: Fonts.latoMedium,
     fontWeight: '500',
-    marginBottom: spacing.xs,
+    marginBottom: getTabletSafeDimension(spacing.xs, 4, 6),
   },
   dropdownField: {
     flexDirection: 'row',
@@ -191,18 +206,18 @@ const styles = StyleSheet.create({
     borderRadius: 8,
     borderWidth: 1,
     borderColor: '#DCE0E5',
-    paddingHorizontal: spacing.sm,
-    minHeight: scaleHeight(44),
-    paddingVertical: scaleHeight(10),
+    paddingHorizontal: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
+    minHeight: getTabletSafeDimension(scaleHeight(44), scaleHeight(38), scaleHeight(40)),
+    paddingVertical: getTabletSafeDimension(scaleHeight(10), scaleHeight(8), scaleHeight(9)),
   },
   dropdownFieldActive: {
     borderColor: '#00AEEF',
   },
   dropdownText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 10, 11),
     fontFamily: Fonts.latoRegular,
     color: '#A4A7AE',
-    lineHeight: 18,
+    lineHeight: getTabletSafeDimension(18, 14, 16),
   },
   dropdownTextFilled: {
     color: '#252B37',
@@ -231,13 +246,13 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
+    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
+    paddingVertical: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
   optionText: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 13),
     color: '#252B37',
     fontFamily: Fonts.latoRegular,
   },
