@@ -11,7 +11,26 @@ import { Colors } from '../constants/Colors';
 import { Fonts } from '../constants/Fonts';
 import * as DimensionsUtils from '../utils/dimensions';
 
-const { scaleWidth, scaleHeight, moderateScale } = DimensionsUtils;
+const { scaleWidth, scaleHeight, moderateScale, screenWidth } = DimensionsUtils;
+
+// Tablet detection
+const isTablet = screenWidth >= 600;
+
+// Helper function for tablet-safe font sizes
+const getResponsiveFontSize = (mobileSize: number, tabletFixedSize: number) => {
+  if (isTablet) {
+    return tabletFixedSize; // Use fixed smaller size for tablets
+  }
+  return mobileSize;
+};
+
+// Helper function for tablet-safe dimensions
+const getResponsiveDimension = (mobileSize: number, tabletFixedSize: number) => {
+  if (isTablet) {
+    return tabletFixedSize; // Use fixed smaller size for tablets
+  }
+  return mobileSize;
+};
 
 interface ExitConfirmModalProps {
   visible: boolean;
@@ -64,11 +83,11 @@ const styles = StyleSheet.create({
   },
   container: {
     width: '100%',
-    maxWidth: scaleWidth(340),
+    maxWidth: isTablet ? 320 : scaleWidth(340),
     backgroundColor: Colors.white,
-    borderRadius: moderateScale(14),
-    paddingHorizontal: moderateScale(20),
-    paddingVertical: moderateScale(18),
+    borderRadius: getResponsiveDimension(moderateScale(14), 10),
+    paddingHorizontal: getResponsiveDimension(moderateScale(20), 16),
+    paddingVertical: getResponsiveDimension(moderateScale(18), 14),
     shadowColor: '#000',
     shadowOffset: {
       width: 0,
@@ -80,48 +99,48 @@ const styles = StyleSheet.create({
   },
   title: {
     fontFamily: Fonts.bold,
-    fontSize: moderateScale(18),
+    fontSize: getResponsiveFontSize(moderateScale(18), 15),
     color: Colors.black,
     textAlign: 'left',
-    marginBottom: scaleHeight(10),
+    marginBottom: getResponsiveDimension(scaleHeight(10), 8),
   },
   message: {
     fontFamily: Fonts.regular,
-    fontSize: moderateScale(14),
+    fontSize: getResponsiveFontSize(moderateScale(14), 12),
     color: Colors.grey,
     textAlign: 'left',
-    marginBottom: scaleHeight(18),
-    lineHeight: moderateScale(20),
+    marginBottom: getResponsiveDimension(scaleHeight(18), 14),
+    lineHeight: getResponsiveFontSize(moderateScale(20), 16),
   },
   buttonRow: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
-    gap: scaleWidth(12),
+    gap: getResponsiveDimension(scaleWidth(12), 10),
   },
   cancelBtn: {
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(18),
-    borderRadius: moderateScale(8),
+    paddingVertical: getResponsiveDimension(scaleHeight(10), 8),
+    paddingHorizontal: getResponsiveDimension(scaleWidth(18), 14),
+    borderRadius: getResponsiveDimension(moderateScale(8), 6),
     backgroundColor: '#F0F0F0',
     justifyContent: 'center',
     alignItems: 'center',
   },
   cancelText: {
     fontFamily: Fonts.semiBold,
-    fontSize: moderateScale(14),
+    fontSize: getResponsiveFontSize(moderateScale(14), 12),
     color: Colors.black,
   },
   exitBtn: {
-    paddingVertical: scaleHeight(10),
-    paddingHorizontal: scaleWidth(18),
-    borderRadius: moderateScale(8),
+    paddingVertical: getResponsiveDimension(scaleHeight(10), 8),
+    paddingHorizontal: getResponsiveDimension(scaleWidth(18), 14),
+    borderRadius: getResponsiveDimension(moderateScale(8), 6),
     backgroundColor: Colors.primaryblue,
     justifyContent: 'center',
     alignItems: 'center',
   },
   exitText: {
     fontFamily: Fonts.semiBold,
-    fontSize: moderateScale(14),
+    fontSize: getResponsiveFontSize(moderateScale(14), 12),
     color: Colors.white,
   },
 });

@@ -8,6 +8,7 @@ import {
   Alert,
   FlatList,
   InteractionManager,
+  useWindowDimensions,
 } from 'react-native';
 import { useFocusEffect, useNavigation } from '@react-navigation/native';
 import { AppNavigationProp, Screen } from '../navigations/appNavigation.type';
@@ -66,6 +67,39 @@ const getTabletSafeDimension = (
 };
 
 const ScheduleScreen = () => {
+  const { width } = useWindowDimensions();
+  const isTabletLayout = width >= 600;
+  const getResponsiveDim = useCallback(
+    (mobileValue: number, tabletValue: number, maxValue: number) => {
+      return isTabletLayout ? Math.min(tabletValue, maxValue) : mobileValue;
+    },
+    [isTabletLayout],
+  );
+  const segmentStyles = useMemo(
+    () => ({
+      container: {
+        width,
+        paddingHorizontal: getResponsiveDim(scaleWidth(18), 14, 20),
+        paddingTop: getResponsiveDim(scaleHeight(12), 10, 14),
+        paddingBottom: getResponsiveDim(scaleHeight(12), 10, 14),
+        marginTop: getResponsiveDim(scaleHeight(8), 6, 10),
+      },
+      control: {
+        width: getResponsiveDim(scaleWidth(339), width * 0.9, width - 20),
+        height: getResponsiveDim(scaleHeight(48), 40, 52),
+        borderRadius: getResponsiveDim(10, 8, 12),
+        padding: getResponsiveDim(4, 3, 5),
+        gap: getResponsiveDim(3, 2, 4),
+      },
+      segmentText: {
+        fontSize: getResponsiveDim(fontSize.textSize16, 14, 16),
+      },
+      segmentButton: {
+        borderRadius: getResponsiveDim(8, 6, 10),
+      },
+    }),
+    [getResponsiveDim, width],
+  );
   const navigation = useNavigation<AppNavigationProp>();
   const { setCurrentMonthByIndex } = useCalendarStore();
   const { selectedTimeZone } = useSettingsStore();
@@ -700,11 +734,14 @@ const ScheduleScreen = () => {
       />
 
       {/* Segmented Control Navigation */}
-      <View style={styles.segmentedControlContainer}>
-        <View style={styles.segmentedControl}>
+      <View
+        style={[styles.segmentedControlContainer, segmentStyles.container]}
+      >
+        <View style={[styles.segmentedControl, segmentStyles.control]}>
           <TouchableOpacity
             style={[
               styles.segmentButton,
+              segmentStyles.segmentButton,
               selectedTab === 'All' && styles.segmentButtonActive,
             ]}
             onPress={() => setSelectedTab('All')}
@@ -712,6 +749,7 @@ const ScheduleScreen = () => {
             <Text
               style={[
                 styles.segmentText,
+                segmentStyles.segmentText,
                 selectedTab === 'All' && styles.segmentTextActive,
               ]}
             >
@@ -722,6 +760,7 @@ const ScheduleScreen = () => {
           <TouchableOpacity
             style={[
               styles.segmentButton,
+              segmentStyles.segmentButton,
               selectedTab === 'Upcoming' && styles.segmentButtonActive,
             ]}
             onPress={() => setSelectedTab('Upcoming')}
@@ -729,6 +768,7 @@ const ScheduleScreen = () => {
             <Text
               style={[
                 styles.segmentText,
+                segmentStyles.segmentText,
                 selectedTab === 'Upcoming' && styles.segmentTextActive,
               ]}
             >
@@ -739,6 +779,7 @@ const ScheduleScreen = () => {
           <TouchableOpacity
             style={[
               styles.segmentButton,
+              segmentStyles.segmentButton,
               selectedTab === 'Completed' && styles.segmentButtonActive,
             ]}
             onPress={() => setSelectedTab('Completed')}
@@ -746,6 +787,7 @@ const ScheduleScreen = () => {
             <Text
               style={[
                 styles.segmentText,
+                segmentStyles.segmentText,
                 selectedTab === 'Completed' && styles.segmentTextActive,
               ]}
             >
