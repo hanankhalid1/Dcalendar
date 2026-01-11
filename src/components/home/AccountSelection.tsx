@@ -240,7 +240,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
       : 32;
     // Smaller font and radio sizes for better balance
     const fontSizeName = isTablet
-      ? moderateScale(10)
+      ? moderateScale(8)
       : isFolding
       ? moderateScale(14)
       : isLargeMobile
@@ -249,7 +249,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
       ? moderateScale(10)
       : moderateScale(12);
     const fontSizeEmail = isTablet
-      ? moderateScale(8)
+      ? moderateScale(7)
       : isFolding
       ? moderateScale(12)
       : isLargeMobile

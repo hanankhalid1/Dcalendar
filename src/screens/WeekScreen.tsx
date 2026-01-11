@@ -33,6 +33,7 @@ import { useSettingsStore } from '../stores/useSetting';
 import EventDetailsModal from '../components/EventDetailsModal';
 import { useToast } from '../hooks/useToast';
 import { colors, spacing, shadows } from '../utils/LightTheme';
+import { scaleWidth, scaleHeight, moderateScale } from '../utils/dimensions';
 import { BlockchainService } from '../services/BlockChainService';
 import { useToken } from '../stores/useTokenStore';
 import { NECJSPRIVATE_KEY } from '../constants/Config';
@@ -45,6 +46,7 @@ import LinearGradient from 'react-native-linear-gradient';
 import { Fonts } from '../constants/Fonts';
 import { convertToSelectedTimezone } from '../utils/timezone';
 import Icon from 'react-native-vector-icons/AntDesign';
+import EventCard from '../components/EventCard';
 
 const screenWidth = Dimensions.get('window').width;
 const isTablet = screenWidth >= 600;
@@ -1723,219 +1725,67 @@ const WeekScreen = () => {
 
           <View style={styles.eventsList}>
             {selectedDateEvents.length > 0 ? (
-              selectedDateEvents.slice(0, 20).map((event, index) => (
-                <View
-                  key={`${event.uid}-${index}`}
-                  style={{
-                    display: 'flex',
-                    flexDirection: 'column',
-                    marginBottom: 10,
-                  }}
-                >
+              selectedDateEvents.slice(0, 20).map((event, index) => {
+                const start = parseTimeToPST(event.fromTime)?.toLocaleTimeString(
+                  'en-US',
+                  { hour: 'numeric', minute: '2-digit' },
+                );
+                const end = parseTimeToPST(event.toTime)?.toLocaleTimeString(
+                  'en-US',
+                  { hour: 'numeric', minute: '2-digit' },
+                );
+                const timeDisplay = event.isTask ? `${start}` : `${start} - ${end}`;
+
+                return (
                   <View
+                    key={`${event.uid}-${index}`}
                     style={{
-                      flexDirection: 'row',
-                      alignItems: 'center',
-                      marginBottom: spacing.sm,
+                      display: 'flex',
+                      flexDirection: 'column',
+                      marginBottom: 10,
                     }}
                   >
-                    <Text style={[styles.eventTime]}>
-                      {event.instanceStartTime?.toLocaleTimeString('en-US', {
-                        hour: 'numeric',
-                        minute: '2-digit',
-                      })}
-                    </Text>
-
                     <View
                       style={{
-                        flex: 1,
-                        height: 1,
-                        backgroundColor: '#D5D7DA',
-                        marginLeft: 14,
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: spacing.sm,
                       }}
-                    />
-                  </View>
+                    >
+                      <Text style={[styles.eventTime]}>
+                        {event.instanceStartTime?.toLocaleTimeString('en-US', {
+                          hour: 'numeric',
+                          minute: '2-digit',
+                        })}
+                      </Text>
 
-                  <TouchableOpacity
-                    style={styles.eventItem}
-                    onPress={() => handleEventPress(event)}
-                  >
-                    <View style={styles.eventContent}>
-                      <Text style={styles.eventTitle}>{event.title}</Text>
-
-                      <View style={styles.eventBadges}>
-                        <View style={styles.badge}>
-                          <ClockIcon height={14} width={14} />
-                          <Text style={styles.eventTime}>
-                            {parseTimeToPST(event.fromTime)?.toLocaleTimeString(
-                              'en-US',
-                              {
-                                hour: 'numeric',
-                                minute: '2-digit',
-                              },
-                            )}
-                            {!event.isTask && (
-                              <>
-                                {' - '}
-                                {parseTimeToPST(
-                                  event.toTime,
-                                )?.toLocaleTimeString('en-US', {
-                                  hour: 'numeric',
-                                  minute: '2-digit',
-                                })}
-                              </>
-                            )}
-                          </Text>
-                        </View>
-
-                        {event.isRecurring && (
-                          <View style={styles.badge}>
-                            <CalendarIcon height={14} width={14} />
-                            <Text style={styles.badgeText}>
-                              {getRecurrenceDayText(event)}
-                            </Text>
-                          </View>
-                        )}
-
-                        <View
-                          style={[
-                            styles.badge,
-                            {
-                              borderColor: event.isTask ? '#8DC63F' : '#00AEEF',
-                            },
-                          ]}
-                        >
-                          {event.isTask ? (
-                            <TaskIcon height={14} width={14} />
-                          ) : (
-                            <EventIcon height={14} width={14} />
-                          )}
-                          <Text style={styles.badgeText}>
-                            {event.isTask ? 'Task' : 'Event'}
-                          </Text>
-                        </View>
-                      </View>
-
-                      {(() => {
-                        const eventGuests = getEventGuests(event);
-                        if (!eventGuests || eventGuests.length === 0)
-                          return null;
-
-                        const maxVisible = 5;
-                        const size = 36;
-                        const visibleGuests = eventGuests.slice(0, maxVisible);
-                        const remainingCount = eventGuests.length - maxVisible;
-                        const isSingleGuest = eventGuests.length === 1;
-
-                        return (
-                          <View style={styles.guestsContainer}>
-                            {visibleGuests.map((guest, index) => {
-                              const initials = getGuestInitials(guest.email);
-                              const gradientColors = getGuestBackgroundColor(
-                                guest.email,
-                              );
-                              const hasAvatar =
-                                guest.avatar &&
-                                typeof guest.avatar === 'string' &&
-                                guest.avatar.trim() !== '';
-                              const imageFailed = failedImages.has(guest.email);
-                              const marginLeft = isSingleGuest
-                                ? 0
-                                : index > 0
-                                ? -12
-                                : 0;
-
-                              return (
-                                <View
-                                  key={`${guest.email}-${index}`}
-                                  style={[
-                                    {
-                                      width: size,
-                                      height: size,
-                                      borderRadius: size / 2,
-                                      marginLeft: marginLeft,
-                                      zIndex: maxVisible - index,
-                                      borderWidth: 2,
-                                      borderColor: colors.white,
-                                      overflow: 'hidden',
-                                      backgroundColor: 'transparent',
-                                    },
-                                  ]}
-                                >
-                                  {hasAvatar && !imageFailed ? (
-                                    <Image
-                                      source={{ uri: guest.avatar }}
-                                      style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        resizeMode: 'cover',
-                                      }}
-                                      onError={() => {
-                                        setFailedImages(prev =>
-                                          new Set(prev).add(guest.email),
-                                        );
-                                      }}
-                                    />
-                                  ) : (
-                                    <LinearGradient
-                                      colors={gradientColors}
-                                      start={{ x: 0, y: 0 }}
-                                      end={{ x: 1, y: 1 }}
-                                      style={{
-                                        width: '100%',
-                                        height: '100%',
-                                        justifyContent: 'center',
-                                        alignItems: 'center',
-                                      }}
-                                    >
-                                      <Text
-                                        style={[
-                                          styles.guestInitialsText,
-                                          {
-                                            fontSize: size * 0.4,
-                                          },
-                                        ]}
-                                      >
-                                        {initials}
-                                      </Text>
-                                    </LinearGradient>
-                                  )}
-                                </View>
-                              );
-                            })}
-
-                            {remainingCount > 0 && (
-                              <View
-                                style={[
-                                  styles.guestRemainingCount,
-                                  {
-                                    width: size,
-                                    height: size,
-                                    borderRadius: size / 2,
-                                    marginLeft: -12,
-                                    zIndex: 0,
-                                  },
-                                ]}
-                              >
-                                <Text
-                                  style={[
-                                    styles.guestCountText,
-                                    {
-                                      fontSize: size * 0.35,
-                                    },
-                                  ]}
-                                >
-                                  +{remainingCount}
-                                </Text>
-                              </View>
-                            )}
-                          </View>
-                        );
-                      })()}
+                      <View
+                        style={{
+                          flex: 1,
+                          height: 1,
+                          backgroundColor: '#D5D7DA',
+                          marginLeft: 14,
+                        }}
+                      />
                     </View>
-                  </TouchableOpacity>
-                </View>
-              ))
+
+                    <View style={styles.eventItem}>
+                      <EventCard
+                        title={event.title}
+                        eventId={event.uid}
+                        event={event}
+                        time={timeDisplay}
+                        date={selectedDateString}
+                        color={event.isTask ? '#8DC63F' : '#00AEEF'}
+                        tags={event.list || []}
+                        compact={true}
+                        tabletCornerRadius={12}
+                        onPress={() => handleEventPress(event)}
+                      />
+                    </View>
+                  </View>
+                );
+              })
             ) : (
               <Text style={styles.noEventsText}>No events for this date</Text>
             )}
@@ -2108,7 +1958,7 @@ const styles = StyleSheet.create({
   },
   eventsContainer: {
     marginHorizontal: getTabletSafeDimension(spacing.md, 12, 18),
-    paddingHorizontal: getTabletSafeDimension(4, 3, 6),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(4, 8, 12)),
   },
   eventsTitle: {
     fontSize: getTabletSafeDimension(14, 12, 16),
@@ -2120,50 +1970,50 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
   eventItem: {
-    backgroundColor: '#ffffff',
-    borderRadius: getTabletSafeDimension(12, 10, 14),
-    paddingVertical: getTabletSafeDimension(8, 12, 16),
-    paddingHorizontal: getTabletSafeDimension(12, 16, 20),
-    marginBottom: getTabletSafeDimension(spacing.sm, 8, 12),
-    borderColor: '#D5D7DA',
-    borderWidth: 1,
-    borderLeftColor: '#D5D7DA',
-    borderLeftWidth: 1,
+    backgroundColor: 'transparent',
+    borderRadius: 0,
+    paddingVertical: 0,
+    paddingHorizontal: 0,
+    marginBottom: scaleHeight(getTabletSafeDimension(12, 8, 16)),
+    borderColor: 'transparent',
+    borderWidth: 0,
+    borderLeftColor: 'transparent',
+    borderLeftWidth: 0,
   },
   eventContent: {
     gap: getTabletSafeDimension(12, 10, 14),
   },
   eventTitle: {
-    fontSize: getTabletSafeDimension(14, 16, 16),
+    fontSize: moderateScale(getTabletSafeDimension(14, 7, 16)),
     fontFamily: Fonts.latoRegular,
     color: '#000',
     marginBottom: 0,
   },
   eventTime: {
-    fontSize: getTabletSafeDimension(10, 12, 12),
-    fontFamily: Fonts.bold,
+    fontSize: moderateScale(getTabletSafeDimension(10, 6, 12)),
+    fontFamily: Fonts.latoMedium,
     textAlign: 'left',
     color: '#717680',
   },
   eventBadges: {
     flexDirection: 'row',
     flexWrap: 'wrap',
-    gap: getTabletSafeDimension(8, 6, 10),
+    gap: scaleWidth(getTabletSafeDimension(6, 8, 10)),
   },
   badge: {
     display: 'flex',
     flexDirection: 'row',
-    gap: getTabletSafeDimension(4, 3, 6),
+    gap: scaleWidth(getTabletSafeDimension(3, 3, 4)),
     backgroundColor: '#fff',
-    paddingHorizontal: getTabletSafeDimension(8, 6, 10),
-    paddingVertical: getTabletSafeDimension(4, 3, 6),
-    borderRadius: 100,
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(6, 6, 8)),
+    paddingVertical: scaleHeight(getTabletSafeDimension(3, 2, 4)),
+    borderRadius: moderateScale(getTabletSafeDimension(12, 14, 16)),
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
   },
   badgeText: {
-    fontSize: getTabletSafeDimension(10, 12, 12),
-    fontFamily: Fonts.bold,
+    fontSize: moderateScale(getTabletSafeDimension(10, 6, 12)),
+    fontFamily: Fonts.latoBold,
     color: '#717680',
     fontWeight: '500',
   },

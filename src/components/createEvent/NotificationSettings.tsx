@@ -7,6 +7,7 @@ import {
   Image,
   TextInput,
   Platform,
+  Dimensions,
 } from 'react-native';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { scaleHeight, scaleWidth } from '../../utils/dimensions';
@@ -28,6 +29,20 @@ interface NotificationSettingsProps {
   // Register a closer so parent can close this dropdown when others open
   registerCloser?: (closeFn: () => void) => void;
 }
+
+const screenWidth = Dimensions.get('window').width;
+const isTablet = screenWidth >= 600;
+
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 const NotificationSettings: React.FC<NotificationSettingsProps> = ({
   notificationMinutes,
@@ -162,8 +177,8 @@ const styles = StyleSheet.create({
   labelText: {
     fontFamily: Fonts.latoMedium,
     fontWeight: '500',
-    fontSize: 12,
-    lineHeight: 12,
+    fontSize: getTabletSafeDimension(12, 15, 17),
+    lineHeight: getTabletSafeDimension(12, 18, 20),
     letterSpacing: 0,
     color: '#414651',
     marginBottom: scaleHeight(8),
@@ -188,14 +203,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   numberText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 14, 16),
     fontFamily: Fonts.latoRegular,
     color: colors.textPrimary,
     fontWeight: '400',
     marginHorizontal: spacing.xs,
   },
   numberTextInput: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 14, 16),
     fontFamily: Fonts.latoRegular,
     color: '#252B37',
     fontWeight: '500',
@@ -228,7 +243,7 @@ const styles = StyleSheet.create({
     borderColor: '#00AEEF',
   },
   timeUnitText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 14, 16),
     fontFamily: Fonts.latoRegular,
     color: '#252B37',
     fontWeight: '500',
@@ -274,7 +289,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'transparent',
   },
   timeUnitOptionText: {
-    fontSize: 12,
+    fontSize: getTabletSafeDimension(12, 14, 16),
     fontFamily: Fonts.latoRegular,
     color: '#252B37',
     fontWeight: '500',

@@ -638,18 +638,21 @@ const ScheduleScreen = () => {
   // Memoize event cards to prevent re-renders
   const renderEventCard = useCallback(
     (event: any, dateKey: string, index: number) => (
-      <EventCard
-        key={event.id || `${dateKey}-${index}`}
-        title={event.title}
-        eventId={event.id}
-        event={event}
-        time={event.time}
-        date={event.date}
-        color={event.color}
-        tags={event.tags}
-        compact={true}
-        onEdit={() => handleEditEvent(event)}
-      />
+      <View style={styles.eventCardWrapper}>
+        <EventCard
+          key={event.id || `${dateKey}-${index}`}
+          title={event.title}
+          eventId={event.id}
+          event={event}
+          time={event.time}
+          date={event.date}
+          color={event.color}
+          tags={event.tags}
+          compact={true}
+          tabletCornerRadius={12}
+          onEdit={() => handleEditEvent(event)}
+        />
+      </View>
     ),
     [],
   );
@@ -804,7 +807,11 @@ const ScheduleScreen = () => {
         activeOpacity={0.1}
       />
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView 
+        style={styles.content} 
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
         {loading ? (
           <CustomLoader />
         ) : events.length === 0 ? (
@@ -905,6 +912,10 @@ const styles = StyleSheet.create({
   content: {
     flex: 1,
   },
+  scrollContent: {
+    flexGrow: 1,
+    paddingBottom: getTabletSafeDimension(scaleHeight(100), 80, 120),
+  },
   leftEdgeTouchArea: {
     position: 'absolute',
     left: 0,
@@ -943,7 +954,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primaryBlue, // Using the same blue as calendar icon
   },
   segmentText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 16),
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 16, 18),
     fontWeight: '500',
     fontFamily: Fonts.latoMedium,
     color: colors.grey400,
@@ -978,10 +989,10 @@ const styles = StyleSheet.create({
     marginBottom: getTabletSafeDimension(scaleHeight(8), 6, 10), // Reduced gap
   },
   emptyStateIconText: {
-    fontSize: getTabletSafeDimension(scaleWidth(60), 48, 64),
+    fontSize: getTabletSafeDimension(scaleWidth(60), 54, 68),
   },
   emptyStateTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize20, 16, 22),
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 20, 24),
     fontWeight: '700',
     fontFamily: Fonts.latoBold,
     color: colors.blackText,
@@ -989,21 +1000,29 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   emptyStateDescription: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 11, 16),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     fontFamily: Fonts.latoRegular,
     color: colors.grey400,
     textAlign: 'center',
     paddingHorizontal: getTabletSafeDimension(scaleWidth(40), 30, 50),
-    lineHeight: getTabletSafeDimension(fontSize.textSize20, 16, 24),
+    lineHeight: getTabletSafeDimension(fontSize.textSize20, 22, 26),
     marginTop: getTabletSafeDimension(scaleHeight(4), 3, 6),
   },
   // Date Group Styles (matching DeletedEventsScreen)
   dateGroup: {
-    marginBottom: getTabletSafeDimension(scaleHeight(24), 18, 28),
-    paddingHorizontal: getTabletSafeDimension(scaleWidth(20), 16, 24),
+    marginBottom: scaleHeight(getTabletSafeDimension(16, 8, 20)),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(20, 12, 24)),
+    flexShrink: 0,
+    flexGrow: 0,
+  },
+  eventCardWrapper: {
+    width: '100%',
+    marginBottom: scaleHeight(getTabletSafeDimension(12, 8, 16)),
+    alignSelf: 'flex-start',
+    flexShrink: 0,
   },
   dateHeader: {
-    fontSize: getTabletSafeDimension(moderateScale(16), 13, 18),
+    fontSize: getTabletSafeDimension(moderateScale(16), 16, 20),
     fontWeight: '600',
     color: '#000',
     marginBottom: getTabletSafeDimension(scaleHeight(12), 10, 14),
@@ -1012,7 +1031,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   dateHeaderText: {
-    fontSize: getTabletSafeDimension(moderateScale(16), 13, 18),
+    fontSize: getTabletSafeDimension(moderateScale(16), 16, 20),
     fontWeight: '600',
     color: '#000',
     fontFamily: Fonts.latoBold,

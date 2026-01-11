@@ -643,12 +643,12 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   inlineErrorTitle: {
-    fontSize: fontSize.textSize14,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, fontSize.textSize12, 14),
     color: '#EF4444',
     fontFamily: Fonts.latoMedium,
   },
   inlineErrorSubtext: {
-    fontSize: fontSize.textSize12,
+    fontSize: getTabletSafeDimension(fontSize.textSize12, fontSize.textSize11, 12),
     color: '#9CA3AF',
     marginTop: 4,
   },

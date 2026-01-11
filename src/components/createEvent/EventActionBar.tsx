@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
 import { scaleHeight, scaleWidth } from '../../utils/dimensions';
 import {
@@ -9,6 +9,20 @@ import {
   borderRadius,
   shadows,
 } from '../../utils/LightTheme';
+
+const screenWidth = Dimensions.get('window').width;
+const isTablet = screenWidth >= 600;
+
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 interface EventActionBarProps {
   showAdvanced: boolean;
@@ -65,7 +79,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   advanceOptionsText: {
-    fontSize: fontSize.textSize18,
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 20, 22),
     color: colors.dimGray,
     fontWeight: '600',
   },

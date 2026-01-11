@@ -1522,7 +1522,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                           return null;
 
                         const maxVisible = 5;
-                        const size = 36;
+                        const size = moderateScale(getTabletSafeDimension(30, 18, 24));
                         const visibleGuests = eventGuests.slice(0, maxVisible);
                         const remainingCount = eventGuests.length - maxVisible;
                         const isSingleGuest = eventGuests.length === 1;
@@ -1743,9 +1743,9 @@ const styles = StyleSheet.create({
   eventItem: {
     backgroundColor: '#ffffff',
     borderRadius: getTabletSafeDimension(moderateScale(12), moderateScale(14), 18),
-    paddingVertical: getTabletSafeDimension(scaleHeight(10), 12, 16),
-    paddingHorizontal: getTabletSafeDimension(scaleWidth(14), 16, 20),
-    marginBottom: getTabletSafeDimension(spacing.sm, spacing.md, 16),
+    paddingVertical: scaleHeight(getTabletSafeDimension(10, 8, 10)),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(12, 12, 16)),
+    marginBottom: scaleHeight(getTabletSafeDimension(12, 10, 12)),
     borderColor: '#D5D7DA',
     borderWidth: 1,
     borderLeftColor: '#D5D7DA',
@@ -1760,17 +1760,17 @@ const styles = StyleSheet.create({
     elevation: isTablet ? 2 : 1,
   },
   eventContent: {
-    gap: getTabletSafeDimension(scaleHeight(10), 12, 14),
+    gap: getTabletSafeDimension(scaleHeight(10), 8, 10),
   },
   eventTitle: {
-    fontSize: getTabletSafeDimension(moderateScale(14), moderateScale(16), 18),
+    fontSize: moderateScale(getTabletSafeDimension(14, 7, 16)),
     fontFamily: Fonts.latoRegular,
     color: '#252B37',
     marginBottom: 0,
     fontWeight: '500',
   },
   eventTime: {
-    fontSize: getTabletSafeDimension(moderateScale(11), moderateScale(13), 15),
+    fontSize: moderateScale(getTabletSafeDimension(11, 6, 15)),
     fontFamily: Fonts.latoMedium,
     textAlign: 'left',
     color: '#717680',
@@ -1790,19 +1790,19 @@ const styles = StyleSheet.create({
   badge: {
     display: 'flex',
     flexDirection: 'row',
-    gap: getTabletSafeDimension(scaleWidth(4), 6, 8),
+    gap: scaleWidth(getTabletSafeDimension(3, 3, 4)),
     backgroundColor: '#fff',
-    paddingHorizontal: getTabletSafeDimension(scaleWidth(8), 10, 12),
-    paddingVertical: getTabletSafeDimension(scaleHeight(5), 6, 8),
-    borderRadius: getTabletSafeDimension(moderateScale(100), 120, 140),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(6, 6, 8)),
+    paddingVertical: scaleHeight(getTabletSafeDimension(3, 2, 4)),
+    borderRadius: moderateScale(getTabletSafeDimension(12, 14, 16)),
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
   },
   badgeText: {
-    fontSize: getTabletSafeDimension(moderateScale(10), moderateScale(12), 14),
-    fontFamily: Fonts.latoMedium,
+    fontSize: moderateScale(getTabletSafeDimension(10, 6, 12)),
+    fontFamily: Fonts.latoBold,
     color: '#717680',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   noEventsText: {
     fontSize: 14,

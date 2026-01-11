@@ -2301,7 +2301,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   closeButtonText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize17, 15, 17),
+    fontSize: getTabletSafeDimension(fontSize.textSize17, 19, 20),
     color: colors.blackText,
     fontWeight: '700',
     fontFamily: Fonts.latoBold,
@@ -2331,8 +2331,8 @@ const styles = StyleSheet.create({
   labelText: {
     fontFamily: Fonts.latoMedium,
     fontWeight: '500',
-    fontSize: getTabletSafeDimension(12, 11, 13),
-    lineHeight: getTabletSafeDimension(12, 12, 14),
+    fontSize: getTabletSafeDimension(12, 15, 17),
+    lineHeight: getTabletSafeDimension(12, 18, 20),
     letterSpacing: 0,
     color: '#414651', // Gray-700
     marginBottom: getTabletSafeDimension(scaleHeight(8), 6, 10),
@@ -2341,10 +2341,10 @@ const styles = StyleSheet.create({
     borderColor: colors.primaryBlue,
   },
   titleInput: {
-    fontSize: getTabletSafeDimension(12, 11, 13),
+    fontSize: getTabletSafeDimension(12, 16, 18),
     fontFamily: Fonts.latoRegular,
     fontWeight: '400',
-    lineHeight: 18,
+    lineHeight: 22,
     letterSpacing: 0,
     color: '#252B37',
     paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 14),
@@ -2384,7 +2384,7 @@ const styles = StyleSheet.create({
     minHeight: getTabletSafeDimension(scaleHeight(44), 40, 48),
   },
   fieldErrorText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize12, 10, 11),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 14, 15),
     color: '#FF3B30',
     fontWeight: '400',
     marginTop: getTabletSafeDimension(spacing.xs, 2, spacing.xs),
@@ -2396,10 +2396,10 @@ const styles = StyleSheet.create({
     textAlignVertical: 'top', // Aligns text to the top for Android
     borderWidth: 1,
     borderColor: '#DCE0E5',
-    fontSize: getTabletSafeDimension(12, 11, 13),
+    fontSize: getTabletSafeDimension(12, 16, 18),
     fontFamily: Fonts.latoRegular,
     fontWeight: '400',
-    lineHeight: 18,
+    lineHeight: 22,
     letterSpacing: 0,
     color: '#252B37',
     padding: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
@@ -2431,7 +2431,7 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
   saveButtonText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize16, 17, 18),
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 18, 20),
     color: colors.white,
     fontWeight: '700',
     fontFamily: Fonts.latoBold,
@@ -2576,7 +2576,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.xs, spacing.sm),
   },
   customModalTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize18, 16, 18),
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 20, 22),
     fontWeight: '600',
     color: '#252B37',
     marginBottom: getTabletSafeDimension(spacing.sm, 2, 4),
@@ -2587,7 +2587,7 @@ const styles = StyleSheet.create({
     overflow: 'visible',
   },
   customRecurrenceSectionTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 14),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 17, 19),
     fontWeight: '600',
     color: '#414651',
     marginBottom: getTabletSafeDimension(spacing.md, 2, 4),
@@ -2605,7 +2605,7 @@ const styles = StyleSheet.create({
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
     textAlign: 'left',
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 14, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 17, 19),
     color: '#252B37',
     paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
     paddingVertical: 0,
@@ -2671,7 +2671,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   customUnitDropdownItemText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 14, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 17, 19),
     color: '#252B37',
     fontFamily: Fonts.latoRegular,
   },
@@ -2730,7 +2730,7 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   },
   customDayOptionText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 11, 12),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     fontWeight: '400',
     color: '#A4A7AE',
     fontFamily: Fonts.latoRegular,
@@ -2762,7 +2762,7 @@ const styles = StyleSheet.create({
     borderColor: '#000000',
   },
   customEndsOptionText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 11, 12),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     color: '#A4A7AE',
     fontWeight: '400',
     minWidth: getTabletSafeDimension(scaleWidth(40), 25, 30),
@@ -2779,10 +2779,10 @@ const styles = StyleSheet.create({
     borderColor: '#DCE0E5',
     borderRadius: 3,
     paddingHorizontal: getTabletSafeDimension(spacing.xs, 4, 6),
-    fontSize: getTabletSafeDimension(fontSize.textSize12, 9, 10),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 16, 18),
     color: colors.blackText,
     paddingVertical: getTabletSafeDimension(spacing.sm, 3, 4),
-    lineHeight: getTabletSafeDimension(scaleHeight(13), 12, 14),
+    lineHeight: getTabletSafeDimension(scaleHeight(13), 20, 22),
     justifyContent: 'center',
     flexShrink: 1,
     flex: 0.8,
@@ -2791,7 +2791,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#F5F5F5',
   },
   customEndsInputText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize12, 9, 10),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 16, 18),
     color: colors.blackText,
     flexShrink: 0,
     fontFamily: Fonts.latoRegular,
@@ -2819,7 +2819,7 @@ const styles = StyleSheet.create({
     marginBottom: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
   },
   datePickerModalTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize18, 18, 20),
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 20, 22),
     fontWeight: 'bold',
     color: colors.blackText,
   },
@@ -2827,11 +2827,11 @@ const styles = StyleSheet.create({
     padding: getTabletSafeDimension(spacing.xs, spacing.sm, spacing.md),
   },
   datePickerModalCloseText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize20, 20, 22),
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 22, 24),
     color: colors.blackText,
   },
   customEndsOccurrencesText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 9, 10),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     color: colors.blackText,
     marginLeft: getTabletSafeDimension(spacing.xs, 2, 3),
     fontFamily: Fonts.latoRegular,
@@ -2855,7 +2855,7 @@ const styles = StyleSheet.create({
     height: getTabletSafeDimension(scaleHeight(45), 42, 48),
   },
   customCancelButtonText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 10, 11),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     fontWeight: '500',
     color: '#6B7280',
     fontFamily: Fonts.latoMedium,
@@ -2871,7 +2871,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   customDoneButtonText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 10, 11),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     fontWeight: '600',
     color: colors.white,
     fontFamily: Fonts.latoSemiBold,
@@ -2884,7 +2884,7 @@ const styles = StyleSheet.create({
     marginBottom: getTabletSafeDimension(scaleHeight(12), 10, 14),
   },
   repeatTitle: {
-    fontSize: getTabletSafeDimension(16, 15, 17),
+    fontSize: getTabletSafeDimension(16, 18, 20),
     fontWeight: '600',
     fontFamily: Fonts.latoSemiBold,
     color: colors.blackText,

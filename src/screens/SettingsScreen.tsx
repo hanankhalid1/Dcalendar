@@ -1267,7 +1267,7 @@ const styles = StyleSheet.create({
   },
 
   headerTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize18, 16, 20),
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 20, 24),
 
     fontWeight: '600',
 
@@ -1297,7 +1297,7 @@ const styles = StyleSheet.create({
   },
 
   sectionLabel: {
-    fontSize: getTabletSafeDimension(fontSize.textSize12, 10, 12),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 15, 17),
 
     color: themeColors.grey400,
 
@@ -1351,7 +1351,7 @@ const styles = StyleSheet.create({
   },
 
   settingTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 14),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
 
     color: Colors.black,
 
@@ -1361,7 +1361,7 @@ const styles = StyleSheet.create({
   },
 
   settingSubtitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize12, 10, 12),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 14, 15),
 
     color: themeColors.grey400,
 
@@ -1373,7 +1373,7 @@ const styles = StyleSheet.create({
   settingButtonText: {
     color: Colors.primaryBlue,
 
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 14),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
 
     fontWeight: '700',
 
@@ -1420,7 +1420,7 @@ const styles = StyleSheet.create({
   },
 
   modalTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize20, 17, 20),
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 20, 22),
 
     fontWeight: '600',
 
@@ -1474,7 +1474,7 @@ const styles = StyleSheet.create({
   },
 
   radioText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 14),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
 
     color: Colors.black,
 
@@ -1528,7 +1528,7 @@ const styles = StyleSheet.create({
   },
 
   cancelButtonText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 16),
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 16, 18),
 
     color: Colors.black,
 
@@ -1538,7 +1538,7 @@ const styles = StyleSheet.create({
   },
 
   confirmButtonText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 16),
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 16, 18),
 
     color: Colors.white,
 
@@ -1570,7 +1570,7 @@ const styles = StyleSheet.create({
   titleStyle: {
     fontFamily: Fonts.semiBold,
 
-    fontSize: getTabletSafeDimension(16, 14, 16),
+    fontSize: getTabletSafeDimension(16, 18, 20),
 
     color: Colors.white,
 
@@ -1585,7 +1585,7 @@ const styles = StyleSheet.create({
   },
 
   logoutText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 16),
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 16, 18),
     color: '#FF3B30', // Red color for logout
     fontFamily: Fonts.regular,
     fontWeight: '400',

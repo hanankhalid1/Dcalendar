@@ -576,6 +576,7 @@ const DailyCalendarScreen = () => {
                             color={isTaskEvent ? '#8DC63F' : '#00AEEF'}
                             tags={event.list || []}
                             compact={true}
+                          tabletCornerRadius={12}
                             onEdit={() => handleEditEvent(event)}
                           />
                         </View>

@@ -93,6 +93,7 @@ interface EventCardProps {
   onEdit?: (event: CalendarEvent) => void;
   event: CalendarEvent;
   isExpanded?: boolean; // New prop to control expanded state from parent
+  tabletCornerRadius?: number; // Optional: override corner radius on tablets
 }
 
 // Helper function to render icons based on type
@@ -137,6 +138,7 @@ const EventCard: React.FC<EventCardProps> = ({
 
   onPress,
   isExpanded = false,
+  tabletCornerRadius,
 }) => {
   const [internalExpanded, setInternalExpanded] = useState(false);
   const navigation = useNavigation();
@@ -415,6 +417,9 @@ const EventCard: React.FC<EventCardProps> = ({
             expanded
               ? styles.compactContainerExpanded
               : styles.compactContainer,
+            isTablet && tabletCornerRadius
+              ? { borderRadius: tabletCornerRadius }
+              : null,
           ]}
           {...containerProps}
         >
@@ -431,14 +436,28 @@ const EventCard: React.FC<EventCardProps> = ({
             {/* Badges Row */}
             <View style={styles.compactBadgesRow}>
               {/* Time Badge */}
-              <View style={styles.compactBadge}>
+              <View
+                style={[
+                  styles.compactBadge,
+                  isTablet && tabletCornerRadius
+                    ? { borderRadius: tabletCornerRadius }
+                    : null,
+                ]}
+              >
                 <ClockIcon height={14} width={14} />
                 <Text style={styles.compactBadgeText}>{timeWithTimezone}</Text>
               </View>
 
               {/* Recurrence Badge */}
               {recurrenceInfo && recurrenceInfo !== 'Does not repeat' && (
-                <View style={styles.compactBadge}>
+                <View
+                  style={[
+                    styles.compactBadge,
+                    isTablet && tabletCornerRadius
+                      ? { borderRadius: tabletCornerRadius }
+                      : null,
+                  ]}
+                >
                   <CalendarIcon height={14} width={14} />
                   <Text style={styles.compactBadgeText}>
                     {typeof recurrenceInfo === 'string'
@@ -455,6 +474,9 @@ const EventCard: React.FC<EventCardProps> = ({
                   {
                     borderColor: isTask ? '#8DC63F' : '#00AEEF',
                   },
+                  isTablet && tabletCornerRadius
+                    ? { borderRadius: tabletCornerRadius }
+                    : null,
                 ]}
               >
                 {isTask ? (
@@ -654,7 +676,11 @@ const EventCard: React.FC<EventCardProps> = ({
       {isLoading && <CustomLoader />}
 
       <TouchableOpacity
-        style={[styles.container, { borderLeftColor: color }]}
+        style={[
+          styles.container,
+          { borderLeftColor: color },
+          isTablet && tabletCornerRadius ? { borderRadius: tabletCornerRadius } : null,
+        ]}
         onPress={handlePress}
         activeOpacity={0.8}
       >
@@ -847,12 +873,12 @@ const styles = StyleSheet.create({
   compactContainer: {
     backgroundColor: '#fff',
     borderRadius: moderateScale(getTabletSafeDimension(12, 14, 16)),
-    paddingVertical: scaleHeight(getTabletSafeDimension(10, 12, 14)),
-    paddingHorizontal: scaleWidth(getTabletSafeDimension(12, 16, 20)),
+    paddingVertical: scaleHeight(getTabletSafeDimension(10, 16, 18)),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(12, 12, 16)),
     borderLeftWidth: 4,
     borderLeftColor: '#00AEEF',
     ...shadows.sm,
-    marginBottom: scaleHeight(getTabletSafeDimension(12, 14, 16)),
+    marginBottom: scaleHeight(getTabletSafeDimension(12, 10, 12)),
   },
   // Expanded container style for when event is expanded
   compactContainerExpanded: {
@@ -871,13 +897,13 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     marginHorizontal: scaleWidth(getTabletSafeDimension(4, 6, 8)), // Scaled on tablets
-    minHeight: scaleHeight(getTabletSafeDimension(28, 32, 36)), // Increased on tablets
+    minHeight: scaleHeight(getTabletSafeDimension(28, 26, 32)), // Reduced on tablets
   },
   compactHeader2: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    minHeight: scaleHeight(getTabletSafeDimension(28, 32, 36)), // Increased on tablets
+    minHeight: scaleHeight(getTabletSafeDimension(28, 26, 32)), // Reduced on tablets
   },
   compactTitleContainer: {
     flexDirection: 'row',
@@ -921,19 +947,19 @@ const styles = StyleSheet.create({
     marginRight: getTabletSafeDimension(spacing.md, 12, 14), // Scaled
   },
   compactTime: {
-    fontSize: screenWidth < 375 ? fontSize.textSize12 : getTabletSafeDimension(fontSize.textSize14, 8, 18), // Scaled
+    fontSize: screenWidth < 375 ? fontSize.textSize12 : getTabletSafeDimension(fontSize.textSize14, 6, 16), // Scaled
     color: colors.textSecondary,
-    marginBottom: getTabletSafeDimension(spacing.xs, 8, 10), // Scaled
+    marginBottom: getTabletSafeDimension(spacing.xs, 6, 10), // Scaled
     flexShrink: 0, // Prevent time from shrinking
   },
   compactTitle: {
-    fontSize: moderateScale(getTabletSafeDimension(14, 8, 18)),
+    fontSize: moderateScale(getTabletSafeDimension(14, 7, 16)),
     fontWeight: '600',
     color: '#000',
-    marginBottom: scaleHeight(getTabletSafeDimension(6, 4, 10)),
+    marginBottom: scaleHeight(getTabletSafeDimension(6, 3, 8)),
     fontFamily: Fonts.latoBold,
     flexWrap: 'wrap',
-    lineHeight: moderateScale(getTabletSafeDimension(18, 14, 22)),
+    lineHeight: moderateScale(getTabletSafeDimension(18, 9, 20)),
   },
   compactEditButton: {
     padding: getTabletSafeDimension(spacing.xs, 6, 8),
@@ -1035,16 +1061,16 @@ const styles = StyleSheet.create({
   compactBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: scaleWidth(getTabletSafeDimension(6, 8, 10)), // Scaled
-    paddingVertical: scaleHeight(getTabletSafeDimension(3, 4, 5)), // Scaled
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(6, 6, 8)), // Reduced on tablets
+    paddingVertical: scaleHeight(getTabletSafeDimension(3, 2, 4)), // Reduced on tablets
     borderRadius: moderateScale(getTabletSafeDimension(12, 14, 16)), // Scaled
     backgroundColor: 'transparent',
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
-    gap: scaleWidth(getTabletSafeDimension(3, 4, 5)), // Scaled
+    gap: scaleWidth(getTabletSafeDimension(3, 3, 4)), // Reduced on tablets
   },
   compactBadgeText: {
-    fontSize: moderateScale(getTabletSafeDimension(10, 8, 14)),
+    fontSize: moderateScale(getTabletSafeDimension(10, 6, 12)),
     fontWeight: '500',
     color: '#717680',
     fontFamily: Fonts.latoBold,
@@ -1055,9 +1081,9 @@ const styles = StyleSheet.create({
     marginTop: scaleHeight(getTabletSafeDimension(6, 8, 10)), // Scaled
   },
   compactGuestAvatar: {
-    width: moderateScale(getTabletSafeDimension(30, 36, 40)), // Scaled
-    height: moderateScale(getTabletSafeDimension(30, 36, 40)), // Scaled
-    borderRadius: moderateScale(getTabletSafeDimension(15, 18, 20)), // Scaled
+    width: moderateScale(getTabletSafeDimension(30, 18, 24)), // Scaled
+    height: moderateScale(getTabletSafeDimension(30, 18, 24)), // Scaled
+    borderRadius: moderateScale(getTabletSafeDimension(15, 9, 12)), // Scaled
     overflow: 'hidden',
     justifyContent: 'center',
     alignItems: 'center',

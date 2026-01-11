@@ -805,7 +805,7 @@ const styles = StyleSheet.create({
     marginRight: getTabletSafeDimension(12, 10, 14),
   },
   compactName: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     fontFamily: Fonts.latoRegular,
     color: Colors.black,
   },
@@ -818,7 +818,7 @@ const styles = StyleSheet.create({
   compactConnect: {},
   compactConnected: {},
   compactButtonText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     fontFamily: Fonts.latoBold,
     fontWeight: '700',
   },
@@ -863,16 +863,16 @@ const styles = StyleSheet.create({
   },
   confirmTitle: {
     fontFamily: Fonts.latoSemiBold,
-    fontSize: getTabletSafeDimension(fontSize.textSize16, 15, 17),
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 18, 20),
     color: Colors.black,
     marginBottom: getTabletSafeDimension(6, 6, 8),
   },
   confirmMessage: {
     fontFamily: Fonts.latoRegular,
-    fontSize: getTabletSafeDimension(fontSize.textSize13, 12, 14),
+    fontSize: getTabletSafeDimension(fontSize.textSize13, 15, 17),
     color: '#555',
     marginBottom: getTabletSafeDimension(18, 16, 22),
-    lineHeight: getTabletSafeDimension(18, 18, 20),
+    lineHeight: getTabletSafeDimension(18, 20, 22),
   },
   confirmButtons: {
     flexDirection: 'row',
@@ -886,7 +886,7 @@ const styles = StyleSheet.create({
   },
   confirmCancelText: {
     fontFamily: Fonts.latoSemiBold,
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     color: '#555',
   },
   confirmPrimary: {
@@ -897,7 +897,7 @@ const styles = StyleSheet.create({
   },
   confirmPrimaryText: {
     fontFamily: Fonts.latoSemiBold,
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 13, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     color: Colors.white,
   },
 });
