@@ -1,13 +1,14 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { isValidTimezone } from '../constants/timezones';
 
 // ✅ Define Type for State and Actions
 export type SettingsStore = {
   // ====== State ======
   selectedDay: string;
   selectedTheme: 'system' | 'light' | 'dark';
-  selectedTimeZone: 'ist' | 'utc' | 'est' | 'pst';
+  selectedTimeZone: string; // Now accepts any valid IANA timezone
   showCompletedEvents: boolean;
   showDeclinedEvents: boolean;
   calendarNotifications: boolean;
@@ -18,7 +19,7 @@ export type SettingsStore = {
   // ====== Actions ======
   setSelectedDay: (day: string) => void;
   setSelectedTheme: (theme: 'system' | 'light' | 'dark') => void;
-  setSelectedTimeZone: (timeZone: 'ist' | 'utc' | 'est' | 'pst') => void;
+  setSelectedTimeZone: (timeZone: string) => void;
   toggleShowCompletedEvents: () => void;
   toggleShowDeclinedEvents: () => void;
   toggleCalendarNotifications: () => void;
@@ -34,7 +35,7 @@ export const useSettingsStore = create<SettingsStore>()(
       // ====== Default State ======
       selectedDay: 'Sunday',
       selectedTheme: 'system',
-      selectedTimeZone: 'ist',
+      selectedTimeZone: 'Asia/Kolkata', // Changed to IANA timezone format
       showCompletedEvents: true,
       showDeclinedEvents: false,
       calendarNotifications: true,
@@ -45,7 +46,14 @@ export const useSettingsStore = create<SettingsStore>()(
       // ====== Actions ======
       setSelectedDay: (day) => set({ selectedDay: day }),
       setSelectedTheme: (theme) => set({ selectedTheme: theme }),
-      setSelectedTimeZone: (timeZone) => set({ selectedTimeZone: timeZone }),
+      setSelectedTimeZone: (timeZone) => {
+        // Validate timezone before setting
+        if (isValidTimezone(timeZone)) {
+          set({ selectedTimeZone: timeZone });
+        } else {
+          console.warn(`Invalid timezone: ${timeZone}, keeping current selection`);
+        }
+      },
 
       toggleShowCompletedEvents: () =>
         set((state) => ({ showCompletedEvents: !state.showCompletedEvents })),

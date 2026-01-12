@@ -122,7 +122,11 @@ const isFolding =
   screenWidth >= 380 && screenWidth <= 500 && screenHeight > 800;
 
 // Helper to cap font sizes for tablets
-const getTabletSafeFontSize = (mobileSize: number, tabletSize: number, maxSize: number) => {
+const getTabletSafeFontSize = (
+  mobileSize: number,
+  tabletSize: number,
+  maxSize: number,
+) => {
   if (isTablet) {
     return Math.min(tabletSize, maxSize);
   }
@@ -136,7 +140,7 @@ const getTabletSafeDimension = (
   largeMobileValue: number,
   smallMobileValue: number,
   tabletValue: number,
-  maxValue: number
+  maxValue: number,
 ) => {
   if (isTablet) {
     return Math.min(tabletValue, maxValue);
@@ -192,7 +196,7 @@ const styles = StyleSheet.create({
       scaleWidth(80),
       scaleWidth(70),
       scaleWidth(90),
-      100
+      100,
     ),
     height: getTabletSafeDimension(
       scaleHeight(72.00009155273438),
@@ -200,7 +204,7 @@ const styles = StyleSheet.create({
       scaleHeight(85),
       scaleHeight(70),
       scaleHeight(100),
-      110
+      110,
     ),
     alignItems: 'center',
     justifyContent: 'center',
@@ -210,7 +214,7 @@ const styles = StyleSheet.create({
       scaleHeight(20),
       scaleHeight(16),
       scaleHeight(24),
-      28
+      28,
     ),
   },
 
@@ -233,21 +237,13 @@ const styles = StyleSheet.create({
       scaleHeight(12),
       scaleHeight(8),
       scaleHeight(16),
-      18
+      18,
     ),
   },
   title: {
     fontFamily: Fonts.latoExtraBold,
-    fontSize: getTabletSafeFontSize(
-      moderateScale(30),
-      moderateScale(32),
-      32
-    ),
-    lineHeight: getTabletSafeFontSize(
-      moderateScale(38),
-      moderateScale(40),
-      40
-    ),
+    fontSize: getTabletSafeFontSize(moderateScale(30), moderateScale(32), 32),
+    lineHeight: getTabletSafeFontSize(moderateScale(38), moderateScale(40), 40),
     color: Colors.black,
     textAlign: 'center',
     letterSpacing: 0,
@@ -265,16 +261,8 @@ const styles = StyleSheet.create({
       ? scaleWidth(220)
       : scaleWidth(326),
     fontFamily: Fonts.latoRegular,
-    fontSize: getTabletSafeFontSize(
-      moderateScale(14),
-      moderateScale(16),
-      16
-    ),
-    lineHeight: getTabletSafeFontSize(
-      moderateScale(20),
-      moderateScale(24),
-      24
-    ),
+    fontSize: getTabletSafeFontSize(moderateScale(14), moderateScale(16), 16),
+    lineHeight: getTabletSafeFontSize(moderateScale(20), moderateScale(24), 24),
     color: Colors.grey,
     textAlign: 'center',
     letterSpacing: 0,
@@ -284,7 +272,7 @@ const styles = StyleSheet.create({
       scaleHeight(24),
       scaleHeight(16),
       scaleHeight(28),
-      32
+      32,
     ),
   },
 
@@ -296,7 +284,7 @@ const styles = StyleSheet.create({
       scaleWidth(140),
       scaleWidth(120),
       scaleWidth(160),
-      180
+      180,
     ),
     alignItems: 'center',
     marginBottom: getTabletSafeDimension(
@@ -305,7 +293,7 @@ const styles = StyleSheet.create({
       scaleHeight(20),
       scaleHeight(16),
       scaleHeight(24),
-      28
+      28,
     ),
   },
   walletIconWrapper: {
@@ -315,7 +303,7 @@ const styles = StyleSheet.create({
       scaleWidth(140),
       scaleWidth(120),
       scaleWidth(160),
-      180
+      180,
     ),
     height: getTabletSafeDimension(
       scaleWidth(134),
@@ -323,7 +311,7 @@ const styles = StyleSheet.create({
       scaleWidth(140),
       scaleWidth(120),
       scaleWidth(160),
-      180
+      180,
     ),
     borderRadius: getTabletSafeDimension(
       scaleWidth(67),
@@ -331,7 +319,7 @@ const styles = StyleSheet.create({
       scaleWidth(70),
       scaleWidth(60),
       scaleWidth(80),
-      90
+      90,
     ),
     backgroundColor: '#F9FAFB',
     alignItems: 'center',
@@ -342,16 +330,12 @@ const styles = StyleSheet.create({
       scaleWidth(45),
       scaleWidth(35),
       scaleWidth(55),
-      65
+      65,
     ),
   },
   ncogText: {
     fontFamily: Fonts.latoBold,
-    fontSize: getTabletSafeFontSize(
-      moderateScale(14),
-      moderateScale(16),
-      16
-    ),
+    fontSize: getTabletSafeFontSize(moderateScale(14), moderateScale(16), 16),
     color: Colors.black,
     marginTop: getTabletSafeDimension(
       scaleHeight(10),
@@ -359,7 +343,7 @@ const styles = StyleSheet.create({
       scaleHeight(12),
       scaleHeight(10),
       scaleHeight(16),
-      18
+      18,
     ),
   },
 
@@ -375,16 +359,8 @@ const styles = StyleSheet.create({
       ? scaleWidth(220)
       : scaleWidth(326),
     fontFamily: Fonts.latoRegular,
-    fontSize: getTabletSafeFontSize(
-      moderateScale(14),
-      moderateScale(16),
-      16
-    ),
-    lineHeight: getTabletSafeFontSize(
-      moderateScale(20),
-      moderateScale(24),
-      24
-    ),
+    fontSize: getTabletSafeFontSize(moderateScale(14), moderateScale(16), 16),
+    lineHeight: getTabletSafeFontSize(moderateScale(20), moderateScale(24), 24),
     color: Colors.black,
     textAlign: 'center',
     letterSpacing: 0,
@@ -394,7 +370,7 @@ const styles = StyleSheet.create({
       scaleHeight(24),
       scaleHeight(16),
       scaleHeight(32),
-      36
+      36,
     ),
   },
 
@@ -415,13 +391,13 @@ const styles = StyleSheet.create({
       scaleHeight(44),
       scaleHeight(36),
       scaleHeight(52),
-      56
+      56,
     ),
     backgroundColor: '#00AEEF',
     borderRadius: getTabletSafeFontSize(
       moderateScale(8),
       moderateScale(10),
-      12
+      12,
     ),
     paddingVertical: getTabletSafeDimension(
       scaleHeight(10),
@@ -429,7 +405,7 @@ const styles = StyleSheet.create({
       scaleHeight(12),
       scaleHeight(8),
       scaleHeight(14),
-      16
+      16,
     ),
     paddingHorizontal: getTabletSafeDimension(
       scaleWidth(16),
@@ -437,7 +413,7 @@ const styles = StyleSheet.create({
       scaleWidth(20),
       scaleWidth(10),
       scaleWidth(24),
-      28
+      28,
     ),
     flexDirection: 'row',
     alignItems: 'center',
@@ -453,24 +429,8 @@ const styles = StyleSheet.create({
   },
   buttonText: {
     fontFamily: Fonts.latoMedium,
-    fontSize: isTablet
-      ? moderateScale(20)
-      : isFolding
-      ? moderateScale(18)
-      : isLargeMobile
-      ? moderateScale(16)
-      : isSmallMobile
-      ? moderateScale(13)
-      : moderateScale(16),
-    lineHeight: isTablet
-      ? moderateScale(28)
-      : isFolding
-      ? moderateScale(24)
-      : isLargeMobile
-      ? moderateScale(22)
-      : isSmallMobile
-      ? moderateScale(18)
-      : moderateScale(24),
+    fontSize: getTabletSafeFontSize(moderateScale(16), moderateScale(20), 22),
+    lineHeight: getTabletSafeFontSize(moderateScale(24), moderateScale(28), 32),
     color: Colors.white,
     textAlign: 'center',
     letterSpacing: 0,

@@ -448,7 +448,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: borderRadius.md,
     width: getTabletSafeDimension(574, SCREEN_WIDTH * 0.80, SCREEN_WIDTH * 0.85),
-    height: getTabletSafeDimension(374, 560, 580),
+    height: getTabletSafeDimension(374, 450, 480),
     flexDirection: 'row',
     overflow: 'hidden',
     borderWidth: 1,

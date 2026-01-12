@@ -192,7 +192,7 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   label: {
-    fontSize: getTabletSafeDimension(fontSize.textSize12, 10, 11),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 15, 17),
     color: '#414651',
     fontFamily: Fonts.latoMedium,
     fontWeight: '500',
@@ -214,10 +214,10 @@ const styles = StyleSheet.create({
     borderColor: '#00AEEF',
   },
   dropdownText: {
-    fontSize: getTabletSafeDimension(12, 10, 11),
+    fontSize: getTabletSafeDimension(12, 14, 16),
     fontFamily: Fonts.latoRegular,
     color: '#A4A7AE',
-    lineHeight: getTabletSafeDimension(18, 14, 16),
+    lineHeight: getTabletSafeDimension(18, 20, 22),
   },
   dropdownTextFilled: {
     color: '#252B37',
@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   optionText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 12, 13),
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
     color: '#252B37',
     fontFamily: Fonts.latoRegular,
   },

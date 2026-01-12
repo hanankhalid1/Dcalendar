@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -18,7 +18,7 @@ import WeekHeader from '../components/WeekHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
-import { parseTimeToPST, isEventInPast } from '../utils';
+import { isEventInPast } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -38,10 +38,14 @@ import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import LinearGradient from 'react-native-linear-gradient';
 import { Fonts } from '../constants/Fonts';
-import { convertToSelectedTimezone } from '../utils/timezone';
+import {
+  convertToSelectedTimezone,
+  convertToTimezoneDate,
+} from '../utils/timezone';
 import * as DimensionsUtils from '../utils/dimensions';
 
-const { scaleWidth, scaleHeight, moderateScale, screenWidth, screenHeight } = DimensionsUtils;
+const { scaleWidth, scaleHeight, moderateScale, screenWidth, screenHeight } =
+  DimensionsUtils;
 
 // Tablet detection constants
 const isTablet = screenWidth >= 600;
@@ -49,7 +53,11 @@ const isSmallMobile = screenWidth <= 340;
 const isLargeMobile = screenWidth > 400 && screenWidth < 600;
 
 // Helper function for tablet-safe dimensions
-const getTabletSafeDimension = (mobileValue: number, tabletValue: number, maxValue: number) => {
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
   if (isTablet) {
     return Math.min(tabletValue, maxValue);
   }
@@ -172,6 +180,14 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     const year = date.getFullYear();
     return `${day} ${month} ${year}`;
   };
+
+  const toTimezoneDate = useCallback(
+    (timeString?: string | null) => {
+      if (!timeString) return null;
+      return convertToTimezoneDate(timeString, selectedTimeZone);
+    },
+    [selectedTimeZone],
+  );
 
   const selectedDateString = useMemo(() => {
     const dateString = formatDate(selectedDate);
@@ -1164,16 +1180,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       eventToPass.list || eventToPass.tags || event.list || event.tags || [];
     const isTask = list.some((item: any) => item.key === 'task');
 
-    // Check if event is in the past
-    if (isEventInPast(eventToPass)) {
-      showAlert(
-        isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
-        '',
-        'warning',
-      );
-      return;
-    }
-
     // Determine the target screen
     const targetScreen = isTask
       ? Screen.CreateTaskScreen
@@ -1358,8 +1364,8 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
 
   const formatEventTimeRange = (event: any) => {
-    const start = parseTimeToPST(event.fromTime) || event.instanceStartTime;
-    const end = parseTimeToPST(event.toTime) || event.instanceEndTime;
+    const start = toTimezoneDate(event.fromTime) || event.instanceStartTime;
+    const end = toTimezoneDate(event.toTime) || event.instanceEndTime;
 
     const startText = formatTimeWithoutTimezone(start);
     const endText = !event?.isTask && end ? formatTimeWithoutTimezone(end) : '';
@@ -1522,7 +1528,9 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                           return null;
 
                         const maxVisible = 5;
-                        const size = 36;
+                        const size = moderateScale(
+                          getTabletSafeDimension(30, 18, 24),
+                        );
                         const visibleGuests = eventGuests.slice(0, maxVisible);
                         const remainingCount = eventGuests.length - maxVisible;
                         const isSingleGuest = eventGuests.length === 1;
@@ -1742,10 +1750,14 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     backgroundColor: '#ffffff',
-    borderRadius: getTabletSafeDimension(moderateScale(12), moderateScale(14), 18),
-    paddingVertical: getTabletSafeDimension(scaleHeight(10), 12, 16),
-    paddingHorizontal: getTabletSafeDimension(scaleWidth(14), 16, 20),
-    marginBottom: getTabletSafeDimension(spacing.sm, spacing.md, 16),
+    borderRadius: getTabletSafeDimension(
+      moderateScale(12),
+      moderateScale(14),
+      18,
+    ),
+    paddingVertical: scaleHeight(getTabletSafeDimension(10, 8, 10)),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(12, 12, 16)),
+    marginBottom: scaleHeight(getTabletSafeDimension(12, 10, 12)),
     borderColor: '#D5D7DA',
     borderWidth: 1,
     borderLeftColor: '#D5D7DA',
@@ -1760,17 +1772,17 @@ const styles = StyleSheet.create({
     elevation: isTablet ? 2 : 1,
   },
   eventContent: {
-    gap: getTabletSafeDimension(scaleHeight(10), 12, 14),
+    gap: getTabletSafeDimension(scaleHeight(10), 8, 10),
   },
   eventTitle: {
-    fontSize: getTabletSafeDimension(moderateScale(14), moderateScale(16), 18),
+    fontSize: moderateScale(getTabletSafeDimension(14, 7, 16)),
     fontFamily: Fonts.latoRegular,
     color: '#252B37',
     marginBottom: 0,
     fontWeight: '500',
   },
   eventTime: {
-    fontSize: getTabletSafeDimension(moderateScale(11), moderateScale(13), 15),
+    fontSize: moderateScale(getTabletSafeDimension(11, 6, 15)),
     fontFamily: Fonts.latoMedium,
     textAlign: 'left',
     color: '#717680',
@@ -1790,19 +1802,19 @@ const styles = StyleSheet.create({
   badge: {
     display: 'flex',
     flexDirection: 'row',
-    gap: getTabletSafeDimension(scaleWidth(4), 6, 8),
+    gap: scaleWidth(getTabletSafeDimension(3, 3, 4)),
     backgroundColor: '#fff',
-    paddingHorizontal: getTabletSafeDimension(scaleWidth(8), 10, 12),
-    paddingVertical: getTabletSafeDimension(scaleHeight(5), 6, 8),
-    borderRadius: getTabletSafeDimension(moderateScale(100), 120, 140),
+    paddingHorizontal: scaleWidth(getTabletSafeDimension(6, 6, 8)),
+    paddingVertical: scaleHeight(getTabletSafeDimension(3, 2, 4)),
+    borderRadius: moderateScale(getTabletSafeDimension(12, 14, 16)),
     borderWidth: 0.5,
     borderColor: '#D5D7DA',
   },
   badgeText: {
-    fontSize: getTabletSafeDimension(moderateScale(10), moderateScale(12), 14),
-    fontFamily: Fonts.latoMedium,
+    fontSize: moderateScale(getTabletSafeDimension(10, 6, 12)),
+    fontFamily: Fonts.latoBold,
     color: '#717680',
-    fontWeight: '600',
+    fontWeight: '500',
   },
   noEventsText: {
     fontSize: 14,

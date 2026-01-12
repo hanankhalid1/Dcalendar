@@ -3,6 +3,8 @@ import { View, StyleSheet, Text } from 'react-native';
 import { Calendar } from 'react-native-big-calendar';
 import FloatingActionButton from './FloatingActionButton';
 import WeekHeader from './WeekHeader';
+import { Fonts } from '../constants/Fonts';
+import { screenWidth, scaleWidth, scaleHeight } from '../utils/dimensions';
 
 interface MonthlyCalendarProps {
   onDateSelect?: (date: string) => void;
@@ -21,6 +23,18 @@ const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
   const [selectedDate, setSelectedDate] = useState<string>(
     new Date().toISOString().split('T')[0],
   );
+
+  const isTablet = screenWidth >= 600;
+  const getTabletSafeDimension = (
+    mobileValue: number,
+    tabletValue: number,
+    maxValue: number,
+  ) => {
+    if (isTablet) {
+      return Math.min(tabletValue, maxValue);
+    }
+    return mobileValue;
+  };
 
   // Events with three different types
   const events = [
@@ -114,76 +128,29 @@ const MonthlyCalendar: React.FC<MonthlyCalendarProps> = ({
         mode="month"
         onPressEvent={handleEventPress}
         renderEvent={event => {
-          let containerStyle: any = {};
-          let textStyle: any = {};
-
-          if (event.type === 'holiday') {
-            containerStyle = {
-              backgroundColor: '#18F06E',
-              borderRadius: 20,
-              width: 60,
-              height: 24,
-              borderWidth: 1,
-              borderColor: '#0B6DE0',
-              shadowColor: '#0B6DE0',
-              shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.4,
-              shadowRadius: 3,
-              elevation: 4,
-              justifyContent: 'center',
-              alignItems: 'center',
-            };
-            textStyle = {
-              color: '#FFFFFF',
-              fontFamily: 'Poppins',
-              fontWeight: '500',
-              fontSize: 12,
-              lineHeight: 12, // 100% of font size
-              letterSpacing: 0,
-            };
-          } else if (event.type === 'meeting') {
-            containerStyle = {
-              backgroundColor: '#F7FAFC',
-              borderWidth: 1,
-              borderColor: '#337E8980',
-              borderRadius: 4,
-              width: 72,
-              height: 54,
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 4,
-            };
-            textStyle = {
-              color: '#337E89',
-              fontFamily: 'DM Sans',
-              fontWeight: '700',
-              fontSize: 8,
-              lineHeight: 9,
-              letterSpacing: 0,
-              textAlign: 'center',
-            };
-          } else if (event.type === 'task') {
-            containerStyle = {
-              backgroundColor: '#F7FAFC',
-              borderWidth: 1,
-              borderColor: '#337E8980',
-              borderRadius: 4,
-              width: 48,
-              height: 24,
-              justifyContent: 'center',
-              alignItems: 'center',
-              padding: 2,
-            };
-            textStyle = {
-              color: '#337E89',
-              fontFamily: 'DM Sans',
-              fontWeight: '700',
-              fontSize: 8,
-              lineHeight: 16,
-              letterSpacing: 0,
-              textAlign: 'center',
-            };
-          }
+          // Unified compact badge style matching EventCard
+          const containerStyle: any = {
+            flexDirection: 'row',
+            alignItems: 'center',
+            justifyContent: 'center',
+            paddingHorizontal: scaleWidth(getTabletSafeDimension(6, 8, 10)),
+            paddingVertical: scaleHeight(getTabletSafeDimension(3, 4, 5)),
+            borderRadius: getTabletSafeDimension(12, 14, 16),
+            backgroundColor: 'transparent',
+            borderWidth: 0.5,
+            borderColor: '#D5D7DA',
+            gap: scaleWidth(getTabletSafeDimension(3, 4, 5)),
+            maxWidth: getTabletSafeDimension(80, 90, 100),
+          };
+          const textStyle: any = {
+            color: '#717680',
+            fontFamily: Fonts.latoBold,
+            fontWeight: '500',
+            fontSize: getTabletSafeDimension(10, 12, 12),
+            lineHeight: getTabletSafeDimension(12, 14, 14),
+            letterSpacing: 0,
+            textAlign: 'center',
+          };
 
           return (
             <View style={containerStyle}>

@@ -9,6 +9,7 @@ import {
   StatusBar,
   Image,
   Alert,
+  Dimensions,
 } from 'react-native';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import MaterialIcons from 'react-native-vector-icons/MaterialIcons';
@@ -42,6 +43,20 @@ interface CreateEventModalProps {
   eventData?: any;
   mode?: 'create' | 'edit';
 }
+
+const screenWidth = Dimensions.get('window').width;
+const isTablet = screenWidth >= 600;
+
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
+  if (isTablet) {
+    return Math.min(tabletValue, maxValue);
+  }
+  return mobileValue;
+};
 
 const CreateEventModal: React.FC<CreateEventModalProps> = ({
   isVisible,
@@ -950,7 +965,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
   },
   advanceOptionsText: {
-    fontSize: fontSize.textSize18,
+    fontSize: getTabletSafeDimension(fontSize.textSize18, 20, 22),
     color: colors.dimGray,
     fontWeight: '600',
   },

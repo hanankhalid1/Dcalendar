@@ -1184,7 +1184,7 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.grey20,
   },
   activeAccountIndicator: {
-    fontSize: fontSize.textSize10,
+    fontSize: getTabletSafeDimension(10, 12, 14),
     color: colors.primary || '#4CAF50',
     fontWeight: '600',
   },

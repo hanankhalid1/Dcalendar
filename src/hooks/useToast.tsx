@@ -14,8 +14,10 @@ import Icon from 'react-native-vector-icons/MaterialCommunityIcons';
 import { Fonts } from '../constants/Fonts';
 import { Colors } from '../constants/Colors';
 import { scale } from 'react-native-size-matters';
+import { getTabletSafeDimension } from '../utils/dimensions';
 
 const { width } = Dimensions.get('window');
+const isTablet = width >= 600;
 
 export type ToastType = 'success' | 'error' | 'warning';
 
@@ -141,7 +143,7 @@ const ToastItem: React.FC<{
     >
       <View style={styles.toastContent}>
         <View style={styles.iconContainer}>
-          <Icon name={config.iconName} size={28} color={config.iconColor} />
+          <Icon name={config.iconName} size={isTablet ? 16 : 28} color={config.iconColor} />
         </View>
 
         <View style={styles.textContainer}>
@@ -150,7 +152,7 @@ const ToastItem: React.FC<{
               styles.toastTitle,
               { fontFamily: Fonts.semiBold, color: config.titleColor },
             ]}
-            numberOfLines={1}
+            numberOfLines={isTablet ? 3 : 1}
           >
             {toast.title}
           </Text>
@@ -160,7 +162,7 @@ const ToastItem: React.FC<{
                 styles.toastMessage,
                 { fontFamily: Fonts.regular, color: '#606873' },
               ]}
-              numberOfLines={2}
+              numberOfLines={isTablet ? 3 : 2}
             >
               {toast.message}
             </Text>
@@ -168,7 +170,7 @@ const ToastItem: React.FC<{
         </View>
 
         <TouchableOpacity onPress={hideToast} style={styles.closeButton}>
-          <Icon name="close" size={18} color="#666" />
+          <Icon name="close" size={isTablet ? 12 : 18} color="#666" />
         </TouchableOpacity>
       </View>
     </Animated.View>
@@ -269,10 +271,13 @@ const styles = StyleSheet.create({
     zIndex: 9999,
     elevation: 9999,
     pointerEvents: 'box-none',
+    top: isTablet ? 50 : StatusBar.currentHeight,
+    paddingBottom: isTablet ? 200 : 0,
   },
   toastContainer: {
     marginHorizontal: 16,
     marginVertical: 4,
+    marginBottom: isTablet ? 150 : 4,
     borderRadius: 12,
     borderLeftWidth: 4,
     shadowColor: '#000',
@@ -283,31 +288,35 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 5,
+    maxWidth: isTablet ? '88%' : '100%',
   },
   toastContent: {
     flexDirection: 'row',
     alignItems: 'center',
-    padding: 16,
+    padding: isTablet ? 14 : 16,
+    paddingBottom: isTablet ? 18 : 16,
   },
   iconContainer: {
-    marginRight: 12,
+    marginRight: isTablet ? 6 : 12,
     alignItems: 'center',
     justifyContent: 'center',
-    height: 30,
+    height: isTablet ? 18 : 30,
   },
   textContainer: {
     flex: 1,
-    marginRight: 8,
-    marginBottom: 14,
+    marginRight: isTablet ? 6 : 8,
+    marginBottom: isTablet ? 8 : 14,
+    marginLeft: isTablet ? 4 : 0,
   },
   toastTitle: {
-    fontSize: scale(16),
-    lineHeight: scale(22),
+    fontSize: isTablet ? scale(12) : scale(12),
+    lineHeight: isTablet ? scale(18) : scale(20),
   },
   toastMessage: {
-    fontSize: scale(14),
+    fontSize: isTablet ? scale(10) : scale(14),
     color: '#666',
-    lineHeight: 18,
+    lineHeight: isTablet ? 16 : 18,
+    marginBottom: isTablet ? 4 : 4,
   },
   closeButton: {
     padding: 2,
