@@ -388,15 +388,6 @@ const DailyCalendarScreen = () => {
       eventToPass.list || eventToPass.tags || event.list || event.tags || [];
     const isTaskEvent = list.some((item: any) => item.key === 'task');
 
-    if (isEventInPast(eventToPass)) {
-      showAlert(
-        isTaskEvent ? 'Cannot edit past Task' : 'Cannot edit past Event',
-        '',
-        'warning',
-      );
-      return;
-    }
-
     const targetScreen = isTaskEvent
       ? Screen.CreateTaskScreen
       : Screen.CreateEventScreen;

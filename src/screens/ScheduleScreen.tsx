@@ -143,16 +143,6 @@ const ScheduleScreen = () => {
       eventToPass.list || eventToPass.tags || event.list || event.tags || [];
     const isTask = list.some((item: any) => item.key === 'task');
 
-    // Check if event is in the past
-    if (isEventInPast(eventToPass)) {
-      showAlert(
-        isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
-        '',
-        'warning',
-      );
-      return;
-    }
-
     console.log('Is Task check:', { isTask, list, eventToPass, event });
 
     // 2. Determine the target screen
@@ -724,9 +714,7 @@ const ScheduleScreen = () => {
       />
 
       {/* Segmented Control Navigation */}
-      <View
-        style={[styles.segmentedControlContainer, segmentStyles.container]}
-      >
+      <View style={[styles.segmentedControlContainer, segmentStyles.container]}>
         <View style={[styles.segmentedControl, segmentStyles.control]}>
           <TouchableOpacity
             style={[
@@ -794,8 +782,8 @@ const ScheduleScreen = () => {
         activeOpacity={0.1}
       />
 
-      <ScrollView 
-        style={styles.content} 
+      <ScrollView
+        style={styles.content}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -922,7 +910,11 @@ const styles = StyleSheet.create({
     // No background color - transparent to show gray home screen background
   },
   segmentedControl: {
-    width: getTabletSafeDimension(scaleWidth(339), screenWidth * 0.9, screenWidth - 20),
+    width: getTabletSafeDimension(
+      scaleWidth(339),
+      screenWidth * 0.9,
+      screenWidth - 20,
+    ),
     height: getTabletSafeDimension(scaleHeight(48), 40, 52),
     flexDirection: 'row',
     backgroundColor: colors.white, // White navigation container

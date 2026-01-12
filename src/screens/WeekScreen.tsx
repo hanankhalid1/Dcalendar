@@ -1034,15 +1034,6 @@ const WeekScreen = () => {
       eventToPass.list || eventToPass.tags || event.list || event.tags || [];
     const isTask = list.some((item: any) => item.key === 'task');
 
-    if (isEventInPast(eventToPass)) {
-      showAlert(
-        isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
-        '',
-        'warning',
-      );
-      return;
-    }
-
     const targetScreen = isTask
       ? Screen.CreateTaskScreen
       : Screen.CreateEventScreen;

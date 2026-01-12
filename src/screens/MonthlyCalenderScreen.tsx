@@ -1180,16 +1180,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       eventToPass.list || eventToPass.tags || event.list || event.tags || [];
     const isTask = list.some((item: any) => item.key === 'task');
 
-    // Check if event is in the past
-    if (isEventInPast(eventToPass)) {
-      showAlert(
-        isTask ? 'Cannot edit past Task' : 'Cannot edit past Event',
-        '',
-        'warning',
-      );
-      return;
-    }
-
     // Determine the target screen
     const targetScreen = isTask
       ? Screen.CreateTaskScreen
