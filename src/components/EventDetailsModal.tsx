@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import {
   Modal,
   View,
@@ -15,9 +15,31 @@ import Feather from 'react-native-vector-icons/Feather';
 import FeatherIcon from 'react-native-vector-icons/Feather';
 import { Colors } from '../constants/Colors';
 import { Fonts } from '../constants/Fonts';
-import { parseTimeToPST } from '../utils';
+import { convertToTimezoneDate } from '../utils/timezone';
+import { useSettingsStore } from '../stores/useSetting';
 import * as DimensionsUtils from '../utils/dimensions';
 import MeetIcon from '../assets/svgs/meet.svg';
+
+const formatTimezoneAbbreviation = (timezone: string): string => {
+  try {
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      hour: 'numeric',
+      timeZoneName: 'short',
+    });
+    const tzName = formatter
+      .formatToParts(new Date())
+      .find(part => part.type === 'timeZoneName')?.value;
+
+    if (tzName) {
+      return tzName;
+    }
+  } catch (error) {
+    console.warn('Timezone formatting failed:', error);
+  }
+
+  return timezone;
+};
 
 const { width: screenWidth } = Dimensions.get('window');
 const { scaleWidth, scaleHeight, moderateScale } = DimensionsUtils;
@@ -52,7 +74,12 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   onEdit,
   onDelete,
 }) => {
+  const { selectedTimeZone } = useSettingsStore();
   const [showGuestList, setShowGuestList] = useState(false);
+  const selectedTimezoneLabel = useMemo(() => {
+    const selectedTzAbbr = formatTimezoneAbbreviation(selectedTimeZone);
+    return selectedTzAbbr || selectedTimeZone;
+  }, [selectedTimeZone]);
   console.log('EventDetailsModal render:', { visible, event: event?.title });
 
   if (!event) {
@@ -61,7 +88,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   }
 
   const formatEventDate = (dateString: string) => {
-    const date = parseTimeToPST(dateString);
+    const date = convertToTimezoneDate(dateString, selectedTimeZone);
     if (!date) return '';
 
     return date.toLocaleDateString('en-US', {
@@ -73,7 +100,7 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
   };
 
   const formatEventTime = (dateString: string) => {
-    const date = parseTimeToPST(dateString);
+    const date = convertToTimezoneDate(dateString, selectedTimeZone);
     if (!date) return '';
 
     const hours = date.getHours();
@@ -101,59 +128,18 @@ const EventDetailsModal: React.FC<EventDetailsModalProps> = ({
     return null;
   };
 
-  const formatTimezoneAbbreviation = (timezone: string): string => {
-    try {
-      const formatter = new Intl.DateTimeFormat('en-US', {
-        timeZone: timezone,
-        hour: 'numeric',
-        timeZoneName: 'short',
-      });
-      const tzName = formatter
-        .formatToParts(new Date())
-        .find(part => part.type === 'timeZoneName')?.value;
-
-      if (tzName) {
-        return tzName;
-      }
-    } catch (error) {
-      console.warn('Timezone formatting failed:', error);
-    }
-
-    return timezone;
-  };
-
   const normalizeTimezone = (timezone?: string | null) =>
     (timezone || '').trim().toLowerCase();
 
-  const getTimezoneLabel = (): string | null => {
-    const eventTimezone = extractEventTimezone();
-    if (!eventTimezone) return null;
-
-    let deviceTimezone: string | null = null;
-    try {
-      deviceTimezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch (error) {
-      console.warn('Unable to resolve device timezone:', error);
-    }
-
-    const shouldShowTimezone =
-      !deviceTimezone ||
-      normalizeTimezone(eventTimezone) !== normalizeTimezone(deviceTimezone);
-
-    return shouldShowTimezone
-      ? formatTimezoneAbbreviation(eventTimezone)
-      : null;
-  };
-
   const formatEventDuration = () => {
-    const startDate = parseTimeToPST(event.fromTime);
-    const endDate = parseTimeToPST(event.toTime);
+    const startDate = convertToTimezoneDate(event.fromTime, selectedTimeZone);
+    const endDate = convertToTimezoneDate(event.toTime, selectedTimeZone);
 
     if (!startDate || !endDate) return '';
 
     const startTime = formatEventTime(event.fromTime);
     const endTime = formatEventTime(event.toTime);
-    const timezoneLabel = getTimezoneLabel();
+    const timezoneLabel = selectedTimezoneLabel;
 
     // Check if it's a multi-day event
     const startDay = startDate.toDateString();
