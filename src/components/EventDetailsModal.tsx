@@ -26,7 +26,11 @@ const { scaleWidth, scaleHeight, moderateScale } = DimensionsUtils;
 const isTablet = screenWidth >= 600;
 
 // Helper function for tablet-safe dimensions
-const getTabletSafeDimension = (mobileValue: number, tabletValue: number, maxValue: number) => {
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
   if (isTablet) {
     return Math.min(tabletValue, maxValue);
   }
@@ -534,10 +538,10 @@ const styles = StyleSheet.create({
     marginRight: scaleWidth(12),
   },
   eventTitle: {
-    fontSize: moderateScale(getTabletSafeDimension(18, 11, 20)),
+    fontSize: moderateScale(getTabletSafeDimension(18, 9, 20)), // decreased tablet font size
     fontFamily: Fonts.bold,
     color: Colors.black,
-    lineHeight: moderateScale(getTabletSafeDimension(26, 17, 28)),
+    lineHeight: moderateScale(getTabletSafeDimension(26, 15, 28)),
   },
   headerActions: {
     flexDirection: 'row',
@@ -585,10 +589,10 @@ const styles = StyleSheet.create({
     marginBottom: scaleHeight(4),
   },
   detailValue: {
-    fontSize: moderateScale(getTabletSafeDimension(14, 9, 15)),
+    fontSize: moderateScale(getTabletSafeDimension(14, 8, 15)), // decreased tablet font size
     fontFamily: Fonts.latoRegular,
     color: '#252B37',
-    lineHeight: moderateScale(getTabletSafeDimension(20, 15, 22)),
+    lineHeight: moderateScale(getTabletSafeDimension(20, 13, 22)),
   },
   guestsContainer: {
     flexDirection: 'row',

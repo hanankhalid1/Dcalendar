@@ -240,7 +240,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
       : 32;
     // Smaller font and radio sizes for better balance
     const fontSizeName = isTablet
-      ? moderateScale(8)
+      ? moderateScale(6)
       : isFolding
       ? moderateScale(14)
       : isLargeMobile
@@ -249,7 +249,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
       ? moderateScale(10)
       : moderateScale(12);
     const fontSizeEmail = isTablet
-      ? moderateScale(7)
+      ? moderateScale(5)
       : isFolding
       ? moderateScale(12)
       : isLargeMobile
@@ -490,11 +490,7 @@ const AccountSelectionModal: React.FC<AccountSelectionModalProps> = ({
             }}
             activeOpacity={0.7}
           >
-            <Icon
-              name="plus"
-              size={isTablet ? 18 : 20}
-              color={Colors.white}
-            />
+            <Icon name="plus" size={isTablet ? 22 : 20} color={Colors.white} />
             <Text
               style={[styles.addAccountText, { fontFamily: Fonts.latoMedium }]}
             >
@@ -525,7 +521,11 @@ const isFolding =
   screenWidth >= 380 && screenWidth <= 500 && screenHeight > 800;
 
 // Helper to cap font sizes for tablets
-const getTabletSafeFontSize = (mobileSize: number, tabletSize: number, maxSize: number) => {
+const getTabletSafeFontSize = (
+  mobileSize: number,
+  tabletSize: number,
+  maxSize: number,
+) => {
   if (isTablet) {
     return Math.min(tabletSize, maxSize);
   }
@@ -539,7 +539,7 @@ const getTabletSafeDimension = (
   largeMobileValue: number,
   smallMobileValue: number,
   tabletValue: number,
-  maxValue: number
+  maxValue: number,
 ) => {
   if (isTablet) {
     return Math.min(tabletValue, maxValue);
@@ -568,7 +568,7 @@ const styles = StyleSheet.create({
   },
 
   accountText: {
-    fontSize: moderateScale(20),
+    fontSize: getTabletSafeFontSize(moderateScale(20), moderateScale(16), 18),
   },
   closeButton: {
     padding: 4,
@@ -607,20 +607,20 @@ const styles = StyleSheet.create({
   },
   avatarText: {
     color: Colors.white,
-    fontSize: moderateScale(14),
+    fontSize: getTabletSafeFontSize(moderateScale(14), moderateScale(12), 14),
     fontFamily: Fonts.latoBold,
   },
   accountInfo: {
     // flex: 1,
   },
   accountName: {
-    fontSize: moderateScale(14),
+    fontSize: getTabletSafeFontSize(moderateScale(14), moderateScale(12), 14),
     color: '#000',
     marginBottom: 4,
     fontFamily: Fonts.latoRegular,
   },
   accountEmail: {
-    fontSize: moderateScale(14),
+    fontSize: getTabletSafeFontSize(moderateScale(14), moderateScale(12), 14),
     color: '#181D27',
     fontFamily: Fonts.latoRegular,
   },
@@ -647,11 +647,7 @@ const styles = StyleSheet.create({
   },
 
   addAccountText: {
-    fontSize: getTabletSafeFontSize(
-      moderateScale(16),
-      moderateScale(14),
-      14
-    ),
+    fontSize: getTabletSafeFontSize(moderateScale(16), moderateScale(18), 20),
     color: Colors.white,
     fontFamily: Fonts.latoMedium,
   },
@@ -671,7 +667,7 @@ const styles = StyleSheet.create({
     gap: moderateScale(12),
   },
   loadingText: {
-    fontSize: moderateScale(14),
+    fontSize: getTabletSafeFontSize(moderateScale(14), moderateScale(16), 18),
     color: Colors.primaryblue,
     marginTop: scaleHeight(8),
   },
@@ -687,45 +683,16 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   logo: {
-    width: getTabletSafeDimension(
-      40,
-      48,
-      44,
-      32,
-      56,
-      60
-    ),
-    height: getTabletSafeDimension(
-      40,
-      48,
-      44,
-      32,
-      56,
-      60
-    ),
-    marginBottom: getTabletSafeDimension(
-      16,
-      20,
-      18,
-      14,
-      20,
-      24
-    ),
+    width: getTabletSafeDimension(40, 48, 44, 32, 56, 60),
+    height: getTabletSafeDimension(40, 48, 44, 32, 56, 60),
+    marginBottom: getTabletSafeDimension(16, 20, 18, 14, 20, 24),
   },
   appName: {
-    fontSize: getTabletSafeFontSize(
-      42.79,
-      48,
-      48
-    ),
+    fontSize: getTabletSafeFontSize(42.79, 48, 48),
     fontFamily: Fonts.latoExtraBold,
     fontWeight: '800',
     color: '#000000',
-    lineHeight: getTabletSafeFontSize(
-      42.79,
-      48,
-      48
-    ),
+    lineHeight: getTabletSafeFontSize(42.79, 48, 48),
     letterSpacing: 0,
   },
   header: {
@@ -733,30 +700,15 @@ const styles = StyleSheet.create({
     marginBottom: isTablet ? 16 : isFolding ? 12 : 8,
   },
   chooseText: {
-    fontSize: getTabletSafeFontSize(
-      moderateScale(30),
-      moderateScale(32),
-      32
-    ),
+    fontSize: getTabletSafeFontSize(moderateScale(30), moderateScale(32), 32),
     color: '#181D27',
     textAlign: 'center',
     fontFamily: Fonts.latoExtraBold,
   },
   subtitle: {
-    fontSize: getTabletSafeFontSize(
-      moderateScale(14),
-      moderateScale(16),
-      16
-    ),
+    fontSize: getTabletSafeFontSize(moderateScale(14), moderateScale(16), 16),
     color: '#666',
-    marginBottom: getTabletSafeDimension(
-      24,
-      28,
-      24,
-      16,
-      28,
-      32
-    ),
+    marginBottom: getTabletSafeDimension(24, 28, 24, 16, 28, 32),
     textAlign: 'center',
     fontFamily: Fonts.latoRegular,
   },
@@ -778,7 +730,7 @@ const styles = StyleSheet.create({
       moderateScale(15),
       moderateScale(12),
       moderateScale(18),
-      20
+      20,
     ),
     paddingRight: getTabletSafeDimension(
       moderateScale(12),
@@ -786,7 +738,7 @@ const styles = StyleSheet.create({
       moderateScale(13),
       moderateScale(10),
       moderateScale(16),
-      18
+      18,
     ),
     paddingBottom: getTabletSafeDimension(
       moderateScale(14),
@@ -794,7 +746,7 @@ const styles = StyleSheet.create({
       moderateScale(15),
       moderateScale(12),
       moderateScale(18),
-      20
+      20,
     ),
     paddingLeft: getTabletSafeDimension(
       moderateScale(12),
@@ -802,7 +754,7 @@ const styles = StyleSheet.create({
       moderateScale(13),
       moderateScale(10),
       moderateScale(16),
-      18
+      18,
     ),
     borderBottomWidth: 1,
     borderBottomColor: '#E5E5E7',
@@ -810,11 +762,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: getTabletSafeDimension(12, 16, 14, 10, 18, 20),
   },
   accountsLabel: {
-    fontSize: getTabletSafeFontSize(
-      moderateScale(14),
-      moderateScale(16),
-      16
-    ),
+    fontSize: getTabletSafeFontSize(moderateScale(14), moderateScale(16), 16),
     color: '#535862',
   },
   accountList: {
@@ -823,22 +771,8 @@ const styles = StyleSheet.create({
   accountItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: getTabletSafeDimension(
-      16,
-      20,
-      18,
-      12,
-      20,
-      22
-    ),
-    paddingHorizontal: getTabletSafeDimension(
-      16,
-      24,
-      20,
-      10,
-      24,
-      28
-    ),
+    paddingVertical: getTabletSafeDimension(16, 20, 18, 12, 20, 22),
+    paddingHorizontal: getTabletSafeDimension(16, 24, 20, 10, 24, 28),
     marginBottom: 0,
     backgroundColor: Colors.white,
     borderBottomWidth: 1,
@@ -867,7 +801,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   connectButtonText: {
-    fontSize: getTabletSafeFontSize(18, 16, 16),
+    fontSize: getTabletSafeFontSize(18, 20, 22),
     color: '#181D27',
     fontFamily: Fonts.latoMedium,
   },
@@ -883,7 +817,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
   },
   useAnotherText: {
-    fontSize: isTablet ? scale(20) : isFolding ? scale(18) : scale(16),
+    fontSize: getTabletSafeFontSize(scale(16), scale(20), 22),
     color: Colors.primaryblue,
     marginLeft: isTablet ? 18 : isFolding ? 14 : 12,
     fontFamily: Fonts.medium,
@@ -894,7 +828,7 @@ const styles = StyleSheet.create({
     marginBottom: isTablet ? 32 : isFolding ? 24 : 20,
   },
   walletButtonText: {
-    fontSize: isTablet ? scale(18) : isFolding ? scale(16) : scale(14),
+    fontSize: getTabletSafeFontSize(scale(14), scale(18), 20),
     color: '#666',
     fontFamily: Fonts.medium,
   },
