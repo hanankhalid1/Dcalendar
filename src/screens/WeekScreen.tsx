@@ -25,7 +25,7 @@ import WeekHeader from '../components/WeekHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
-import { parseTimeToPST, isEventInPast } from '../utils';
+import { isEventInPast } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -44,7 +44,10 @@ import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import LinearGradient from 'react-native-linear-gradient';
 import { Fonts } from '../constants/Fonts';
-import { convertToSelectedTimezone } from '../utils/timezone';
+import {
+  convertToSelectedTimezone,
+  convertToTimezoneDate,
+} from '../utils/timezone';
 import Icon from 'react-native-vector-icons/AntDesign';
 import EventCard from '../components/EventCard';
 
@@ -134,6 +137,27 @@ const WeekScreen = () => {
     const dateString = formatDate(selectedDate);
     return dateString;
   }, [selectedDate]);
+
+  const toTimezoneDate = useCallback(
+    (timeString?: string | null) => {
+      if (!timeString) return null;
+      return convertToTimezoneDate(timeString, selectedTimeZone);
+    },
+    [selectedTimeZone],
+  );
+
+  const formatTimeInSelectedTZ = useCallback(
+    (timeString?: string | null) => {
+      const date = toTimezoneDate(timeString);
+      if (!date) return '';
+
+      return date.toLocaleTimeString('en-US', {
+        hour: 'numeric',
+        minute: '2-digit',
+      });
+    },
+    [toTimezoneDate],
+  );
 
   // Define a map for day names to Date.prototype.getDay() values (0=Sunday, 6=Saturday)
   const DAY_MAP: { [key: string]: number } = {
@@ -1726,15 +1750,11 @@ const WeekScreen = () => {
           <View style={styles.eventsList}>
             {selectedDateEvents.length > 0 ? (
               selectedDateEvents.slice(0, 20).map((event, index) => {
-                const start = parseTimeToPST(event.fromTime)?.toLocaleTimeString(
-                  'en-US',
-                  { hour: 'numeric', minute: '2-digit' },
-                );
-                const end = parseTimeToPST(event.toTime)?.toLocaleTimeString(
-                  'en-US',
-                  { hour: 'numeric', minute: '2-digit' },
-                );
-                const timeDisplay = event.isTask ? `${start}` : `${start} - ${end}`;
+                const start = formatTimeInSelectedTZ(event.fromTime);
+                const end = formatTimeInSelectedTZ(event.toTime);
+                const timeDisplay = event.isTask
+                  ? `${start}`
+                  : `${start} - ${end}`;
 
                 return (
                   <View
@@ -1753,10 +1773,7 @@ const WeekScreen = () => {
                       }}
                     >
                       <Text style={[styles.eventTime]}>
-                        {event.instanceStartTime?.toLocaleTimeString('en-US', {
-                          hour: 'numeric',
-                          minute: '2-digit',
-                        })}
+                        {formatTimeInSelectedTZ(event.fromTime)}
                       </Text>
 
                       <View

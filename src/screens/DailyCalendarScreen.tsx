@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -20,9 +20,9 @@ import { useApiClient } from '../hooks/useApi';
 import { Screen } from '../navigations/appNavigation.type';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
-import { parseTimeToPST, isEventInPast } from '../utils';
+import { isEventInPast } from '../utils';
 import { expandEventsForRange, formatYMD } from '../utils/recurrence';
-import { convertToSelectedTimezone } from '../utils/timezone';
+import { convertToTimezoneDate } from '../utils/timezone';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
 import {
@@ -115,6 +115,14 @@ const DailyCalendarScreen = () => {
     return `${year}-${month}-${day}`;
   };
 
+  const toTimezoneDate = useCallback(
+    (dateString?: string | null) => {
+      if (!dateString) return null;
+      return convertToTimezoneDate(dateString, selectedTimeZone);
+    },
+    [selectedTimeZone],
+  );
+
   // Group events by date using expandEventsForRange (same as ScheduleScreen and MonthlyCalendar)
   const { eventsByDate } = useMemo(() => {
     const byDate: { [key: string]: any[] } = {};
@@ -162,16 +170,13 @@ const DailyCalendarScreen = () => {
 
     // Group expanded events by date
     expandedEvents.forEach((ev: any) => {
-      const startTimeData = convertToSelectedTimezone(
-        ev.fromTime,
-        selectedTimeZone,
-      );
+      const startDateInTimezone = toTimezoneDate(ev.fromTime);
 
-      if (!startTimeData || !startTimeData.date) {
+      if (!startDateInTimezone) {
         return;
       }
 
-      const dateString = formatYMD(startTimeData.date);
+      const dateString = formatYMD(startDateInTimezone);
 
       if (!byDate[dateString]) {
         byDate[dateString] = [];
@@ -194,14 +199,14 @@ const DailyCalendarScreen = () => {
     );
 
     return { eventsByDate: byDate };
-  }, [userEvents, selectedTimeZone, selectedDate]);
+  }, [userEvents, selectedTimeZone, selectedDate, toTimezoneDate]);
 
   // Get events for selected date and sort by time
   const selectedDateEvents = useMemo(() => {
     const events = eventsByDate[selectedDateString] || [];
     const sorted = events.sort((a, b) => {
-      const timeA = parseTimeToPST(a.fromTime);
-      const timeB = parseTimeToPST(b.fromTime);
+      const timeA = toTimezoneDate(a.fromTime);
+      const timeB = toTimezoneDate(b.fromTime);
       if (!timeA || !timeB) return 0;
       return timeA.getTime() - timeB.getTime();
     });
@@ -216,12 +221,12 @@ const DailyCalendarScreen = () => {
       );
     }
     return sorted;
-  }, [eventsByDate, selectedDateString]);
+  }, [eventsByDate, selectedDateString, toTimezoneDate]);
 
   // Calculate duration
   const calculateDuration = (fromTime: string, toTime: string) => {
-    const from = parseTimeToPST(fromTime);
-    const to = parseTimeToPST(toTime);
+    const from = toTimezoneDate(fromTime);
+    const to = toTimezoneDate(toTime);
     if (!from || !to) return '0h';
 
     const diffMs = to.getTime() - from.getTime();
@@ -238,7 +243,7 @@ const DailyCalendarScreen = () => {
 
   // Format time
   const formatTime = (dateString: string) => {
-    const date = parseTimeToPST(dateString);
+    const date = toTimezoneDate(dateString);
     if (!date) return 'Invalid Time';
 
     return date
@@ -450,8 +455,8 @@ const DailyCalendarScreen = () => {
 
   // Transform events for EventCard component
   const transformEventForCard = (event: any) => {
-    const startTime = parseTimeToPST(event.fromTime);
-    const endTime = parseTimeToPST(event.toTime);
+    const startTime = toTimezoneDate(event.fromTime);
+    const endTime = toTimezoneDate(event.toTime);
     const duration = calculateDuration(event.fromTime, event.toTime);
     const startTimeStr =
       startTime
@@ -522,7 +527,7 @@ const DailyCalendarScreen = () => {
               // Group events by time (hour) for display
               const groupedByTime: { [key: string]: any[] } = {};
               selectedDateEvents.forEach(event => {
-                const startTime = parseTimeToPST(event.fromTime);
+                const startTime = toTimezoneDate(event.fromTime);
                 const timeLabel =
                   startTime
                     ?.toLocaleTimeString('en-US', {
@@ -576,7 +581,7 @@ const DailyCalendarScreen = () => {
                             color={isTaskEvent ? '#8DC63F' : '#00AEEF'}
                             tags={event.list || []}
                             compact={true}
-                          tabletCornerRadius={12}
+                            tabletCornerRadius={12}
                             onEdit={() => handleEditEvent(event)}
                           />
                         </View>

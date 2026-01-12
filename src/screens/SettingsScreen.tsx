@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 
 import {
   View,
@@ -14,6 +14,8 @@ import {
   Platform,
   ScrollView,
   ActivityIndicator,
+  TextInput,
+  FlatList,
 } from 'react-native';
 
 import Share from 'react-native-share';
@@ -72,6 +74,7 @@ import { spacing, fontSize, colors as themeColors } from '../utils/LightTheme';
 
 import * as DimensionsUtils from '../utils/dimensions';
 import { generateEventUID } from '../utils/eventUtils';
+import { getTimezoneArray, getTimezoneLabel } from '../constants/timezones';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 600;
@@ -98,29 +101,33 @@ const blockchainService = new BlockchainService();
 
 // Setting Row Component
 
+interface SettingRowProps {
+  title: string;
+  subtitle?: string;
+  hasDropdown?: boolean;
+  hasSwitch?: boolean;
+  hasButton?: boolean;
+  hasRightArrow?: boolean;
+  buttonText?: string;
+  switchValue?: boolean;
+  onSwitchChange?: (value: boolean) => void;
+  onPress?: () => void;
+  onButtonPress?: () => void;
+}
+
 const SettingRow = ({
   title,
-
   subtitle,
-
   hasDropdown = false,
-
   hasSwitch = false,
-
-  hasButton = false, // <-- NEW PROP
-
-  hasRightArrow = false, // <-- NEW PROP for right arrow
-
-  buttonText = 'Action', // <-- NEW PROP for button label
-
+  hasButton = false,
+  hasRightArrow = false,
+  buttonText = 'Action',
   switchValue,
-
   onSwitchChange,
-
   onPress,
-
-  onButtonPress, // <-- NEW PROP for button action
-}) => (
+  onButtonPress,
+}: SettingRowProps) => (
   <TouchableOpacity
     style={styles.settingRow}
     onPress={onPress}
@@ -177,7 +184,13 @@ const SettingRow = ({
 
 // Bottom Sheet Modal Component
 
-const BottomSheetModal = ({ visible, onClose, children }) => {
+interface BottomSheetModalProps {
+  visible: boolean;
+  onClose: () => void;
+  children: React.ReactNode;
+}
+
+const BottomSheetModal = ({ visible, onClose, children }: BottomSheetModalProps) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   useEffect(() => {
@@ -246,8 +259,15 @@ const WEEK_DAYS = [
 
 // Day Selection Modal Component
 
+interface DaySelectionModalProps {
+  visible: boolean;
+  onClose: () => void;
+  selectedDay: string;
+  onSelectDay: (day: string) => void;
+}
+
 const DaySelectionModal = React.memo(
-  ({ visible, onClose, selectedDay, onSelectDay }) => {
+  ({ visible, onClose, selectedDay, onSelectDay }: DaySelectionModalProps) => {
     const { account } = useActiveAccount();
 
     const [isSaving, setIsSaving] = useState(false);
@@ -400,12 +420,19 @@ const DaySelectionModal = React.memo(
 
 // Theme Selection Modal Component
 
+interface ThemeSelectionModalProps {
+  visible: boolean;
+  onClose: () => void;
+  selectedTheme: string;
+  onSelectTheme: (theme: 'system' | 'light' | 'dark') => void;
+}
+
 const ThemeSelectionModal = ({
   visible,
   onClose,
   selectedTheme,
   onSelectTheme,
-}) => {
+}: ThemeSelectionModalProps) => {
   const themes = [
     { id: 'system', label: 'System Default' },
 
@@ -429,7 +456,7 @@ const ThemeSelectionModal = ({
           <TouchableOpacity
             key={theme.id}
             style={styles.radioOption}
-            onPress={() => onSelectTheme(theme.id)}
+            onPress={() => onSelectTheme(theme.id as 'system' | 'light' | 'dark')}
             activeOpacity={0.7}
           >
             <View style={styles.radioButton}>
@@ -466,72 +493,129 @@ const ThemeSelectionModal = ({
 
 // Time Zone Modal Component
 
+interface TimeZoneModalProps {
+  visible: boolean;
+  onClose: () => void;
+  selectedTimeZone: string;
+  onSelectTimeZone: (timeZone: string) => void;
+}
+
 const TimeZoneModal = ({
   visible,
   onClose,
   selectedTimeZone,
   onSelectTimeZone,
-}) => {
+}: TimeZoneModalProps) => {
   const [tempSelectedTimeZone, setTempSelectedTimeZone] =
     useState(selectedTimeZone);
+  const [searchQuery, setSearchQuery] = useState('');
 
-  const timeZones = [
-    { id: 'ist', label: '(GMT+05:30) Indian Standard' },
+  const allTimeZones = useMemo(() => getTimezoneArray(), []);
 
-    { id: 'utc', label: '(GMT+00:00) UTC' },
-
-    { id: 'est', label: '(GMT-05:00) Eastern Standard' },
-
-    { id: 'pst', label: '(GMT-08:00) Pacific Standard' },
-  ];
+  const filteredTimeZones = useMemo(() => {
+    if (!searchQuery.trim()) {
+      return allTimeZones;
+    }
+    const query = searchQuery.toLowerCase();
+    return allTimeZones.filter(tz => 
+      tz.label.toLowerCase().includes(query) || 
+      tz.id.toLowerCase().includes(query)
+    );
+  }, [searchQuery, allTimeZones]);
 
   // Reset temp state when modal opens or selectedTimeZone changes
-
   useEffect(() => {
     if (visible) {
       setTempSelectedTimeZone(selectedTimeZone);
+      setSearchQuery('');
     }
   }, [visible, selectedTimeZone]);
 
   const handleConfirm = () => {
     onSelectTimeZone(tempSelectedTimeZone);
-
     onClose();
   };
 
   const handleCancel = () => {
     // Reset to original value
-
     setTempSelectedTimeZone(selectedTimeZone);
-
+    setSearchQuery('');
     onClose();
   };
+
+  const renderTimezoneItem = useCallback(
+    ({ item }: { item: any }) => (
+      <TouchableOpacity
+        style={[
+          styles.timezoneOption,
+          tempSelectedTimeZone === item.id && styles.timezoneOptionSelected,
+        ]}
+        onPress={() => setTempSelectedTimeZone(item.id)}
+        activeOpacity={0.7}
+      >
+        <View style={styles.radioButton}>
+          {tempSelectedTimeZone === item.id && (
+            <View style={styles.radioButtonSelected} />
+          )}
+        </View>
+        <View style={styles.timezoneTextContainer}>
+          <Text style={styles.timezoneId}>{item.id}</Text>
+          <Text style={styles.timezoneLabel}>{item.label}</Text>
+        </View>
+      </TouchableOpacity>
+    ),
+    [tempSelectedTimeZone],
+  );
 
   return (
     <BottomSheetModal visible={visible} onClose={handleCancel}>
       <View style={styles.modalHeader}>
-        <Text style={styles.modalTitle}>Time Zone</Text>
+        <Text style={styles.modalTitle}>Select Time Zone</Text>
       </View>
 
-      <View style={styles.modalBody}>
-        {timeZones.map(timezone => (
-          <TouchableOpacity
-            key={timezone.id}
-            style={styles.radioOption}
-            onPress={() => setTempSelectedTimeZone(timezone.id)}
-            activeOpacity={0.7}
-          >
-            <View style={styles.radioButton}>
-              {tempSelectedTimeZone === timezone.id && (
-                <View style={styles.radioButtonSelected} />
-              )}
-            </View>
-
-            <Text style={styles.radioText}>{timezone.label}</Text>
+      {/* Search Input */}
+      <View style={styles.searchContainer}>
+        <MaterialIcons
+          name="search"
+          size={20}
+          color={Colors.grey}
+          style={styles.searchIcon}
+        />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Search timezones..."
+          placeholderTextColor={Colors.grey}
+          value={searchQuery}
+          onChangeText={setSearchQuery}
+        />
+        {searchQuery !== '' && (
+          <TouchableOpacity onPress={() => setSearchQuery('')}>
+            <MaterialIcons
+              name="close"
+              size={20}
+              color={Colors.grey}
+            />
           </TouchableOpacity>
-        ))}
+        )}
       </View>
 
+      {/* Timezone List */}
+      <ScrollView 
+        style={styles.modalBody} 
+        scrollEnabled={true} 
+        nestedScrollEnabled={true}
+        contentContainerStyle={{ flexGrow: 1 }}
+      >
+        {filteredTimeZones.length > 0 ? (
+          filteredTimeZones.map((item) => renderTimezoneItem({ item }))
+        ) : (
+          <View style={styles.noResultsContainer}>
+            <Text style={styles.noResultsText}>No timezones found</Text>
+          </View>
+        )}
+      </ScrollView>
+
+      {/* Buttons */}
       <View style={styles.modalButtons}>
         <TouchableOpacity
           style={styles.cancelButton}
@@ -711,30 +795,17 @@ const SettingsScreen = () => {
     toggleTaskOverdueNotification,
   } = useSettingsStore();
 
-  const getThemeLabel = themeId => {
-    const themeMap = {
+  const getThemeLabel = (themeId: string): string => {
+    const themeMap: Record<string, string> = {
       system: 'System Default',
-
       light: 'Light mode',
-
       dark: 'Dark mode',
     };
-
     return themeMap[themeId] || 'System Default';
   };
 
-  const getTimeZoneLabel = tzId => {
-    const tzMap = {
-      ist: '(GMT+05:30) Indian Standard',
-
-      utc: '(GMT+00:00) UTC',
-
-      est: '(GMT-05:00) Eastern Standard',
-
-      pst: '(GMT-08:00) Pacific Standard',
-    };
-
-    return tzMap[tzId] || '(GMT+05:30) Indian Standard';
+  const getTimeZoneLabelLocal = (tzId: string) => {
+    return getTimezoneLabel(tzId) || tzId;
   };
 
   const handleExportEvents = async () => {
@@ -1082,7 +1153,7 @@ const SettingsScreen = () => {
           <View style={[styles.card, { marginTop: spacing.xs }]}>
             <SettingRow
               title="Time Zone"
-              subtitle={getTimeZoneLabel(selectedTimeZone)}
+              subtitle={getTimeZoneLabelLocal(selectedTimeZone)}
               hasDropdown={true}
               onPress={() => setShowTimeZoneModal(true)}
             />
@@ -1399,12 +1470,13 @@ const styles = StyleSheet.create({
 
     borderTopRightRadius: moderateScale(16),
 
-    maxHeight: SCREEN_HEIGHT * 0.7,
+    maxHeight: SCREEN_HEIGHT * 0.85,
 
     paddingBottom: Platform.OS === 'ios' ? scaleHeight(20) : 0,
 
     width: '100%',
     alignSelf: 'center',
+    flexDirection: 'column',
   },
 
   modalHeader: {
@@ -1430,7 +1502,8 @@ const styles = StyleSheet.create({
   },
 
   modalBody: {
-    paddingVertical: getTabletSafeDimension(scaleHeight(8), 6, 10),
+    maxHeight: SCREEN_HEIGHT * 0.45,
+    flexGrow: 0,
   },
 
   radioOption: {
@@ -1589,6 +1662,73 @@ const styles = StyleSheet.create({
     color: '#FF3B30', // Red color for logout
     fontFamily: Fonts.regular,
     fontWeight: '400',
+  },
+
+  // Timezone Modal Styles
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: getTabletSafeDimension(moderateScale(20), 16, 22),
+    paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 14),
+    backgroundColor: themeColors.grey100,
+    marginHorizontal: getTabletSafeDimension(moderateScale(20), 16, 22),
+    marginVertical: getTabletSafeDimension(scaleHeight(12), 10, 14),
+    borderRadius: moderateScale(8),
+  },
+
+  searchIcon: {
+    marginRight: getTabletSafeDimension(moderateScale(10), 8, 12),
+  },
+
+  searchInput: {
+    flex: 1,
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 14, 16),
+    color: Colors.black,
+    fontFamily: Fonts.latoRegular,
+    padding: 0,
+  },
+
+  timezoneOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: getTabletSafeDimension(moderateScale(20), 16, 22),
+    paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 14),
+    minHeight: getTabletSafeDimension(scaleHeight(48), 44, 52),
+  },
+
+  timezoneOptionSelected: {
+    backgroundColor: themeColors.grey100,
+  },
+
+  timezoneTextContainer: {
+    flex: 1,
+    marginLeft: getTabletSafeDimension(moderateScale(14), 12, 16),
+  },
+
+  timezoneId: {
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 14, 16),
+    color: Colors.black,
+    fontWeight: '500',
+    fontFamily: Fonts.latoMedium,
+  },
+
+  timezoneLabel: {
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 12, 14),
+    color: themeColors.grey400,
+    marginTop: scaleHeight(2),
+    fontFamily: Fonts.latoRegular,
+  },
+
+  noResultsContainer: {
+    paddingVertical: getTabletSafeDimension(scaleHeight(40), 30, 50),
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  noResultsText: {
+    fontSize: getTabletSafeDimension(fontSize.textSize14, 14, 16),
+    color: themeColors.grey400,
+    fontFamily: Fonts.latoRegular,
   },
 });
 

@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   View,
   StyleSheet,
@@ -18,7 +18,7 @@ import WeekHeader from '../components/WeekHeader';
 import CustomDrawer from '../components/CustomDrawer';
 import { useActiveAccount } from '../stores/useActiveAccount';
 import { useEventsStore } from '../stores/useEventsStore';
-import { parseTimeToPST, isEventInPast } from '../utils';
+import { isEventInPast } from '../utils';
 import { useCalendarStore } from '../stores/useCalendarStore';
 import CustomAlert from '../components/CustomAlert';
 import DeleteConfirmModal from '../components/DeleteConfirmModal';
@@ -38,10 +38,14 @@ import EventIcon from '../assets/svgs/eventIcon.svg';
 import TaskIcon from '../assets/svgs/taskIcon.svg';
 import LinearGradient from 'react-native-linear-gradient';
 import { Fonts } from '../constants/Fonts';
-import { convertToSelectedTimezone } from '../utils/timezone';
+import {
+  convertToSelectedTimezone,
+  convertToTimezoneDate,
+} from '../utils/timezone';
 import * as DimensionsUtils from '../utils/dimensions';
 
-const { scaleWidth, scaleHeight, moderateScale, screenWidth, screenHeight } = DimensionsUtils;
+const { scaleWidth, scaleHeight, moderateScale, screenWidth, screenHeight } =
+  DimensionsUtils;
 
 // Tablet detection constants
 const isTablet = screenWidth >= 600;
@@ -49,7 +53,11 @@ const isSmallMobile = screenWidth <= 340;
 const isLargeMobile = screenWidth > 400 && screenWidth < 600;
 
 // Helper function for tablet-safe dimensions
-const getTabletSafeDimension = (mobileValue: number, tabletValue: number, maxValue: number) => {
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
   if (isTablet) {
     return Math.min(tabletValue, maxValue);
   }
@@ -172,6 +180,14 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     const year = date.getFullYear();
     return `${day} ${month} ${year}`;
   };
+
+  const toTimezoneDate = useCallback(
+    (timeString?: string | null) => {
+      if (!timeString) return null;
+      return convertToTimezoneDate(timeString, selectedTimeZone);
+    },
+    [selectedTimeZone],
+  );
 
   const selectedDateString = useMemo(() => {
     const dateString = formatDate(selectedDate);
@@ -1358,8 +1374,8 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
 
   const formatEventTimeRange = (event: any) => {
-    const start = parseTimeToPST(event.fromTime) || event.instanceStartTime;
-    const end = parseTimeToPST(event.toTime) || event.instanceEndTime;
+    const start = toTimezoneDate(event.fromTime) || event.instanceStartTime;
+    const end = toTimezoneDate(event.toTime) || event.instanceEndTime;
 
     const startText = formatTimeWithoutTimezone(start);
     const endText = !event?.isTask && end ? formatTimeWithoutTimezone(end) : '';
@@ -1522,7 +1538,9 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
                           return null;
 
                         const maxVisible = 5;
-                        const size = moderateScale(getTabletSafeDimension(30, 18, 24));
+                        const size = moderateScale(
+                          getTabletSafeDimension(30, 18, 24),
+                        );
                         const visibleGuests = eventGuests.slice(0, maxVisible);
                         const remainingCount = eventGuests.length - maxVisible;
                         const isSingleGuest = eventGuests.length === 1;
@@ -1742,7 +1760,11 @@ const styles = StyleSheet.create({
   },
   eventItem: {
     backgroundColor: '#ffffff',
-    borderRadius: getTabletSafeDimension(moderateScale(12), moderateScale(14), 18),
+    borderRadius: getTabletSafeDimension(
+      moderateScale(12),
+      moderateScale(14),
+      18,
+    ),
     paddingVertical: scaleHeight(getTabletSafeDimension(10, 8, 10)),
     paddingHorizontal: scaleWidth(getTabletSafeDimension(12, 12, 16)),
     marginBottom: scaleHeight(getTabletSafeDimension(12, 10, 12)),
