@@ -5722,7 +5722,7 @@ const styles = StyleSheet.create({
     marginBottom: getTabletSafeDimension(scaleHeight(20), scaleHeight(10), scaleHeight(20)),
   },
   timezoneTagText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 14, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 15, 17),
     color: colors.blackText,
     fontWeight: '400',
   },
@@ -5981,7 +5981,7 @@ const styles = StyleSheet.create({
     paddingVertical: getTabletSafeDimension(spacing.sm, spacing.sm, spacing.sm),
   },
   allDayText: {
-    fontSize: getTabletSafeDimension(14, 15, 16),
+    fontSize: getTabletSafeDimension(12, 15, 17),
     fontFamily: Fonts.latoRegular,
     fontWeight: '400',
     lineHeight: getTabletSafeDimension(18, 20, 22),
