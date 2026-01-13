@@ -45,7 +45,11 @@ import { parseCustomRecurrence } from '../utils/recurrence';
 const isTablet = screenWidth >= 600;
 
 // Helper function for tablet-safe dimensions
-const getTabletSafeDimension = (mobileValue: number, tabletValue: number, maxValue: number) => {
+const getTabletSafeDimension = (
+  mobileValue: number,
+  tabletValue: number,
+  maxValue: number,
+) => {
   if (isTablet) {
     return Math.min(tabletValue, maxValue);
   }
@@ -235,6 +239,11 @@ const EventCard: React.FC<EventCardProps> = ({
         return parseCustomRecurrence(customRepeatTag.value);
       }
       // Fallback to "custom" if no customRepeatEvent data
+      return 'custom';
+    }
+
+    // If value is 'custom_' (legacy), display as 'custom'
+    if (recurrenceTag.value === 'custom_') {
       return 'custom';
     }
 
@@ -679,7 +688,9 @@ const EventCard: React.FC<EventCardProps> = ({
         style={[
           styles.container,
           { borderLeftColor: color },
-          isTablet && tabletCornerRadius ? { borderRadius: tabletCornerRadius } : null,
+          isTablet && tabletCornerRadius
+            ? { borderRadius: tabletCornerRadius }
+            : null,
         ]}
         onPress={handlePress}
         activeOpacity={0.8}
@@ -883,7 +894,10 @@ const styles = StyleSheet.create({
   // Expanded container style for when event is expanded
   compactContainerExpanded: {
     paddingVertical: screenWidth < 375 ? scaleHeight(4) : scaleHeight(6), // Same as collapsed
-    paddingHorizontal: screenWidth < 375 ? spacing.xs : getTabletSafeDimension(spacing.sm, 12, 14), // Scaled on tablets
+    paddingHorizontal:
+      screenWidth < 375
+        ? spacing.xs
+        : getTabletSafeDimension(spacing.sm, 12, 14), // Scaled on tablets
     borderRadius: getTabletSafeDimension(borderRadius.lg, 14, 16),
     overflow: 'visible', // Allow content to be visible
     alignSelf: 'stretch', // Stretch to full width when expanded
@@ -933,8 +947,14 @@ const styles = StyleSheet.create({
     minWidth: 0, // Allow flex shrinking
   },
   chevronContainer: {
-    width: screenWidth < 375 ? scaleWidth(14) : getTabletSafeDimension(scaleWidth(16), 18, 20), // Scaled on tablets
-    height: screenWidth < 375 ? scaleHeight(14) : getTabletSafeDimension(scaleHeight(16), 18, 20), // Scaled on tablets
+    width:
+      screenWidth < 375
+        ? scaleWidth(14)
+        : getTabletSafeDimension(scaleWidth(16), 18, 20), // Scaled on tablets
+    height:
+      screenWidth < 375
+        ? scaleHeight(14)
+        : getTabletSafeDimension(scaleHeight(16), 18, 20), // Scaled on tablets
     justifyContent: 'center',
     alignItems: 'center',
     flexShrink: 0, // Prevent chevron from shrinking
@@ -947,7 +967,10 @@ const styles = StyleSheet.create({
     marginRight: getTabletSafeDimension(spacing.md, 12, 14), // Scaled
   },
   compactTime: {
-    fontSize: screenWidth < 375 ? fontSize.textSize12 : getTabletSafeDimension(fontSize.textSize14, 6, 16), // Scaled
+    fontSize:
+      screenWidth < 375
+        ? fontSize.textSize12
+        : getTabletSafeDimension(fontSize.textSize14, 6, 16), // Scaled
     color: colors.textSecondary,
     marginBottom: getTabletSafeDimension(spacing.xs, 6, 10), // Scaled
     flexShrink: 0, // Prevent time from shrinking

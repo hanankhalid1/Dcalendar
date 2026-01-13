@@ -79,6 +79,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [emailError, setEmailError] = useState('');
+  const [lastConfirmedGuests, setLastConfirmedGuests] = useState<string[]>([]);
   const { account } = useActiveAccount();
 
   // Load contacts when modal opens
@@ -100,26 +101,45 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
     }
   }, [showGuestModal, account?.userName]);
 
-  // Load contacts when modal opens and seed pending selection
+  // Sync pendingSelection only when selectedGuests changes from parent (when Add is confirmed)
+  useEffect(() => {
+    // Check if selectedGuests actually changed (parent updated it)
+    const guestsChanged =
+      JSON.stringify(selectedGuests) !== JSON.stringify(lastConfirmedGuests);
+    if (guestsChanged) {
+      console.log(
+        '[GuestSelector] selectedGuests changed from parent, syncing pendingSelection',
+      );
+      setPendingSelection(selectedGuests);
+      setLastConfirmedGuests(selectedGuests);
+    }
+  }, [selectedGuests, lastConfirmedGuests]);
+
+  // Load contacts when modal opens
   useEffect(() => {
     if (showGuestModal) {
-      setPendingSelection(selectedGuests);
       loadContacts();
       debugLogDcontacts(); // Log dcontacts for debugging
     } else {
-      // Reset when modal closes
+      // Reset when modal closes (only clear guests and search)
       setGuests([]);
       onSearchQueryChange('');
-      setPendingSelection([]);
     }
-  }, [showGuestModal, loadContacts, onSearchQueryChange, selectedGuests]);
+  }, [showGuestModal, loadContacts, onSearchQueryChange]);
 
   const togglePendingGuest = (guestEmail: string) => {
-    setPendingSelection(prev =>
-      prev.includes(guestEmail)
+    setPendingSelection(prev => {
+      const updated = prev.includes(guestEmail)
         ? prev.filter(email => email !== guestEmail)
-        : [...prev, guestEmail],
-    );
+        : [...prev, guestEmail];
+      console.log(
+        '[GuestSelector] togglePendingGuest:',
+        guestEmail,
+        '-> pendingSelection:',
+        updated,
+      );
+      return updated;
+    });
     setEmailError('');
   };
 
@@ -185,7 +205,8 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
   const isAddDisabled = pendingSelection.length === 0 || disabled;
 
   const handleCancel = () => {
-    setPendingSelection(selectedGuests);
+    // Don't apply any changes - just close the modal
+    // The useEffect will reset pendingSelection when modal closes
     setEmailError('');
     onToggleGuestModal();
   };
@@ -196,6 +217,15 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
     onToggleGuestModal();
   };
 
+  // Always show pending selection count when modal is open to reflect live changes
+  const displayCount = showGuestModal
+    ? pendingSelection.length
+    : selectedGuests.length;
+  const displayText =
+    displayCount > 0
+      ? `${displayCount} guest${displayCount > 1 ? 's' : ''} selected`
+      : 'Add people';
+
   return (
     <View style={styles.section}>
       <TouchableOpacity
@@ -203,13 +233,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
         onPress={onToggleGuestModal}
         disabled={disabled}
       >
-        <Text style={styles.guestInput}>
-          {selectedGuests.length > 0
-            ? `${selectedGuests.length} guest${
-                selectedGuests.length > 1 ? 's' : ''
-              } selected`
-            : 'Add people'}
-        </Text>
+        <Text style={styles.guestInput}>{displayText}</Text>
         <Text style={{ fontSize: 20, color: '#A4A7AE', marginLeft: 8 }}>
           ＋
         </Text>
@@ -487,11 +511,14 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                         {email}
                       </Text>
                       <TouchableOpacity
-                        onPress={() =>
-                          setPendingSelection(prev =>
-                            prev.filter(e => e !== email),
-                          )
-                        }
+                        onPress={() => {
+                          const updated = pendingSelection.filter(
+                            e => e !== email,
+                          );
+                          setPendingSelection(updated);
+                          // Immediately update parent to persist the removal
+                          onConfirmSelection(updated);
+                        }}
                         style={{ marginLeft: 8, padding: 2 }}
                         accessibilityLabel={`Remove ${email}`}
                       >
@@ -559,18 +586,30 @@ const styles = StyleSheet.create({
     borderColor: '#DCE0E5',
     backgroundColor: colors.white,
     borderRadius: 8,
-    paddingVertical: getTabletSafeDimension(scaleHeight(12), scaleHeight(8), scaleHeight(10)),
-    paddingHorizontal: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
-    minHeight: getTabletSafeDimension(scaleHeight(44), scaleHeight(36), scaleHeight(40)),
+    paddingVertical: getTabletSafeDimension(
+      scaleHeight(12),
+      scaleHeight(8),
+      scaleHeight(10),
+    ),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.sm,
+      spacing.xs,
+      spacing.sm,
+    ),
+    minHeight: getTabletSafeDimension(
+      scaleHeight(44),
+      scaleHeight(36),
+      scaleHeight(40),
+    ),
   },
   guestInput: {
     flex: 1,
-    fontSize: getTabletSafeDimension(14, 9, 10),
+    fontSize: getTabletSafeDimension(14, 15, 16), // match event screen
     color: '#A4A7AE',
     fontWeight: '400',
     marginLeft: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
     fontFamily: Fonts.latoRegular,
-    lineHeight: getTabletSafeDimension(18, 12, 13),
+    lineHeight: getTabletSafeDimension(18, 20, 22),
     letterSpacing: 0,
   },
   // Modal Styles
@@ -604,7 +643,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   modalTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize20, 16, 18),
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 18, 20), // match event screen
     fontWeight: '600',
     color: colors.blackText,
     fontFamily: Fonts.latoBold,
@@ -627,7 +666,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 15, 16), // match event screen
     color: '#252B37',
     marginLeft: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
     padding: 0,
@@ -643,12 +682,20 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   inlineErrorTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, fontSize.textSize12, 14),
+    fontSize: getTabletSafeDimension(
+      fontSize.textSize14,
+      fontSize.textSize12,
+      14,
+    ),
     color: '#EF4444',
     fontFamily: Fonts.latoMedium,
   },
   inlineErrorSubtext: {
-    fontSize: getTabletSafeDimension(fontSize.textSize12, fontSize.textSize11, 12),
+    fontSize: getTabletSafeDimension(
+      fontSize.textSize12,
+      fontSize.textSize11,
+      12,
+    ),
     color: '#9CA3AF',
     marginTop: 4,
   },
@@ -668,7 +715,7 @@ const styles = StyleSheet.create({
   guestAvatar: {
     width: scaleWidth(40),
     height: scaleHeight(40),
-    borderRadius: 20,
+    borderRadius: isTablet ? scaleWidth(20) : 20, // fully rounded for tablet
     marginRight: spacing.md,
     overflow: 'hidden',
   },
@@ -706,7 +753,7 @@ const styles = StyleSheet.create({
   checkbox: {
     width: scaleWidth(20),
     height: scaleHeight(20),
-    borderRadius: 4,
+    borderRadius: isTablet ? 4 : 4, // square with rounded corners for tablet
     borderWidth: 2,
     borderColor: '#D1D5DB',
     justifyContent: 'center',
@@ -763,8 +810,12 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     backgroundColor: '#F3F4F6',
-    borderRadius: getTabletSafeDimension(borderRadius.md, 4, 5),
-    paddingVertical: getTabletSafeDimension(scaleHeight(12), scaleHeight(14), scaleHeight(14)),
+    borderRadius: getTabletSafeDimension(10, 10, 12), // more rounded on tablet
+    paddingVertical: getTabletSafeDimension(
+      scaleHeight(12),
+      scaleHeight(14),
+      scaleHeight(14),
+    ),
     alignItems: 'center',
   },
   cancelButtonText: {
@@ -775,9 +826,13 @@ const styles = StyleSheet.create({
   },
   addButton: {
     flex: 2,
-    borderRadius: getTabletSafeDimension(borderRadius.md, 4, 5),
+    borderRadius: getTabletSafeDimension(10, 10, 12), // more rounded on tablet
     backgroundColor: colors.primaryBlue,
-    paddingVertical: getTabletSafeDimension(scaleHeight(12), scaleHeight(14), scaleHeight(14)),
+    paddingVertical: getTabletSafeDimension(
+      scaleHeight(12),
+      scaleHeight(14),
+      scaleHeight(14),
+    ),
     alignItems: 'center',
     justifyContent: 'center',
   },
