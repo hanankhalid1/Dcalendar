@@ -177,15 +177,7 @@ const styles = StyleSheet.create({
       ? scaleWidth(320)
       : scaleWidth(374),
     alignItems: 'center',
-    marginTop: isTablet
-      ? scaleHeight(24) // Much smaller margin for tablets
-      : isFolding
-      ? scaleHeight(150)
-      : isLargeMobile
-      ? scaleHeight(140)
-      : isSmallMobile
-      ? scaleHeight(80)
-      : scaleHeight(134),
+    
   },
 
   // Top Calendar Icon

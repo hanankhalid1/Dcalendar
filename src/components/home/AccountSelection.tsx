@@ -801,7 +801,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   connectButtonText: {
-    fontSize: getTabletSafeFontSize(18, 20, 22),
+    fontSize: getTabletSafeFontSize(16, 18, 20),
     color: '#181D27',
     fontFamily: Fonts.latoMedium,
   },

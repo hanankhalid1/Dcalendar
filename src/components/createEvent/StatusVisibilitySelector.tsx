@@ -252,7 +252,7 @@ const styles = StyleSheet.create({
     borderBottomColor: '#F0F0F0',
   },
   optionText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 16, 18),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 15, 17),
     color: '#252B37',
     fontFamily: Fonts.latoRegular,
   },
