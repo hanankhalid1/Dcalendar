@@ -604,12 +604,12 @@ const styles = StyleSheet.create({
   },
   guestInput: {
     flex: 1,
-    fontSize: getTabletSafeDimension(14, 9, 10),
+    fontSize: getTabletSafeDimension(14, 15, 16), // match event screen
     color: '#A4A7AE',
     fontWeight: '400',
     marginLeft: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
     fontFamily: Fonts.latoRegular,
-    lineHeight: getTabletSafeDimension(18, 12, 13),
+    lineHeight: getTabletSafeDimension(18, 20, 22),
     letterSpacing: 0,
   },
   // Modal Styles
@@ -643,7 +643,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
   },
   modalTitle: {
-    fontSize: getTabletSafeDimension(fontSize.textSize20, 16, 18),
+    fontSize: getTabletSafeDimension(fontSize.textSize20, 18, 20), // match event screen
     fontWeight: '600',
     color: colors.blackText,
     fontFamily: Fonts.latoBold,
@@ -666,7 +666,7 @@ const styles = StyleSheet.create({
   },
   searchInput: {
     flex: 1,
-    fontSize: getTabletSafeDimension(fontSize.textSize16, 14, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize16, 15, 16), // match event screen
     color: '#252B37',
     marginLeft: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
     padding: 0,
@@ -715,7 +715,7 @@ const styles = StyleSheet.create({
   guestAvatar: {
     width: scaleWidth(40),
     height: scaleHeight(40),
-    borderRadius: 20,
+    borderRadius: isTablet ? scaleWidth(20) : 20, // fully rounded for tablet
     marginRight: spacing.md,
     overflow: 'hidden',
   },
@@ -753,7 +753,7 @@ const styles = StyleSheet.create({
   checkbox: {
     width: scaleWidth(20),
     height: scaleHeight(20),
-    borderRadius: 4,
+    borderRadius: isTablet ? 4 : 4, // square with rounded corners for tablet
     borderWidth: 2,
     borderColor: '#D1D5DB',
     justifyContent: 'center',
@@ -810,7 +810,7 @@ const styles = StyleSheet.create({
   cancelButton: {
     flex: 1,
     backgroundColor: '#F3F4F6',
-    borderRadius: getTabletSafeDimension(borderRadius.md, 4, 5),
+    borderRadius: getTabletSafeDimension(10, 10, 12), // more rounded on tablet
     paddingVertical: getTabletSafeDimension(
       scaleHeight(12),
       scaleHeight(14),
@@ -826,7 +826,7 @@ const styles = StyleSheet.create({
   },
   addButton: {
     flex: 2,
-    borderRadius: getTabletSafeDimension(borderRadius.md, 4, 5),
+    borderRadius: getTabletSafeDimension(10, 10, 12), // more rounded on tablet
     backgroundColor: colors.primaryBlue,
     paddingVertical: getTabletSafeDimension(
       scaleHeight(12),
