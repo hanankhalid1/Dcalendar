@@ -402,7 +402,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         if (customMatch[3]) {
           customDays = customMatch[3]
             .split(',')
-            .map(d => d.trim().toLowerCase());
+            .map((d: string) => d.trim().toLowerCase());
         }
 
         if (customMatch[4]) {
@@ -858,7 +858,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         (item: any) => item.key === 'task' && item.value === 'true',
       );
       const repeatType =
-        ev.repeatEvent ||
+        (ev as any).repeatEvent ||
         ev.list?.find((item: any) => item.key === 'repeatEvent')?.value;
       const isRecurring = repeatType && repeatType !== 'Does not repeat';
 
@@ -1084,7 +1084,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
       e.preventDefault();
       setExitModal(true);
 
-      setNavigationAction(e.data.action);
+      setNavigationAction(null);
     });
 
     return unsub;
@@ -1431,7 +1431,7 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
               selectedDotColor: '#ffffff',
               arrowColor: colors.figmaLightBlue || '#2196F3',
               textDayFontFamily: Fonts.bold,
-              textDayHeaderFontFamily: Fonts.black,
+              textDayHeaderFontFamily: Fonts.bold,
               textDayFontSize: 12,
               textDayHeaderFontSize: 14,
             }}
@@ -1703,15 +1703,6 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
         onCancel={() => {
           setExitModal(false);
           setNavigationAction(null);
-        }}
-        onConfirm={() => {
-          setExitModal(false);
-          setNavigationAction(null);
-          if (navigationAction) {
-            navigation.dispatch(navigationAction);
-          } else {
-            navigation.goBack();
-          }
         }}
       />
     </View>
