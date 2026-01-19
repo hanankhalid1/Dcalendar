@@ -1,4 +1,10 @@
-import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
+import React, {
+  useEffect,
+  useState,
+  useRef,
+  useMemo,
+  useCallback,
+} from 'react';
 
 import {
   View,
@@ -74,7 +80,7 @@ import { spacing, fontSize, colors as themeColors } from '../utils/LightTheme';
 
 import * as DimensionsUtils from '../utils/dimensions';
 import { generateEventUID } from '../utils/eventUtils';
-import { getTimezoneArray, getTimezoneLabel } from '../constants/timezones';
+import { TIMEZONES, getTimezoneLabel } from '../constants/timezones';
 
 const { height: SCREEN_HEIGHT, width: SCREEN_WIDTH } = Dimensions.get('window');
 const isTablet = SCREEN_WIDTH >= 600;
@@ -190,7 +196,11 @@ interface BottomSheetModalProps {
   children: React.ReactNode;
 }
 
-const BottomSheetModal = ({ visible, onClose, children }: BottomSheetModalProps) => {
+const BottomSheetModal = ({
+  visible,
+  onClose,
+  children,
+}: BottomSheetModalProps) => {
   const slideAnim = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
 
   useEffect(() => {
@@ -456,7 +466,9 @@ const ThemeSelectionModal = ({
           <TouchableOpacity
             key={theme.id}
             style={styles.radioOption}
-            onPress={() => onSelectTheme(theme.id as 'system' | 'light' | 'dark')}
+            onPress={() =>
+              onSelectTheme(theme.id as 'system' | 'light' | 'dark')
+            }
             activeOpacity={0.7}
           >
             <View style={styles.radioButton}>
@@ -510,16 +522,17 @@ const TimeZoneModal = ({
     useState(selectedTimeZone);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const allTimeZones = useMemo(() => getTimezoneArray(), []);
+  const allTimeZones = useMemo(() => TIMEZONES, []);
 
   const filteredTimeZones = useMemo(() => {
     if (!searchQuery.trim()) {
       return allTimeZones;
     }
     const query = searchQuery.toLowerCase();
-    return allTimeZones.filter(tz => 
-      tz.label.toLowerCase().includes(query) || 
-      tz.id.toLowerCase().includes(query)
+    return allTimeZones.filter(
+      tz =>
+        tz.label.toLowerCase().includes(query) ||
+        tz.value.toLowerCase().includes(query),
     );
   }, [searchQuery, allTimeZones]);
 
@@ -544,26 +557,27 @@ const TimeZoneModal = ({
   };
 
   const renderTimezoneItem = useCallback(
-    ({ item }: { item: any }) => (
-      <TouchableOpacity
-        style={[
-          styles.timezoneOption,
-          tempSelectedTimeZone === item.id && styles.timezoneOptionSelected,
-        ]}
-        onPress={() => setTempSelectedTimeZone(item.id)}
-        activeOpacity={0.7}
-      >
-        <View style={styles.radioButton}>
-          {tempSelectedTimeZone === item.id && (
-            <View style={styles.radioButtonSelected} />
-          )}
-        </View>
-        <View style={styles.timezoneTextContainer}>
-          <Text style={styles.timezoneId}>{item.id}</Text>
-          <Text style={styles.timezoneLabel}>{item.label}</Text>
-        </View>
-      </TouchableOpacity>
-    ),
+    ({ item }: { item: any }) => {
+      const isSelected = tempSelectedTimeZone === item.value;
+      return (
+        <TouchableOpacity
+          style={[
+            styles.timezoneOption,
+            isSelected && styles.timezoneOptionSelected,
+          ]}
+          onPress={() => setTempSelectedTimeZone(item.value)}
+          activeOpacity={0.7}
+        >
+          <View style={styles.radioButton}>
+            {isSelected && <View style={styles.radioButtonSelected} />}
+          </View>
+          <View style={styles.timezoneTextContainer}>
+            <Text style={styles.timezoneId}>{item.value}</Text>
+            <Text style={styles.timezoneLabel}>{item.label}</Text>
+          </View>
+        </TouchableOpacity>
+      );
+    },
     [tempSelectedTimeZone],
   );
 
@@ -590,24 +604,20 @@ const TimeZoneModal = ({
         />
         {searchQuery !== '' && (
           <TouchableOpacity onPress={() => setSearchQuery('')}>
-            <MaterialIcons
-              name="close"
-              size={20}
-              color={Colors.grey}
-            />
+            <MaterialIcons name="close" size={20} color={Colors.grey} />
           </TouchableOpacity>
         )}
       </View>
 
       {/* Timezone List */}
-      <ScrollView 
-        style={styles.modalBody} 
-        scrollEnabled={true} 
+      <ScrollView
+        style={styles.modalBody}
+        scrollEnabled={true}
         nestedScrollEnabled={true}
         contentContainerStyle={{ flexGrow: 1 }}
       >
         {filteredTimeZones.length > 0 ? (
-          filteredTimeZones.map((item) => renderTimezoneItem({ item }))
+          filteredTimeZones.map(item => renderTimezoneItem({ item }))
         ) : (
           <View style={styles.noResultsContainer}>
             <Text style={styles.noResultsText}>No timezones found</Text>
@@ -804,8 +814,8 @@ const SettingsScreen = () => {
     return themeMap[themeId] || 'System Default';
   };
 
-  const getTimeZoneLabelLocal = (tzId: string) => {
-    return getTimezoneLabel(tzId) || tzId;
+  const getTimeZoneLabelLocal = (tzValue: string) => {
+    return getTimezoneLabel(tzValue) || tzValue;
   };
 
   const handleExportEvents = async () => {

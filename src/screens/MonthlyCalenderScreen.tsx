@@ -182,9 +182,13 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
 
   const toTimezoneDate = useCallback(
-    (timeString?: string | null) => {
+    (timeString?: string | null, eventTimeZone?: string | null) => {
       if (!timeString) return null;
-      return convertToTimezoneDate(timeString, selectedTimeZone);
+      return convertToTimezoneDate(
+        timeString,
+        selectedTimeZone,
+        eventTimeZone || undefined,
+      );
     },
     [selectedTimeZone],
   );
@@ -291,10 +295,18 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     const startTimeData = convertToSelectedTimezone(
       event.fromTime,
       selectedTimeZone,
+      event.timezone ||
+        (Array.isArray(event.list)
+          ? event.list.find((item: any) => item.key === 'timezone')?.value
+          : undefined),
     );
     const endTimeData = convertToSelectedTimezone(
       event.toTime,
       selectedTimeZone,
+      event.timezone ||
+        (Array.isArray(event.list)
+          ? event.list.find((item: any) => item.key === 'timezone')?.value
+          : undefined),
     );
 
     if (!startTimeData || !endTimeData) return [];
@@ -827,13 +839,18 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
     viewEndDate.setDate(viewEndDate.getDate() + 365); // Show full year after
 
     (userEvents || []).forEach(ev => {
+      const eventTz = Array.isArray(ev.list)
+        ? ev.list.find((item: any) => item.key === 'timezone')?.value
+        : undefined;
       const startTimeData = convertToSelectedTimezone(
         ev.fromTime,
         selectedTimeZone,
+        eventTz,
       );
       const endTimeData = convertToSelectedTimezone(
         ev.toTime,
         selectedTimeZone,
+        eventTz,
       );
 
       console.log('startTimeData in memo for event', startTimeData, ev.title);
@@ -1364,8 +1381,14 @@ const MonthlyCalenderScreen: React.FC<MonthlyCalendarProps> = ({
   };
 
   const formatEventTimeRange = (event: any) => {
-    const start = toTimezoneDate(event.fromTime) || event.instanceStartTime;
-    const end = toTimezoneDate(event.toTime) || event.instanceEndTime;
+    const eventTz =
+      event.timezone ||
+      (Array.isArray(event.list)
+        ? event.list.find((item: any) => item.key === 'timezone')?.value
+        : undefined);
+    const start =
+      toTimezoneDate(event.fromTime, eventTz) || event.instanceStartTime;
+    const end = toTimezoneDate(event.toTime, eventTz) || event.instanceEndTime;
 
     const startText = formatTimeWithoutTimezone(start);
     const endText = !event?.isTask && end ? formatTimeWithoutTimezone(end) : '';
