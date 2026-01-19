@@ -328,6 +328,20 @@ const EventCard: React.FC<EventCardProps> = ({
       ? formatTimezoneAbbreviation(eventTimezone)
       : null;
 
+  // LOG: Event display - timezone debug
+  console.log(
+    '[TIMEZONE-DEBUG][DISPLAY] Event:',
+    eventData,
+    'EventTimezone:',
+    eventTimezone,
+    'DeviceTimezone:',
+    deviceTimezone,
+    'Time:',
+    time,
+    'Date:',
+    date,
+  );
+
   const timeWithTimezone = timezoneLabel ? `${time} (${timezoneLabel})` : time;
 
   const handleDeleteEvent = async (eventId: string) => {
