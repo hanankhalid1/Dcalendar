@@ -16,7 +16,7 @@ import {
   Dimensions,
 } from 'react-native';
 import LinearGradient from 'react-native-linear-gradient';
-import CalendarWithTime from '../components/CalendarWithTime';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { Calendar } from 'react-native-calendars';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import FeatherIcon from 'react-native-vector-icons/Feather';
@@ -162,10 +162,10 @@ const CreateTaskScreen = () => {
   const [selectedEndTime, setSelectedEndTime] = useState(
     editEventData?.selectedEndTime || '',
   );
-  const [showCalendarModal, setShowCalendarModal] = useState(false);
-  const [calendarModalMode, setCalendarModalMode] = useState<
-    'date' | 'startTime' | 'endTime'
-  >('date');
+  const [pickerMode, setPickerMode] = useState<'date' | 'time' | 'datetime'>(
+    'datetime',
+  );
+  const [isPickerVisible, setPickerVisible] = useState(false);
 
   const [showDetailedDateTime, setShowDetailedDateTime] = useState(
     !!editEventData,
@@ -1555,7 +1555,8 @@ const CreateTaskScreen = () => {
                 style={styles.datePicker}
                 onPress={() => {
                   if (!isLoading) {
-                    setShowCalendarModal(true);
+                    setPickerMode('datetime');
+                    setPickerVisible(true);
                   }
                 }}
                 disabled={isLoading}
@@ -1570,8 +1571,7 @@ const CreateTaskScreen = () => {
                 >
                   {selectedDate
                     ? selectedDate.toLocaleDateString() +
-                      ' ' +
-                      selectedStartTime
+                      (selectedStartTime ? ' ' + selectedStartTime : '')
                     : 'Select'}
                 </Text>
                 <FeatherIcon name="calendar" size={20} color="#A4A7AE" />
@@ -1581,6 +1581,26 @@ const CreateTaskScreen = () => {
                   {dateError || timeError}
                 </Text>
               )}
+              <DateTimePickerModal
+                isVisible={isPickerVisible}
+                mode={pickerMode}
+                date={selectedDate || new Date()}
+                onConfirm={date => {
+                  setSelectedDate(date);
+                  // Extract time string in 12-hour format
+                  const timeString = date.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                    hour12: true,
+                  });
+                  setSelectedStartTime(timeString);
+                  setShowDetailedDateTime(true);
+                  setTimeout(() => validateDateTime(), 0);
+                  setPickerVisible(false);
+                }}
+                onCancel={() => setPickerVisible(false)}
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              />
             </View>
 
             {/* Repeat Field - Match task screen design */}
@@ -1782,14 +1802,7 @@ const CreateTaskScreen = () => {
       </KeyboardAvoidingView>
 
       {/* Calendar with Time Modal */}
-      <CalendarWithTime
-        isVisible={showCalendarModal}
-        onClose={() => setShowCalendarModal(false)}
-        onDateTimeSelect={handleDateTimeSelect}
-        mode="from"
-        selectedDate={selectedDate || undefined}
-        selectedTime={selectedStartTime || undefined}
-      />
+      {/* DateTimePickerModal is now used above for Android date/time selection */}
 
       <Modal
         visible={showCustomRecurrenceModal}
@@ -1807,7 +1820,13 @@ const CreateTaskScreen = () => {
               style={{ flexGrow: 0 }}
               showsVerticalScrollIndicator={true}
               scrollEnabled={true}
-              contentContainerStyle={{ paddingBottom: getTabletSafeDimension(spacing.lg, spacing.sm, spacing.md) }}
+              contentContainerStyle={{
+                paddingBottom: getTabletSafeDimension(
+                  spacing.lg,
+                  spacing.sm,
+                  spacing.md,
+                ),
+              }}
             >
               <View style={styles.customRecurrenceContent}>
                 {/* Repeat every section */}
@@ -2348,7 +2367,11 @@ const styles = StyleSheet.create({
     letterSpacing: 0,
     color: '#252B37',
     paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 14),
-    paddingHorizontal: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.sm,
+      spacing.xs,
+      spacing.sm,
+    ),
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: 8,
@@ -2379,7 +2402,11 @@ const styles = StyleSheet.create({
     borderColor: '#DCE0E5',
     borderRadius: 8,
     paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 14),
-    paddingHorizontal: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.sm,
+      spacing.xs,
+      spacing.sm,
+    ),
     backgroundColor: colors.white,
     minHeight: getTabletSafeDimension(scaleHeight(44), 40, 48),
   },
@@ -2424,7 +2451,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     backgroundColor: colors.primaryBlue, // Solid blue #00AEEF
     paddingVertical: getTabletSafeDimension(scaleHeight(14), 16, 18),
-    paddingHorizontal: getTabletSafeDimension(spacing.xl, spacing.xl, spacing.xl),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.xl,
+      spacing.xl,
+      spacing.xl,
+    ),
     ...shadows.sm,
   },
   saveButtonDisabled: {
@@ -2470,7 +2501,11 @@ const styles = StyleSheet.create({
     borderColor: '#DCE0E5',
     borderRadius: 8,
     paddingVertical: getTabletSafeDimension(scaleHeight(12), 10, 14),
-    paddingHorizontal: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.sm),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.sm,
+      spacing.xs,
+      spacing.sm,
+    ),
     backgroundColor: colors.white,
     width: '100%',
     minHeight: getTabletSafeDimension(scaleHeight(44), 40, 48),
@@ -2558,22 +2593,38 @@ const styles = StyleSheet.create({
   customRecurrenceModalContainer: {
     backgroundColor: colors.white,
     borderRadius: 20,
-    width: getTabletSafeDimension('92%', SCREEN_WIDTH * 0.75, SCREEN_WIDTH * 0.80),
+    width: getTabletSafeDimension(
+      '92%',
+      SCREEN_WIDTH * 0.75,
+      SCREEN_WIDTH * 0.8,
+    ),
     maxWidth: getTabletSafeDimension(scaleWidth(480), 520, 580),
     maxHeight: getTabletSafeDimension('75%', '55%', '60%'),
     paddingVertical: getTabletSafeDimension(spacing.lg, spacing.sm, spacing.md),
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.sm, spacing.md),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.md,
+      spacing.sm,
+      spacing.md,
+    ),
     flexDirection: 'column',
   },
   customRecurrenceContent: {
     flex: 1,
     overflow: 'scroll',
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.xs, spacing.xs),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.md,
+      spacing.xs,
+      spacing.xs,
+    ),
     paddingBottom: getTabletSafeDimension(spacing.sm, spacing.xs, spacing.xs),
   },
   customModalHeader: {
     marginBottom: getTabletSafeDimension(spacing.lg, spacing.sm, spacing.md),
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.xs, spacing.sm),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.md,
+      spacing.xs,
+      spacing.sm,
+    ),
   },
   customModalTitle: {
     fontSize: getTabletSafeDimension(fontSize.textSize18, 20, 22),
@@ -2607,7 +2658,11 @@ const styles = StyleSheet.create({
     textAlign: 'left',
     fontSize: getTabletSafeDimension(fontSize.textSize14, 17, 19),
     color: '#252B37',
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.md,
+      spacing.md,
+      spacing.lg,
+    ),
     paddingVertical: 0,
     backgroundColor: colors.white,
     fontFamily: Fonts.latoRegular,
@@ -2634,7 +2689,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.md,
+      spacing.md,
+      spacing.lg,
+    ),
     paddingVertical: getTabletSafeDimension(spacing.sm, spacing.sm, spacing.md),
     height: getTabletSafeDimension(scaleHeight(40), 44, 48),
     width: '100%',
@@ -2666,7 +2725,11 @@ const styles = StyleSheet.create({
   },
   customUnitDropdownItem: {
     paddingVertical: getTabletSafeDimension(scaleHeight(10), 14, 16),
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.md, spacing.lg),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.md,
+      spacing.md,
+      spacing.lg,
+    ),
     borderBottomWidth: 1,
     borderBottomColor: '#F0F0F0',
   },
@@ -2842,7 +2905,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: getTabletSafeDimension(spacing.md, 4, 6),
     paddingVertical: getTabletSafeDimension(spacing.md, 4, 6),
-    paddingHorizontal: getTabletSafeDimension(spacing.md, spacing.xs, spacing.xs),
+    paddingHorizontal: getTabletSafeDimension(
+      spacing.md,
+      spacing.xs,
+      spacing.xs,
+    ),
     paddingTop: getTabletSafeDimension(spacing.lg, 4, 6),
     backgroundColor: colors.white,
   },
