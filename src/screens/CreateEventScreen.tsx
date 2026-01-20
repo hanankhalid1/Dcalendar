@@ -3469,6 +3469,33 @@ const CreateEventScreen = () => {
                     });
                     setSelectedStartTime(timeString);
                     setTimeout(() => validateDateTime(), 0);
+
+                    // --- Auto-set end date/time logic ---
+                    // Clone the selected date
+                    const endDate = new Date(date.getTime());
+                    let endHour = date.getHours();
+                    let endMinute = date.getMinutes();
+                    if (endHour === 23) {
+                      // If 11:00 PM, set to 12:00 AM next day
+                      endDate.setDate(endDate.getDate() + 1);
+                      endHour = 0;
+                      endMinute = 0;
+                    } else {
+                      // Otherwise, add 1 hour
+                      endHour += 1;
+                    }
+                    endDate.setHours(endHour);
+                    endDate.setMinutes(endMinute);
+                    endDate.setSeconds(0);
+                    endDate.setMilliseconds(0);
+                    setSelectedEndDate(endDate);
+                    // Extract end time string in 12-hour format
+                    const endTimeString = endDate.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                    });
+                    setSelectedEndTime(endTimeString);
                   }
                   setStartPickerVisible(false);
                 }}
