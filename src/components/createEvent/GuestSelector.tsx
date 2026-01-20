@@ -155,7 +155,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
         setEmailError('Enter a valid email');
         return;
       }
-      // Remove duplicates in input
+      // Remove duplicates in input and pendingSelection
       const uniqueEmails = Array.from(new Set(rawEmails));
       // Validate and filter
       const validEmails = uniqueEmails.filter(e => isValidEmail(e));
@@ -166,6 +166,7 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
           !pendingSelection.some(sel => sel.toLowerCase() === e) &&
           (!account?.userName || e !== account.userName.toLowerCase()),
       );
+      // Prevent adding duplicates even if rapid clicks
       if (filteredEmails.length === 0) {
         if (invalidEmails.length > 0) {
           setEmailError('Some emails are invalid');
@@ -174,7 +175,11 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
         }
         return;
       }
-      setPendingSelection(prev => [...prev, ...filteredEmails]);
+      setPendingSelection(prev => {
+        // Only add emails not already present
+        const newEmails = filteredEmails.filter(e => !prev.includes(e));
+        return [...prev, ...newEmails];
+      });
       setEmailError(
         invalidEmails.length > 0 ? `Invalid: ${invalidEmails.join(', ')}` : '',
       );
@@ -339,6 +344,9 @@ const GuestSelector: React.FC<GuestSelectorProps> = ({
                     marginBottom: 8,
                   }}
                   onPress={() => addEmailToList(searchQuery)}
+                  disabled={pendingSelection.includes(
+                    searchQuery.trim().toLowerCase(),
+                  )}
                 >
                   <Text
                     style={{ fontSize: 18, color: '#00AEEF', marginRight: 6 }}
