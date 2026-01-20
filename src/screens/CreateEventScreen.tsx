@@ -26,6 +26,7 @@ import {
 import { Calendar } from 'react-native-calendars';
 import LinearGradient from 'react-native-linear-gradient';
 import FeatherIcon from 'react-native-vector-icons/Feather';
+import MinusCircleIcon from '../assets/svgs/minus-cirlce.svg';
 import {
   borderRadius,
   colors,
@@ -3469,6 +3470,33 @@ const CreateEventScreen = () => {
                     });
                     setSelectedStartTime(timeString);
                     setTimeout(() => validateDateTime(), 0);
+
+                    // --- Auto-set end date/time logic ---
+                    // Clone the selected date
+                    const endDate = new Date(date.getTime());
+                    let endHour = date.getHours();
+                    let endMinute = date.getMinutes();
+                    if (endHour === 23) {
+                      // If 11:00 PM, set to 12:00 AM next day
+                      endDate.setDate(endDate.getDate() + 1);
+                      endHour = 0;
+                      endMinute = 0;
+                    } else {
+                      // Otherwise, add 1 hour
+                      endHour += 1;
+                    }
+                    endDate.setHours(endHour);
+                    endDate.setMinutes(endMinute);
+                    endDate.setSeconds(0);
+                    endDate.setMilliseconds(0);
+                    setSelectedEndDate(endDate);
+                    // Extract end time string in 12-hour format
+                    const endTimeString = endDate.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                    });
+                    setSelectedEndTime(endTimeString);
                   }
                   setStartPickerVisible(false);
                 }}
@@ -3747,6 +3775,67 @@ const CreateEventScreen = () => {
                 onSearchQueryChange={setGuestSearchQuery}
                 disabled={isLoading}
               />
+
+              {/* Dropdown of selected guests below the field */}
+              {selectedGuests.length > 0 && !showGuestModal && (
+                <View
+                  style={{
+                    marginTop: 8,
+                    marginBottom: 4,
+                    marginHorizontal: 0,
+                    maxHeight: 120,
+                    overflow: 'hidden',
+                    borderRadius: 8,
+                    backgroundColor: '#F6F7F9',
+                    paddingVertical: 6,
+                    paddingHorizontal: 4,
+                  }}
+                >
+                  {selectedGuests.map((email, idx) => (
+                    <View
+                      key={email + idx}
+                      style={{
+                        flexDirection: 'row',
+                        alignItems: 'center',
+                        marginBottom: 8, // Increased from 2 to 8 for more vertical space
+                        paddingVertical: 4,
+                        paddingHorizontal: 8,
+                        borderRadius: 6,
+                        backgroundColor: '#fff',
+                        shadowColor: '#000',
+                        shadowOpacity: 0.03,
+                        shadowRadius: 1,
+                        elevation: 1,
+                        marginRight: 2,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          flex: 1,
+                          color: '#252B37',
+                          fontSize: 15,
+                          overflow: 'hidden',
+                        }}
+                        numberOfLines={1}
+                      >
+                        {email}
+                      </Text>
+                      <TouchableOpacity
+                        onPress={() => {
+                          const updated = selectedGuests.filter(
+                            e => e !== email,
+                          );
+                          setSelectedGuests(updated);
+                        }}
+                        style={{ marginLeft: 8, padding: 2 }}
+                        accessibilityLabel={`Remove ${email}`}
+                      >
+                        <MinusCircleIcon width={18} height={18} />
+                      </TouchableOpacity>
+                    </View>
+                  ))}
+                </View>
+              )}
             </View>
 
             {/* Add video conferencing Field - Match task screen design */}
