@@ -43,7 +43,7 @@ import MeetIcon from '../assets/svgs/meet.svg';
 import { useApiClient } from '../hooks/useApi';
 import { useEventsStore } from '../stores/useEventsStore';
 
-import CalendarWithTime from '../components/CalendarWithTime';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 
 import AdvancedOptions from '../components/createEvent/AdvancedOptions';
 import GradientText from '../components/home/GradientText';
@@ -144,6 +144,12 @@ const CreateEventScreen = () => {
       ? new Date(editEventData.selectedEndDate)
       : null,
   );
+  // DateTimePickerModal state
+  const [pickerMode, setPickerMode] = useState<'date' | 'time' | 'datetime'>(
+    'datetime',
+  );
+  const [isStartPickerVisible, setStartPickerVisible] = useState(false);
+  const [isEndPickerVisible, setEndPickerVisible] = useState(false);
   const [selectedStartTime, setSelectedStartTime] = useState(
     editEventData?.selectedStartTime || '',
   );
@@ -266,12 +272,14 @@ const CreateEventScreen = () => {
     }
 
     // Extract time components
-    const fromTimeOnly = fromTime.split('T')[1];
-    const toTimeOnly = toTime.split('T')[1];
+    const fromTimeOnly = fromTime.split('T')[1] || '';
+    const toTimeOnly = toTime.split('T')[1] || '';
 
     // ✅ The All-Day signature: T000000 for both start and end
-    const isStartMidnight = fromTimeOnly && fromTimeOnly.startsWith('000000');
-    const isEndMidnight = toTimeOnly && toTimeOnly.startsWith('000000');
+    const isStartMidnight =
+      typeof fromTimeOnly === 'string' && fromTimeOnly.startsWith('000000');
+    const isEndMidnight =
+      typeof toTimeOnly === 'string' && toTimeOnly.startsWith('000000');
 
     console.log('isAllDayEventCheck details:', {
       fromTime,
@@ -283,7 +291,7 @@ const CreateEventScreen = () => {
       result: isStartMidnight && isEndMidnight,
     });
 
-    return isStartMidnight && isEndMidnight;
+    return Boolean(isStartMidnight && isEndMidnight);
   };
   // Helper function to parse event data from the list/tags array
   const parseEventData = (eventData: any) => {
@@ -718,10 +726,20 @@ const CreateEventScreen = () => {
     }
   }, [editEventData, mode]);
 
-  // Validate date/time whenever dates, times, or all-day status changes
+  // Instantly validate date/time on any change
   useEffect(() => {
     validateDateTime();
-  }, [validateDateTime]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [
+    selectedStartDate,
+    selectedEndDate,
+    selectedStartTime,
+    selectedEndTime,
+    isAllDayEvent,
+  ]);
+
+  // Validate date/time whenever dates, times, or all-day status changes
+  // (useEffect for validateDateTime moved below validateDateTime declaration)
 
   // Removed auto-open dropdown on focus - dropdown should only open on user click
   const handleGoogleMeetClick = () => {
@@ -916,7 +934,9 @@ const CreateEventScreen = () => {
 
     return options;
   };
-  const recurrenceOptions = getRecurrenceOptions(selectedStartDate);
+  const recurrenceOptions = selectedStartDate
+    ? getRecurrenceOptions(selectedStartDate)
+    : [];
 
   // Handle location selection
   const handleLocationSelect = (selectedLocation: any) => {
@@ -942,7 +962,7 @@ const CreateEventScreen = () => {
     }
   };
 
-  const handleUnitSelect = unit => {
+  const handleUnitSelect = (unit: string) => {
     setCustomRecurrence(prev => ({ ...prev, repeatUnit: unit }));
     setShowUnitDropdown(false);
   };
@@ -1095,51 +1115,10 @@ const CreateEventScreen = () => {
         setStartDateError('Please select valid time and date');
         return;
       }
-
-      if (isAllDayEvent) {
-        // For all-day events, check if start date is in the past
-        const startDateTime = new Date(selectedStartDate);
-        startDateTime.setHours(0, 0, 0, 0);
-        const today = new Date(now);
-        today.setHours(0, 0, 0, 0);
-
-        if (startDateTime < today) {
-          setStartDateError('Please select valid time and date');
-          return;
-        }
-      } else {
-        // For timed events, check if start date/time is in the past
-        if (selectedStartTime && selectedStartTime.trim() !== '') {
-          const startDateTime = new Date(selectedStartDate);
-          const normalizedStartTime = selectedStartTime
-            .trim()
-            .replace(/\u00A0/g, ' ')
-            .replace(/\s+/g, ' ');
-          const startTimeMatch = normalizedStartTime.match(
-            /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
-          );
-
-          if (startTimeMatch) {
-            let hours = parseInt(startTimeMatch[1], 10);
-            const minutes = parseInt(startTimeMatch[2], 10);
-            const period = startTimeMatch[3].toUpperCase();
-
-            if (period === 'PM' && hours !== 12) hours += 12;
-            if (period === 'AM' && hours === 12) hours = 0;
-
-            startDateTime.setHours(hours, minutes, 0, 0);
-
-            if (startDateTime < now) {
-              setStartTimeError('Please select valid time and date');
-              return;
-            }
-          }
-        }
-      }
     }
 
+    // For all-day events, just validate dates
     if (isAllDayEvent) {
-      // For all-day events, just validate dates
       const startDateTime = new Date(selectedStartDate);
       startDateTime.setHours(0, 0, 0, 0);
       const endDateTime = new Date(selectedEndDate);
@@ -1159,6 +1138,7 @@ const CreateEventScreen = () => {
         return; // Don't show error if times aren't selected yet
       }
 
+      if (!selectedStartDate || !selectedEndDate) return;
       const startDateTime = new Date(selectedStartDate);
       const endDateTime = new Date(selectedEndDate);
 
@@ -1223,15 +1203,21 @@ const CreateEventScreen = () => {
       // Validate that end date/time is strictly after start date/time
       if (endDateTime <= startDateTime) {
         // Check if it's a date issue or time issue
-        const startDateOnly = new Date(selectedStartDate);
-        startDateOnly.setHours(0, 0, 0, 0);
-        const endDateOnly = new Date(selectedEndDate);
-        endDateOnly.setHours(0, 0, 0, 0);
+        const startDateOnly = selectedStartDate
+          ? new Date(selectedStartDate)
+          : null;
+        const endDateOnly = selectedEndDate ? new Date(selectedEndDate) : null;
+        if (startDateOnly) startDateOnly.setHours(0, 0, 0, 0);
+        if (endDateOnly) endDateOnly.setHours(0, 0, 0, 0);
 
         let errorMessage = '';
-        if (endDateOnly < startDateOnly) {
+        if (endDateOnly && startDateOnly && endDateOnly < startDateOnly) {
           errorMessage = 'End date must be on or after start date';
-        } else if (endDateOnly.getTime() === startDateOnly.getTime()) {
+        } else if (
+          endDateOnly &&
+          startDateOnly &&
+          endDateOnly.getTime() === startDateOnly.getTime()
+        ) {
           // Same date, but end time is before or equal to start time
           errorMessage = 'End time must be after start time';
         } else {
@@ -1249,6 +1235,9 @@ const CreateEventScreen = () => {
     selectedStartTime,
     selectedEndTime,
     isAllDayEvent,
+    mode,
+    setDateTimeError,
+    setStartDateError,
   ]);
 
   const handleDateTimeSelect = (date: Date, time: string) => {
@@ -1491,31 +1480,7 @@ const CreateEventScreen = () => {
       const startDateTime = new Date(startDate);
       const endDateTime = new Date(endDate);
 
-      // Parse start time
-      const normalizedStartTime = startTime
-        .trim()
-        .replace(/\u00A0/g, ' ')
-        .replace(/\s+/g, ' ');
-      const startTimeMatch = normalizedStartTime.match(
-        /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
-      );
-
-      if (!startTimeMatch) {
-        return;
-      }
-
-      const startHours = parseInt(startTimeMatch[1], 10);
-      const startMinutes = parseInt(startTimeMatch[2], 10);
-      const startPeriod = startTimeMatch[3].toUpperCase();
-      let finalStartHours = startHours;
-      if (startPeriod === 'PM' && startHours !== 12) {
-        finalStartHours = startHours + 12;
-      } else if (startPeriod === 'AM' && startHours === 12) {
-        finalStartHours = 0;
-      }
-      startDateTime.setHours(finalStartHours, startMinutes, 0, 0);
-
-      // Parse end time
+      // Parse end time (handle non-breaking spaces)
       const normalizedEndTime = endTime
         .trim()
         .replace(/\u00A0/g, ' ')
@@ -1523,24 +1488,16 @@ const CreateEventScreen = () => {
       const endTimeMatch = normalizedEndTime.match(
         /^(\d{1,2}):(\d{2})\s*(AM|PM)$/i,
       );
-
-      if (!endTimeMatch) {
-        return;
+      let endHours = 0;
+      let endMinutes = 0;
+      let endPeriod = 'AM';
+      if (endTimeMatch) {
+        endHours = parseInt(endTimeMatch[1], 10);
+        endMinutes = parseInt(endTimeMatch[2], 10);
+        endPeriod = endTimeMatch[3].toUpperCase();
       }
-
-      const endHours = parseInt(endTimeMatch[1], 10);
-      const endMinutes = parseInt(endTimeMatch[2], 10);
-      const endPeriod = endTimeMatch[3].toUpperCase();
-      let finalEndHours = endHours;
-      if (endPeriod === 'PM' && endHours !== 12) {
-        finalEndHours = endHours + 12;
-      } else if (endPeriod === 'AM' && endHours === 12) {
-        finalEndHours = 0;
-      }
-      endDateTime.setHours(finalEndHours, endMinutes, 0, 0);
-
-      // Validate that end date/time is strictly after start date/time
-      // If end time is 12:00 AM, it means it's on the next day, so add 1 day to endDateTime for comparison
+      // Parse start time
+      // ...existing code...
       const endDateTimeForComparison = new Date(endDateTime);
       if (endPeriod === 'AM' && endHours === 12) {
         endDateTimeForComparison.setDate(
@@ -1618,10 +1575,10 @@ const CreateEventScreen = () => {
           totalMinutes = totalMinutes % (24 * 60);
           const newHours24 = Math.floor(totalMinutes / 60);
           const newMinutes = totalMinutes % 60;
-          let displayHours = newHours24 % 12;
-          if (displayHours === 0) displayHours = 12;
+          let displayHour = newHours24 % 12;
+          if (displayHour === 0) displayHour = 12;
           const newPeriod = newHours24 >= 12 ? 'PM' : 'AM';
-          return `${displayHours}:${newMinutes
+          return `${displayHour.toString().padStart(2, '0')}:${newMinutes
             .toString()
             .padStart(2, '0')} ${newPeriod}`;
         }
@@ -1816,6 +1773,7 @@ const CreateEventScreen = () => {
         selectedEndTime.trim()
       ) {
         // Validate that end date/time is after start date/time
+        if (!selectedStartDate || !selectedEndDate) return;
         const startDateTime = new Date(selectedStartDate);
         const endDateTime = new Date(selectedEndDate);
 
@@ -1890,6 +1848,7 @@ const CreateEventScreen = () => {
       }
     } else {
       // ✅ For all-day events, just validate that end date is not before start date
+      if (!selectedStartDate || !selectedEndDate) return;
       const startDateTime = new Date(selectedStartDate);
       startDateTime.setHours(0, 0, 0, 0); // Set to start of day for accurate comparison
       const endDateTime = new Date(selectedEndDate);
@@ -1925,7 +1884,7 @@ const CreateEventScreen = () => {
                   });
                 }
               },
-              error => {
+              () => {
                 // If measureLayout fails, try UIManager approach
                 const scrollViewHandle = findNodeHandle(scrollViewRef.current);
                 const fieldHandle = findNodeHandle(ref.current);
@@ -1956,13 +1915,13 @@ const CreateEventScreen = () => {
 
         switch (firstErrorField) {
           case 'title':
-            scrollToField(titleInputRef);
+            scrollToField(titleInputRef as React.RefObject<View>);
             break;
           case 'startDate':
           case 'startTime':
           case 'endDate':
           case 'endTime':
-            scrollToField(dateTimeSectionRef);
+            scrollToField(dateTimeSectionRef as React.RefObject<View>);
             break;
         }
       }, 300);
@@ -2057,11 +2016,11 @@ const CreateEventScreen = () => {
           summary: eventData.title,
           description: eventData.description,
           start: {
-            dateTime: new Date(selectedStartDate).toISOString(),
+            dateTime: selectedStartDate ? selectedStartDate.toISOString() : '',
             timeZone: 'UTC', // match web
           },
           end: {
-            dateTime: new Date(selectedEndDate).toISOString(),
+            dateTime: selectedEndDate ? selectedEndDate.toISOString() : '',
             timeZone: 'UTC',
           },
           attendees: [
@@ -2070,7 +2029,7 @@ const CreateEventScreen = () => {
               displayName: activeAccount.userName.split('@')[0] || 'Organizer',
               responseStatus: 'accepted',
             },
-            ...(eventData.guests?.map(email => ({
+            ...(eventData.guests?.map((email: string) => ({
               email,
               displayName: email.split('@')[0],
               responseStatus: 'needsAction',
@@ -2085,7 +2044,7 @@ const CreateEventScreen = () => {
 
         // Add recurrence if exists
         if (eventData.recurrenceRule) {
-          googleEvent.recurrence = [eventData.recurrenceRule];
+          (googleEvent as any).recurrence = [eventData.recurrenceRule];
         }
 
         try {
@@ -2253,15 +2212,29 @@ const CreateEventScreen = () => {
         }
 
         // ✅ Build Zoom payload
-        const startTime = new Date(selectedStartDate);
-        const endTime = new Date(selectedEndDate);
-        const durationMinutes = Math.round(
-          (endTime.getTime() - startTime.getTime()) / (1000 * 60),
-        );
+        const startTime = selectedStartDate
+          ? new Date(selectedStartDate)
+          : null;
+        const endTime = selectedEndDate ? new Date(selectedEndDate) : null;
+        let durationMinutes = 0;
+        let startTimeISO = '';
+        if (startTime !== null && endTime !== null) {
+          if (
+            typeof startTime.getTime === 'function' &&
+            typeof endTime.getTime === 'function'
+          ) {
+            durationMinutes = Math.round(
+              (endTime.getTime() - startTime.getTime()) / (1000 * 60),
+            );
+          }
+          if (typeof startTime.toISOString === 'function') {
+            startTimeISO = startTime.toISOString();
+          }
+        }
 
         const zoomMeetingPayload = {
           topic: eventData.title || 'Meeting',
-          start_time: startTime.toISOString(),
+          start_time: startTimeISO,
           duration: durationMinutes,
           timezone: 'UTC',
           userName: activeAccount.userName,
@@ -2272,7 +2245,7 @@ const CreateEventScreen = () => {
           // ✅ Check if there's an existing Zoom meeting to update or create new
           if (hasExistingZoom) {
             console.log('✅ Updating existing Zoom meeting...');
-            zoomMeetingPayload.meetingId = previousGoogleMeetEventId; // Use existing meeting ID for update
+            (zoomMeetingPayload as any).meetingId = previousGoogleMeetEventId; // Use existing meeting ID for update
 
             console.log(
               '📤 Sending to /zoom/meetings with payload:',
@@ -2553,23 +2526,23 @@ const CreateEventScreen = () => {
           summary: eventData.title,
           description: eventData.description,
           start: {
-            dateTime: new Date(selectedStartDate).toISOString(),
+            dateTime: selectedStartDate ? selectedStartDate.toISOString() : '',
             timeZone: 'UTC', // match web code
           },
           end: {
-            dateTime: new Date(selectedEndDate).toISOString(),
+            dateTime: selectedEndDate ? selectedEndDate.toISOString() : '',
             timeZone: 'UTC',
           },
           attendees: [
             {
-              email: activeAccount.userName, // organizer / current user
+              email: activeAccount.userName,
               displayName: activeAccount.userName.split('@')[0] || 'Organizer',
               responseStatus: 'accepted',
             },
-            ...(eventData.guests?.map(email => ({
+            ...(eventData.guests?.map((email: string) => ({
               email,
               displayName: email.split('@')[0],
-              responseStatus: 'needsAction', // default for guests
+              responseStatus: 'needsAction',
             })) || []),
           ],
           conferenceData: {
@@ -2581,7 +2554,7 @@ const CreateEventScreen = () => {
 
         // Add recurrence if exists
         if (eventData.recurrenceRule) {
-          googleEvent.recurrence = [eventData.recurrenceRule];
+          (googleEvent as any).recurrence = [eventData.recurrenceRule];
         }
 
         // Wrap in the same structure as web
@@ -2669,16 +2642,21 @@ const CreateEventScreen = () => {
         }
 
         // ✅ Build Zoom-native payload matching backend requirements
-        const startTime = new Date(selectedStartDate);
-        const endTime = new Date(selectedEndDate);
-        const durationMinutes = Math.round(
-          (endTime.getTime() - startTime.getTime()) / (1000 * 60),
-        );
+        const startTime = selectedStartDate
+          ? new Date(selectedStartDate)
+          : null;
+        const endTime = selectedEndDate ? new Date(selectedEndDate) : null;
+        const durationMinutes =
+          startTime && endTime
+            ? Math.round(
+                (endTime.getTime() - startTime.getTime()) / (1000 * 60),
+              )
+            : 0;
 
-        const zoomMeeting = {
+        const zoomMeeting: any = {
           topic: eventData.title || 'New Meeting',
-          start_time: startTime.toISOString(),
-          end_time: endTime.toISOString(),
+          start_time: startTime ? startTime.toISOString() : '',
+          end_time: endTime ? endTime.toISOString() : '',
           duration: durationMinutes,
           timezone: 'UTC',
           userName: activeAccount.userName,
@@ -2869,6 +2847,63 @@ const CreateEventScreen = () => {
       setTitleError('Title is required');
       Alert.alert('Validation Error', 'Please enter a title for the event');
       return;
+    }
+
+    // New: Validate date and time selection for non-all-day events
+    if (!isAllDayEvent) {
+      let hasError = false;
+      if (!selectedStartDate) {
+        setStartDateError('Start date is required');
+        hasError = true;
+      } else {
+        setStartDateError('');
+      }
+      if (!selectedStartTime) {
+        setStartTimeError('Start time is required');
+        hasError = true;
+      } else {
+        setStartTimeError('');
+      }
+      if (!selectedEndDate) {
+        setEndDateError('End date is required');
+        hasError = true;
+      } else {
+        setEndDateError('');
+      }
+      if (!selectedEndTime) {
+        setEndTimeError('End time is required');
+        hasError = true;
+      } else {
+        setEndTimeError('');
+      }
+      if (hasError) {
+        Alert.alert(
+          'Validation Error',
+          'Please select both date and time for start and end.',
+        );
+        return;
+      }
+    } else {
+      // For all-day events, only date is required
+      let hasError = false;
+      if (!selectedStartDate) {
+        setStartDateError('Start date is required');
+        hasError = true;
+      } else {
+        setStartDateError('');
+      }
+      if (!selectedEndDate) {
+        setEndDateError('End date is required');
+        hasError = true;
+      } else {
+        setEndDateError('');
+      }
+      if (hasError) {
+        Alert.alert('Validation Error', 'Please select start and end date.');
+        return;
+      }
+      setStartTimeError('');
+      setEndTimeError('');
     }
 
     setIsLoading(true);
@@ -3119,12 +3154,16 @@ const CreateEventScreen = () => {
         title: title.trim(),
         description: description.trim(),
         fromTime: formatToISO8601Local(
-          selectedStartDate,
+          selectedStartDate || new Date(),
           selectedStartTime || '12:00 AM', // Use midnight if no time
           isAllDayEvent,
         ),
         toTime: formatToISO8601Local(
-          isAllDayEvent ? getNextDay(selectedEndDate) : selectedEndDate, // ✅ Add 1 day for all-day
+          isAllDayEvent
+            ? selectedEndDate
+              ? getNextDay(selectedEndDate)
+              : new Date()
+            : selectedEndDate || new Date(), // ✅ Add 1 day for all-day
           selectedEndTime || '12:00 AM', // Use midnight if no time
           isAllDayEvent,
         ),
@@ -3374,9 +3413,8 @@ const CreateEventScreen = () => {
                 style={styles.datePicker}
                 onPress={() => {
                   if (!isLoading) {
-                    closeInlineDropdowns();
-                    setCalendarMode('from');
-                    setShowCalendarModal(true);
+                    setPickerMode(isAllDayEvent ? 'date' : 'datetime');
+                    setStartPickerVisible(true);
                   }
                 }}
                 disabled={isLoading}
@@ -3399,7 +3437,11 @@ const CreateEventScreen = () => {
                           month: 'short',
                           day: 'numeric',
                         })} ${selectedStartTime}`
-                      : 'Select'
+                      : selectedStartDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
                     : 'Select'}
                 </Text>
                 <FeatherIcon name="calendar" size={20} color="#A4A7AE" />
@@ -3409,6 +3451,30 @@ const CreateEventScreen = () => {
                   {startDateError || startTimeError}
                 </Text>
               )}
+              <DateTimePickerModal
+                isVisible={isStartPickerVisible}
+                mode={pickerMode}
+                date={selectedStartDate || new Date()}
+                onConfirm={date => {
+                  if (isAllDayEvent) {
+                    setSelectedStartDate(date);
+                    setTimeout(() => validateDateTime(), 0);
+                  } else {
+                    setSelectedStartDate(date);
+                    // Extract time string in 12-hour format
+                    const timeString = date.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                    });
+                    setSelectedStartTime(timeString);
+                    setTimeout(() => validateDateTime(), 0);
+                  }
+                  setStartPickerVisible(false);
+                }}
+                onCancel={() => setStartPickerVisible(false)}
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              />
             </View>
 
             {/* End Date and Time */}
@@ -3418,9 +3484,8 @@ const CreateEventScreen = () => {
                 style={styles.datePicker}
                 onPress={() => {
                   if (!isLoading) {
-                    closeInlineDropdowns();
-                    setCalendarMode('to');
-                    setShowCalendarModal(true);
+                    setPickerMode(isAllDayEvent ? 'date' : 'datetime');
+                    setEndPickerVisible(true);
                   }
                 }}
                 disabled={isLoading}
@@ -3443,7 +3508,11 @@ const CreateEventScreen = () => {
                           month: 'short',
                           day: 'numeric',
                         })} ${selectedEndTime}`
-                      : 'Select'
+                      : selectedEndDate.toLocaleDateString('en-US', {
+                          month: 'short',
+                          day: 'numeric',
+                          year: 'numeric',
+                        })
                     : 'Select'}
                 </Text>
                 <FeatherIcon name="calendar" size={20} color="#A4A7AE" />
@@ -3453,6 +3522,30 @@ const CreateEventScreen = () => {
                   {endDateError || endTimeError}
                 </Text>
               )}
+              <DateTimePickerModal
+                isVisible={isEndPickerVisible}
+                mode={pickerMode}
+                date={selectedEndDate || new Date()}
+                onConfirm={date => {
+                  if (isAllDayEvent) {
+                    setSelectedEndDate(date);
+                    setTimeout(() => validateDateTime(), 0);
+                  } else {
+                    setSelectedEndDate(date);
+                    // Extract time string in 12-hour format
+                    const timeString = date.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                      hour12: true,
+                    });
+                    setSelectedEndTime(timeString);
+                    setTimeout(() => validateDateTime(), 0);
+                  }
+                  setEndPickerVisible(false);
+                }}
+                onCancel={() => setEndPickerVisible(false)}
+                display={Platform.OS === 'ios' ? 'inline' : 'default'}
+              />
             </View>
 
             {/* Date/Time relationship validation error - shown below both fields */}
@@ -3906,8 +3999,6 @@ const CreateEventScreen = () => {
                 selectedTimeUnit={selectedTimeUnit}
                 onTimeUnitChange={setSelectedTimeUnit}
                 onAnyDropdownOpen={closeInlineDropdowns}
-                selectedNotificationType={selectedNotificationType}
-                onNotificationTypeChange={setSelectedNotificationType}
                 onAddNotification={() => {
                   // Handle add notification
                   console.log('Add notification pressed');
@@ -3921,14 +4012,6 @@ const CreateEventScreen = () => {
                 onStatusChange={setSelectedStatus}
                 selectedVisibility={selectedVisibility}
                 onVisibilityChange={setSelectedVisibility}
-                onStatusPress={() => {
-                  // Handle status selection
-                  console.log('Status pressed');
-                }}
-                onVisibilityPress={() => {
-                  // Handle visibility selection
-                  console.log('Visibility pressed');
-                }}
               />
             )}
 
@@ -4002,22 +4085,6 @@ const CreateEventScreen = () => {
           </View>
         </ScrollView>
       </KeyboardAvoidingView>
-
-      {/* Calendar with Time Modal */}
-      <CalendarWithTime
-        isVisible={showCalendarModal}
-        onClose={() => setShowCalendarModal(false)}
-        onDateTimeSelect={handleDateTimeSelect}
-        mode={calendarMode}
-        selectedDate={
-          calendarMode === 'from'
-            ? selectedStartDate || undefined
-            : selectedEndDate || undefined
-        }
-        selectedTime={
-          calendarMode === 'from' ? selectedStartTime : selectedEndTime
-        }
-      />
 
       {/* Timezone Selection Modal */}
       <Modal
@@ -5016,8 +5083,8 @@ const styles = StyleSheet.create({
     borderColor: '#DCE0E5',
     borderRadius: borderRadius.sm,
     paddingHorizontal: getTabletSafeDimension(
-      spacing.sm,
-      spacing.sm,
+      spacing.md,
+      spacing.md,
       spacing.md,
     ),
     paddingVertical: getTabletSafeDimension(spacing.xs, spacing.xs, spacing.sm),
@@ -5567,12 +5634,16 @@ const styles = StyleSheet.create({
     backgroundColor: colors.white,
     borderRadius: getTabletSafeDimension(20, borderRadius.lg, borderRadius.lg),
     width: getTabletSafeDimension(
-      '92%',
-      SCREEN_WIDTH * 0.58,
-      SCREEN_WIDTH * 0.6,
+      Math.floor(SCREEN_WIDTH * 0.92),
+      Math.floor(SCREEN_WIDTH * 0.58),
+      Math.floor(SCREEN_WIDTH * 0.6),
     ),
     maxWidth: getTabletSafeDimension(scaleWidth(480), 480, 520),
-    maxHeight: getTabletSafeDimension('75%', '55%', '58%'),
+    maxHeight: getTabletSafeDimension(
+      Math.floor(SCREEN_WIDTH * 0.75),
+      Math.floor(SCREEN_WIDTH * 0.55),
+      Math.floor(SCREEN_WIDTH * 0.58),
+    ),
     paddingVertical: getTabletSafeDimension(spacing.lg, spacing.sm, spacing.sm),
     marginVertical: getTabletSafeDimension(0, spacing.xl, spacing.xl),
     paddingHorizontal: getTabletSafeDimension(
@@ -6147,7 +6218,7 @@ const styles = StyleSheet.create({
   dropdownWrapper: {
     position: 'absolute',
     top: '35%', // Adjust based on where your "Repeat every" section is
-    left: spacing.lg + scaleWidth(60) + spacing.sm, // Position next to the input
+    left: getTabletSafeDimension(scaleWidth(60), 56, 64) + spacing.sm, // Align with dropdown button
     zIndex: 1000,
   },
 
@@ -6183,13 +6254,21 @@ const styles = StyleSheet.create({
       spacing.md,
       spacing.lg,
     ),
-    maxHeight: getTabletSafeDimension('70%', '60%', '65%'),
+    maxHeight: getTabletSafeDimension(
+      Math.floor(SCREEN_WIDTH * 0.7),
+      Math.floor(SCREEN_WIDTH * 0.6),
+      Math.floor(SCREEN_WIDTH * 0.65),
+    ),
     minHeight: getTabletSafeDimension(
       scaleHeight(300),
       scaleHeight(220),
       scaleHeight(250),
     ),
-    width: getTabletSafeDimension('85%', '80%', '85%'),
+    width: getTabletSafeDimension(
+      Math.floor(SCREEN_WIDTH * 0.85),
+      Math.floor(SCREEN_WIDTH * 0.8),
+      Math.floor(SCREEN_WIDTH * 0.85),
+    ),
   },
   integrationModalHeader: {
     alignItems: 'center',
@@ -6283,29 +6362,8 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: Fonts.latoBold,
   },
-  datePicker: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: '#DCE0E5',
-    borderRadius: 8,
-    paddingVertical: scaleHeight(12),
-    paddingHorizontal: spacing.sm,
-    backgroundColor: colors.white,
-    minHeight: scaleHeight(44),
-  },
-  selectorText: {
-    fontSize: 12,
-    fontFamily: Fonts.latoRegular,
-    lineHeight: 18,
-    letterSpacing: 0,
-    color: '#A4A7AE',
-    flex: 1,
-  },
-  selectorTextFilled: {
-    color: '#252B37',
-  },
+  // Removed duplicate datePicker definition
+  // Removed duplicate selectorText and selectorTextFilled definitions
 });
 
 export default CreateEventScreen;
