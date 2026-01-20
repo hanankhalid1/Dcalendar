@@ -1,0 +1,15 @@
+<resources>
+    <!-- Custom style for Date/Time Picker to use Lato font -->
+    <style name="LatoDateTimePicker" parent="Theme.AppCompat.Light.Dialog">
+        <item name="android:fontFamily">@font/lato_regular</item>
+        <item name="fontFamily">@font/lato_regular</item>
+        <item name="android:textSize">16sp</item>
+         <!-- colors for picker elements --> 
+        <item name="android:colorAccent">@color/primary_blue</item>
+        <item name="android:colorBackground">@color/white</item>
+        <item name="android:textColorPrimary">@color/black</item>
+        <item name="android:textColorSecondary">@color/primary_blue</item>
+        
+
+    </style>
+</resources>

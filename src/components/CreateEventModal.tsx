@@ -22,7 +22,7 @@ import {
   borderRadius,
   shadows,
 } from '../utils/LightTheme';
-import CalendarWithTime from './CalendarWithTime';
+import DateTimePickerModal from 'react-native-modal-datetime-picker';
 import { FlatList } from 'react-native';
 import GradientText from './home/GradientText';
 import { Colors } from '../constants/Colors';
@@ -725,11 +725,62 @@ const CreateEventModal: React.FC<CreateEventModalProps> = ({
         </View>
       </ScrollView>
 
-      {/* Calendar with Time Modal */}
-      <CalendarWithTime
-        isVisible={showCalendarModal}
-        onClose={() => setShowCalendarModal(false)}
-        onDateTimeSelect={handleDateTimeSelect}
+      {/* Start/End DateTime Pickers */}
+      <TouchableOpacity
+        onPress={() => {
+          setPickerMode('datetime');
+          setStartPickerVisible(true);
+        }}
+        style={{ marginVertical: 8 }}
+      >
+        <Text style={{ color: colors.primary }}>Select Start Date & Time</Text>
+      </TouchableOpacity>
+      <Text>
+        {selectedStartTime
+          ? new Date(selectedStartTime).toLocaleString()
+          : 'No start selected'}
+      </Text>
+      <TouchableOpacity
+        onPress={() => {
+          setPickerMode('datetime');
+          setEndPickerVisible(true);
+        }}
+        style={{ marginVertical: 8 }}
+      >
+        <Text style={{ color: colors.primary }}>Select End Date & Time</Text>
+      </TouchableOpacity>
+      <Text>
+        {selectedEndTime
+          ? new Date(selectedEndTime).toLocaleString()
+          : 'No end selected'}
+      </Text>
+
+      <DateTimePickerModal
+        isVisible={isStartPickerVisible}
+        mode={pickerMode}
+        date={selectedStartTime ? new Date(selectedStartTime) : new Date()}
+        onConfirm={date => {
+          setSelectedStartTime(date.toISOString());
+          setStartPickerVisible(false);
+        }}
+        onCancel={() => setStartPickerVisible(false)}
+      />
+      <DateTimePickerModal
+        isVisible={isEndPickerVisible}
+        mode={pickerMode}
+        date={selectedEndTime ? new Date(selectedEndTime) : new Date()}
+        onConfirm={date => {
+          if (
+            selectedStartTime &&
+            new Date(date) <= new Date(selectedStartTime)
+          ) {
+            Alert.alert('End time must be after start time');
+            return;
+          }
+          setSelectedEndTime(date.toISOString());
+          setEndPickerVisible(false);
+        }}
+        onCancel={() => setEndPickerVisible(false)}
       />
     </View>
   );

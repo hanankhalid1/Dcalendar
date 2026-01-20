@@ -4,10 +4,17 @@
     <style name="AppTheme" parent="Theme.AppCompat.DayNight.NoActionBar">
         <!-- Customize your theme here. -->
         <item name="android:editTextBackground">@drawable/rn_edit_text_material</item>
+        <!-- App primary color for dialogs, pickers, etc. -->
+        <item name="colorPrimary">@color/primary_blue</item>
+        <item name="colorAccent">@color/primary_blue</item>
         <!-- Enable edge-to-edge display -->
         <item name="android:windowOptOutEdgeToEdgeEnforcement">false</item>
         <item name="android:statusBarColor">@android:color/transparent</item>
         <item name="android:navigationBarColor">@android:color/transparent</item>
+        <!-- Use Lato font for dialogs and pickers -->
+        <item name="android:dialogTheme">@style/LatoDateTimePicker</item>
+        <item name="android:datePickerDialogTheme">@style/LatoDateTimePicker</item>
+        <item name="android:timePickerDialogTheme">@style/LatoDateTimePicker</item>
     </style>
 
 </resources>
