@@ -10,7 +10,7 @@ export const sendEmail = async (formData: FormData) => {
   if (!token) {
     throw new Error('No auth token found in useToken store');
   }
- 
+
   const { apiClient } = await import('../hooks/useApi');
   const response = await apiClient.post('/sendEmail', formData, {
     headers: {
