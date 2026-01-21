@@ -29,10 +29,11 @@ export const sendEmail = async (formData: FormData) => {
 
   console.log("Token used for /sendEmail:", token);
   const response = await axios.post(
-    'https://dev-api.bmail.earth/sendEmail',
+    'https://api.dmail.earth/sendEmail',
     formData,
     {
       headers: {
+        'Content-Type': 'multipart/form-data',
         ...(token && { 'Authorization': `Bearer ${token}` })
       },
     },

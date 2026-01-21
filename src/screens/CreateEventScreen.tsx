@@ -2458,11 +2458,11 @@ const CreateEventScreen = () => {
               'This is a test event invitation from the app. No attachments.',
             );
 
-         
+
             console.log("form data", formData);
             const emailResponse = await sendEmail(formData);
 
-           
+
           }
         } catch (err) {
           console.error(
