@@ -42,6 +42,9 @@ import CalendarIcon from '../assets/svgs/calendar.svg';
 import ArrowDownIcon from '../assets/svgs/arrow-down.svg';
 import MeetIcon from '../assets/svgs/meet.svg';
 import { useApiClient } from '../hooks/useApi';
+import { generateEventEmailHtml } from '../utils/emailTemplate';
+import { generateICSFile } from '../utils/icsGenerator';
+import { sendEmail } from '../services/emailService';
 import { useEventsStore } from '../stores/useEventsStore';
 
 import DateTimePickerModal from 'react-native-modal-datetime-picker';
@@ -2426,6 +2429,54 @@ const CreateEventScreen = () => {
       );
 
       if (response) {
+        // --- EMAIL GUESTS IF ANY (CREATE FLOW) ---
+        try {
+          // Log the full eventData.list for debugging
+          console.log('[EMAIL INVITE][CREATE] eventData.list:', eventData.list);
+          const guestEmails = (eventData.list || [])
+            .filter((item: any) => item.key === 'guest')
+            .map((item: any) => item.value)
+            .filter((email: string) => !!email);
+          console.log('[EMAIL INVITE][CREATE] Guests:', guestEmails);
+          if (guestEmails.length > 0) {
+            // --- Send event invitation with required fields ---
+            const minimalGuest = guestEmails[0];
+            const formData = new FormData();
+            formData.append('subject', 'Test Event Invitation');
+            formData.append('from', activeAccount?.email || '');
+            formData.append('to', minimalGuest);
+            formData.append('cc', '');
+            formData.append('bcc', '');
+            formData.append(
+              'message',
+              'This is a test event invitation from the app. No attachments.',
+            );
+            // If you want to send HTML, you can also add: formData.append('html', ...)
+            console.log('[EMAIL INVITE][CREATE][TEST] Sending payload:', {
+              subject: 'Test Event Invitation',
+              from: activeAccount?.email || '',
+              to: minimalGuest,
+              cc: '',
+              bcc: '',
+              message:
+                'This is a test event invitation from the app. No attachments.',
+            });
+            const emailResponse = await sendEmail(formData);
+            console.log(
+              '[EMAIL INVITE][CREATE][TEST] API response:',
+              emailResponse,
+            );
+            console.log(
+              '[EMAIL INVITE][CREATE][TEST] Email sent to guest:',
+              minimalGuest,
+            );
+          }
+        } catch (err) {
+          console.error(
+            '[EMAIL INVITE][CREATE] Error sending guest invitation emails:',
+            err,
+          );
+        }
         const repeatEvents = (eventData?.list || [])
           .filter((data: any) => data.key === 'repeatEvent')
           .map((data: any) => data.value)
