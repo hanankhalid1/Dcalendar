@@ -118,9 +118,9 @@ const CreateEventScreen = () => {
   const [notificationMinutes, setNotificationMinutes] = useState(
     editEventData?.seconds
       ? convertSecondsToUnit(
-          parseInt(editEventData.seconds, 10),
-          convertionISOToTime(editEventData.trigger)?.Label || 'Minutes',
-        ).toString()
+        parseInt(editEventData.seconds, 10),
+        convertionISOToTime(editEventData.trigger)?.Label || 'Minutes',
+      ).toString()
       : '0',
   );
   const [selectedTimeUnit, setSelectedTimeUnit] = useState(
@@ -2431,45 +2431,38 @@ const CreateEventScreen = () => {
       if (response) {
         // --- EMAIL GUESTS IF ANY (CREATE FLOW) ---
         try {
-          // Log the full eventData.list for debugging
-          console.log('[EMAIL INVITE][CREATE] eventData.list:', eventData.list);
-          const guestEmails = (eventData.list || [])
-            .filter((item: any) => item.key === 'guest')
-            .map((item: any) => item.value)
-            .filter((email: string) => !!email);
+          console.log(
+            '[EMAIL INVITE][CREATE] eventData.list:',
+            eventData?.list,
+          );
+
+          const guestEmails = (eventData?.list || [])
+            .filter((item: any) => item?.key === 'guest')
+            .map((item: any) => item?.value)
+            .filter((email: string) => Boolean(email));
+
           console.log('[EMAIL INVITE][CREATE] Guests:', guestEmails);
+
           if (guestEmails.length > 0) {
-            // --- Send event invitation with required fields ---
             const minimalGuest = guestEmails[0];
+
             const formData = new FormData();
+
             formData.append('subject', 'Test Event Invitation');
-            formData.append('from', activeAccount?.email || '');
+            formData.append('from', activeAccount.userName || '');
             formData.append('to', minimalGuest);
-            formData.append('cc', '');
-            formData.append('bcc', '');
+            formData.append('cc', ['']);
+            formData.append('bcc', ['']);
             formData.append(
               'message',
               'This is a test event invitation from the app. No attachments.',
             );
-            // If you want to send HTML, you can also add: formData.append('html', ...)
-            console.log('[EMAIL INVITE][CREATE][TEST] Sending payload:', {
-              subject: 'Test Event Invitation',
-              from: activeAccount?.email || '',
-              to: minimalGuest,
-              cc: '',
-              bcc: '',
-              message:
-                'This is a test event invitation from the app. No attachments.',
-            });
+
+         
+            console.log("form data", formData);
             const emailResponse = await sendEmail(formData);
-            console.log(
-              '[EMAIL INVITE][CREATE][TEST] API response:',
-              emailResponse,
-            );
-            console.log(
-              '[EMAIL INVITE][CREATE][TEST] Email sent to guest:',
-              minimalGuest,
-            );
+
+           
           }
         } catch (err) {
           console.error(
@@ -2701,8 +2694,8 @@ const CreateEventScreen = () => {
         const durationMinutes =
           startTime && endTime
             ? Math.round(
-                (endTime.getTime() - startTime.getTime()) / (1000 * 60),
-              )
+              (endTime.getTime() - startTime.getTime()) / (1000 * 60),
+            )
             : 0;
 
         const zoomMeeting: any = {
@@ -3188,8 +3181,8 @@ const CreateEventScreen = () => {
         // Format endsDate as YYYYMMDD if it's a Date object
         const formattedEndsDate = endsDate
           ? `${endsDate.getFullYear()}${String(
-              endsDate.getMonth() + 1,
-            ).padStart(2, '0')}${String(endsDate.getDate()).padStart(2, '0')}`
+            endsDate.getMonth() + 1,
+          ).padStart(2, '0')}${String(endsDate.getDate()).padStart(2, '0')}`
           : '';
         customRepeatEventValue = `${repeatEvery}|${repeatUnit}|${repeatOn.join(
           ',',
@@ -3480,16 +3473,16 @@ const CreateEventScreen = () => {
                   {selectedStartDate
                     ? isAllDayEvent
                       ? selectedStartDate.toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
                       : selectedStartTime
-                      ? `${selectedStartDate.toLocaleDateString('en-US', {
+                        ? `${selectedStartDate.toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                         })} ${selectedStartTime}`
-                      : selectedStartDate.toLocaleDateString('en-US', {
+                        : selectedStartDate.toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',
@@ -3578,16 +3571,16 @@ const CreateEventScreen = () => {
                   {selectedEndDate
                     ? isAllDayEvent
                       ? selectedEndDate.toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })
+                        month: 'short',
+                        day: 'numeric',
+                        year: 'numeric',
+                      })
                       : selectedEndTime
-                      ? `${selectedEndDate.toLocaleDateString('en-US', {
+                        ? `${selectedEndDate.toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                         })} ${selectedEndTime}`
-                      : selectedEndDate.toLocaleDateString('en-US', {
+                        : selectedEndDate.toLocaleDateString('en-US', {
                           month: 'short',
                           day: 'numeric',
                           year: 'numeric',
@@ -3727,8 +3720,8 @@ const CreateEventScreen = () => {
                     style={[
                       styles.selectorText,
                       selectedRecurrence &&
-                        selectedRecurrence !== 'Does not repeat' &&
-                        styles.selectorTextFilled,
+                      selectedRecurrence !== 'Does not repeat' &&
+                      styles.selectorTextFilled,
                     ]}
                   >
                     {selectedRecurrence}
@@ -3756,7 +3749,7 @@ const CreateEventScreen = () => {
                           style={[
                             styles.repeatOption,
                             selectedRecurrence === option &&
-                              styles.repeatOptionSelected,
+                            styles.repeatOptionSelected,
                           ]}
                           onPress={() => {
                             if (!isLoading) {
@@ -3770,7 +3763,7 @@ const CreateEventScreen = () => {
                             style={[
                               styles.repeatOptionText,
                               selectedRecurrence === option &&
-                                styles.repeatOptionTextSelected,
+                              styles.repeatOptionTextSelected,
                             ]}
                             numberOfLines={1}
                           >
@@ -3920,7 +3913,7 @@ const CreateEventScreen = () => {
                     style={[
                       styles.selectorText,
                       videoConferencingDisplay.filled &&
-                        styles.selectorTextFilled,
+                      styles.selectorTextFilled,
                     ]}
                   >
                     {videoConferencingDisplay.label}
@@ -3937,7 +3930,7 @@ const CreateEventScreen = () => {
                     style={[
                       styles.videoConferencingDropdownItem,
                       selectedVideoConferencing === 'inperson' &&
-                        styles.videoConferencingDropdownItemSelected,
+                      styles.videoConferencingDropdownItemSelected,
                     ]}
                     onPress={() => {
                       if (!isLoading) {
@@ -3969,7 +3962,7 @@ const CreateEventScreen = () => {
                     style={[
                       styles.videoConferencingDropdownItem,
                       selectedVideoConferencing === 'google' &&
-                        styles.videoConferencingDropdownItemSelected,
+                      styles.videoConferencingDropdownItemSelected,
                     ]}
                     onPress={() => {
                       if (!isLoading) {
@@ -4002,7 +3995,7 @@ const CreateEventScreen = () => {
                     style={[
                       styles.videoConferencingDropdownItem,
                       selectedVideoConferencing === 'zoom' &&
-                        styles.videoConferencingDropdownItemSelected,
+                      styles.videoConferencingDropdownItemSelected,
                     ]}
                     onPress={() => {
                       if (!isLoading) {
@@ -4062,7 +4055,7 @@ const CreateEventScreen = () => {
                   activeField === 'location' && styles.fieldActive,
                   (selectedVideoConferencing === 'google' ||
                     selectedVideoConferencing === 'zoom') &&
-                    styles.fieldDisabled,
+                  styles.fieldDisabled,
                 ]}
                 onPress={() => {
                   if (!isLoading) {
@@ -4088,11 +4081,11 @@ const CreateEventScreen = () => {
                     location && styles.selectorTextFilled,
                     (selectedVideoConferencing === 'google' ||
                       selectedVideoConferencing === 'zoom') &&
-                      styles.fieldDisabledText,
+                    styles.fieldDisabledText,
                   ]}
                 >
                   {selectedVideoConferencing === 'google' ||
-                  selectedVideoConferencing === 'zoom'
+                    selectedVideoConferencing === 'zoom'
                     ? 'Location cannot be selected'
                     : location || 'Add Location'}
                 </Text>
@@ -4217,8 +4210,8 @@ const CreateEventScreen = () => {
                       ? 'Updating...'
                       : 'Creating...'
                     : mode === 'edit'
-                    ? 'Update'
-                    : 'Create'}
+                      ? 'Update'
+                      : 'Create'}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -4275,7 +4268,7 @@ const CreateEventScreen = () => {
                     style={[
                       styles.timezoneItemText,
                       selectedTimezone === item.id &&
-                        styles.timezoneItemTextSelected,
+                      styles.timezoneItemTextSelected,
                     ]}
                   >
                     ({item.offset}) {item.name}
@@ -4441,7 +4434,7 @@ const CreateEventScreen = () => {
                             style={[
                               styles.customDayCheckbox,
                               customRecurrence.repeatOn.includes(day) &&
-                                styles.customDayCheckboxSelected,
+                              styles.customDayCheckboxSelected,
                             ]}
                           >
                             {customRecurrence.repeatOn.includes(day) && (
@@ -4456,7 +4449,7 @@ const CreateEventScreen = () => {
                             style={[
                               styles.customDayOptionText,
                               customRecurrence.repeatOn.includes(day) &&
-                                styles.customDayOptionTextSelected,
+                              styles.customDayOptionTextSelected,
                             ]}
                           >
                             {day}
@@ -4484,7 +4477,7 @@ const CreateEventScreen = () => {
                       style={[
                         styles.customCheckbox,
                         customRecurrence.endsType === endsOptions[0] &&
-                          styles.customCheckboxSelected,
+                        styles.customCheckboxSelected,
                       ]}
                     >
                       {customRecurrence.endsType === endsOptions[0] && (
@@ -4495,7 +4488,7 @@ const CreateEventScreen = () => {
                       style={[
                         styles.customEndsOptionText,
                         customRecurrence.endsType === endsOptions[0] &&
-                          styles.customEndsOptionTextSelected,
+                        styles.customEndsOptionTextSelected,
                       ]}
                     >
                       {endsOptions[0]}
@@ -4515,7 +4508,7 @@ const CreateEventScreen = () => {
                       style={[
                         styles.customCheckbox,
                         customRecurrence.endsType === endsOptions[1] &&
-                          styles.customCheckboxSelected,
+                        styles.customCheckboxSelected,
                       ]}
                     >
                       {customRecurrence.endsType === endsOptions[1] && (
@@ -4526,7 +4519,7 @@ const CreateEventScreen = () => {
                       style={[
                         styles.customEndsOptionText,
                         customRecurrence.endsType === endsOptions[1] &&
-                          styles.customEndsOptionTextSelected,
+                        styles.customEndsOptionTextSelected,
                       ]}
                     >
                       {endsOptions[1]}
@@ -4535,7 +4528,7 @@ const CreateEventScreen = () => {
                       style={[
                         styles.customEndsInput,
                         customRecurrence.endsType !== endsOptions[1] &&
-                          styles.customEndsInputDisabled,
+                        styles.customEndsInputDisabled,
                       ]}
                       onPress={() => {
                         if (customRecurrence.endsType === endsOptions[1]) {
@@ -4548,23 +4541,23 @@ const CreateEventScreen = () => {
                         style={[
                           styles.customEndsInputText,
                           !customRecurrence.endsDate &&
-                            styles.customEndsInputPlaceholder,
+                          styles.customEndsInputPlaceholder,
                         ]}
                         numberOfLines={1}
                       >
                         {customRecurrence.endsDate
                           ? (() => {
-                              const date = customRecurrence.endsDate;
-                              const month = String(
-                                date.getMonth() + 1,
-                              ).padStart(2, '0');
-                              const day = String(date.getDate()).padStart(
-                                2,
-                                '0',
-                              );
-                              const year = date.getFullYear();
-                              return `${month}/${day}/${year}`;
-                            })()
+                            const date = customRecurrence.endsDate;
+                            const month = String(
+                              date.getMonth() + 1,
+                            ).padStart(2, '0');
+                            const day = String(date.getDate()).padStart(
+                              2,
+                              '0',
+                            );
+                            const year = date.getFullYear();
+                            return `${month}/${day}/${year}`;
+                          })()
                           : '04/09/2025'}
                       </Text>
                     </TouchableOpacity>
@@ -4583,7 +4576,7 @@ const CreateEventScreen = () => {
                       style={[
                         styles.customCheckbox,
                         customRecurrence.endsType === endsOptions[2] &&
-                          styles.customCheckboxSelected,
+                        styles.customCheckboxSelected,
                       ]}
                     >
                       {customRecurrence.endsType === endsOptions[2] && (
@@ -4594,7 +4587,7 @@ const CreateEventScreen = () => {
                       style={[
                         styles.customEndsOptionText,
                         customRecurrence.endsType === endsOptions[2] &&
-                          styles.customEndsOptionTextSelected,
+                        styles.customEndsOptionTextSelected,
                       ]}
                     >
                       {endsOptions[2]}
@@ -4603,7 +4596,7 @@ const CreateEventScreen = () => {
                       style={[
                         styles.customEndsInput,
                         customRecurrence.endsType !== endsOptions[2] &&
-                          styles.customEndsInputDisabled,
+                        styles.customEndsInputDisabled,
                       ]}
                       value={customRecurrence.endsAfter}
                       onChangeText={text =>
@@ -4657,13 +4650,13 @@ const CreateEventScreen = () => {
                     markedDates={
                       customRecurrence.endsDate
                         ? {
-                            [customRecurrence.endsDate
-                              .toISOString()
-                              .split('T')[0]]: {
-                              selected: true,
-                              selectedColor: '#0B6DE0',
-                            },
-                          }
+                          [customRecurrence.endsDate
+                            .toISOString()
+                            .split('T')[0]]: {
+                            selected: true,
+                            selectedColor: '#0B6DE0',
+                          },
+                        }
                         : {}
                     }
                     theme={{
@@ -6502,8 +6495,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: Fonts.latoBold,
   },
-  // Removed duplicate datePicker definition
-  // Removed duplicate selectorText and selectorTextFilled definitions
+
 });
 
 export default CreateEventScreen;
