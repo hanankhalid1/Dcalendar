@@ -11,6 +11,22 @@ export const sendEmail = async (formData: FormData) => {
     throw new Error('No auth token found in useToken store');
   }
 
+  // Log FormData contents
+  if (formData && typeof formData.getParts === 'function') {
+    // React Native FormData (has getParts)
+    const parts = formData.getParts();
+    console.log('[EMAIL SERVICE] FormData parts:', parts);
+  } else if (formData && typeof formData.forEach === 'function') {
+    // Web FormData (has forEach)
+    const entries: any[] = [];
+    formData.forEach((value: any, key: string) => {
+      entries.push({ key, value });
+    });
+    console.log('[EMAIL SERVICE] FormData entries:', entries);
+  } else {
+    console.log('[EMAIL SERVICE] FormData (raw):', formData);
+  }
+
   const { apiClient } = await import('../hooks/useApi');
   const response = await apiClient.post('/sendEmail', formData, {
     headers: {

@@ -2439,23 +2439,28 @@ const CreateEventScreen = () => {
             .filter((email: string) => !!email);
           console.log('[EMAIL INVITE][CREATE] Guests:', guestEmails);
           if (guestEmails.length > 0) {
-            // --- TEST: Send minimal payload, no .ics, one guest, simple body ---
+            // --- Send event invitation with required fields ---
             const minimalGuest = guestEmails[0];
             const formData = new FormData();
-            formData.append('to', minimalGuest);
             formData.append('subject', 'Test Event Invitation');
+            formData.append('from', activeAccount?.email || '');
+            formData.append('to', minimalGuest);
+            formData.append('cc', '');
+            formData.append('bcc', '');
             formData.append(
-              'html',
-              '<p>This is a test event invitation from the app. No attachments.</p>',
+              'message',
+              'This is a test event invitation from the app. No attachments.',
             );
-            console.log(
-              '[EMAIL INVITE][CREATE][TEST] Sending minimal payload:',
-              {
-                to: minimalGuest,
-                subject: 'Test Event Invitation',
-                html: '<p>This is a test event invitation from the app. No attachments.</p>',
-              },
-            );
+            // If you want to send HTML, you can also add: formData.append('html', ...)
+            console.log('[EMAIL INVITE][CREATE][TEST] Sending payload:', {
+              subject: 'Test Event Invitation',
+              from: activeAccount?.email || '',
+              to: minimalGuest,
+              cc: '',
+              bcc: '',
+              message:
+                'This is a test event invitation from the app. No attachments.',
+            });
             const emailResponse = await sendEmail(formData);
             console.log(
               '[EMAIL INVITE][CREATE][TEST] API response:',
