@@ -2431,44 +2431,120 @@ const CreateEventScreen = () => {
       if (response) {
         // --- EMAIL GUESTS IF ANY (CREATE FLOW) ---
         try {
-          // Log the full eventData.list for debugging
-          console.log('[EMAIL INVITE][CREATE] eventData.list:', eventData.list);
-          const guestEmails = (eventData.list || [])
-            .filter((item: any) => item.key === 'guest')
-            .map((item: any) => item.value)
-            .filter((email: string) => !!email);
-          console.log('[EMAIL INVITE][CREATE] Guests:', guestEmails);
+          // Use the new email template utility
+          const guestEmails = (eventData?.list || [])
+            .filter((item: any) => item?.key === 'guest')
+            .map((item: any) => item?.value)
+            .filter((email: string) => Boolean(email));
+
           if (guestEmails.length > 0) {
-            // --- Send event invitation with required fields ---
-            const minimalGuest = guestEmails[0];
-            const formData = new FormData();
-            formData.append('subject', 'Test Event Invitation');
-            formData.append('from', activeAccount?.email || '');
-            formData.append('to', minimalGuest);
-            formData.append('cc', '');
-            formData.append('bcc', '');
-            formData.append(
-              'message',
-              'This is a test event invitation from the app. No attachments.',
+            // Dynamically import the template generator, ics generator, and react-native-fs
+            const { generateEventInvitationEmail } = await import(
+              '../utils/emailTemplates'
             );
-            // If you want to send HTML, you can also add: formData.append('html', ...)
-            console.log('[EMAIL INVITE][CREATE][TEST] Sending payload:', {
-              subject: 'Test Event Invitation',
-              from: activeAccount?.email || '',
-              to: minimalGuest,
-              cc: '',
-              bcc: '',
-              message:
-                'This is a test event invitation from the app. No attachments.',
+            const { generateICS } = await import('../utils/icsGenerator');
+            const RNFS = await import('react-native-fs');
+
+            const eventTitle = eventData?.title || 'Untitled Event';
+            const organizer = activeAccount?.userName || 'Organizer';
+            const eventDate = selectedStartDate
+              ? selectedStartDate.toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })
+              : '';
+            const startTime = selectedStartTime || '';
+            const endTime = selectedEndTime || '';
+            const timezone = selectedTimezone || '';
+            const meetingLink =
+              eventData?.locationType === 'google' ||
+              eventData?.locationType === 'zoom'
+                ? eventData?.location
+                : '';
+            const meetingType =
+              eventData?.locationType === 'google'
+                ? 'google'
+                : eventData?.locationType === 'zoom'
+                ? 'zoom'
+                : '';
+
+            // Prepare guests array for template
+            const guestsArr = guestEmails.map((email: string) => ({
+              name: email.split('@')[0],
+              email,
+            }));
+
+            const emailBody = generateEventInvitationEmail({
+              eventTitle,
+              organizer: organizer.split('@')[0],
+              organizerEmail: organizer,
+              guests: guestsArr,
+              eventDate,
+              fromTime: startTime,
+              toTime: endTime,
+              timezone,
+              meetingLink,
+              meetingType,
+              location: eventData?.location || '',
             });
-            const emailResponse = await sendEmail(formData);
-            console.log(
-              '[EMAIL INVITE][CREATE][TEST] API response:',
-              emailResponse,
-            );
-            console.log(
-              '[EMAIL INVITE][CREATE][TEST] Email sent to guest:',
-              minimalGuest,
+
+            // Generate .ics content and save to file using react-native-fs
+            let icsFilePath = '';
+            if (selectedStartDate && selectedEndDate) {
+              const icsContent = generateICS({
+                title: eventTitle,
+                description: eventData?.description || '',
+                location: eventData?.location || '',
+                startDate: selectedStartDate,
+                endDate: selectedEndDate,
+                organizerEmail: organizer,
+                guests: guestEmails,
+                meetingUrl: meetingLink,
+                timezone,
+              });
+              // Save to a temporary file
+              const fileName = `invite_${Date.now()}.ics`;
+              icsFilePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+              await RNFS.writeFile(icsFilePath, icsContent, 'utf8');
+            }
+
+            await Promise.all(
+              guestEmails.map(async guestEmail => {
+                const formData = new FormData();
+                formData.append('subject', `Invitation: ${eventTitle}`);
+                formData.append('from', organizer);
+                formData.append('to', guestEmail);
+                formData.append('cc', '');
+                formData.append('bcc', '');
+                formData.append('message', emailBody);
+                if (icsFilePath) {
+                  // Attach .ics file as base64 for maximum compatibility
+                  try {
+                    const icsBase64 = await RNFS.readFile(
+                      icsFilePath,
+                      'base64',
+                    );
+                    formData.append('attachment', {
+                      uri: `data:text/calendar;base64,${icsBase64}`,
+                      type: 'text/calendar',
+                      name: 'invite.ics',
+                    });
+                  } catch (err) {
+                    console.error('Failed to read .ics file as base64:', err);
+                  }
+                }
+                try {
+                  await sendEmail(formData);
+                  console.log(`[EMAIL INVITE][CREATE] Sent to: ${guestEmail}`);
+                } catch (emailErr) {
+                  console.error(
+                    `[EMAIL INVITE][CREATE] Failed for ${guestEmail}:`,
+                    emailErr,
+                  );
+                }
+              }),
             );
           }
         } catch (err) {
@@ -6028,7 +6104,7 @@ const styles = StyleSheet.create({
     ),
   },
   timezoneTagText: {
-    fontSize: getTabletSafeDimension(fontSize.textSize14, 14, 15),
+    fontSize: getTabletSafeDimension(fontSize.textSize12, 15, 17),
     color: colors.blackText,
     fontWeight: '400',
   },
@@ -6347,7 +6423,7 @@ const styles = StyleSheet.create({
     paddingVertical: getTabletSafeDimension(spacing.sm, spacing.sm, spacing.sm),
   },
   allDayText: {
-    fontSize: getTabletSafeDimension(14, 15, 16),
+    fontSize: getTabletSafeDimension(12, 15, 17),
     fontFamily: Fonts.latoRegular,
     fontWeight: '400',
     lineHeight: getTabletSafeDimension(18, 20, 22),
@@ -6502,8 +6578,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: Fonts.latoBold,
   },
-  // Removed duplicate datePicker definition
-  // Removed duplicate selectorText and selectorTextFilled definitions
 });
 
 export default CreateEventScreen;

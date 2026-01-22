@@ -4,7 +4,7 @@ import axios from 'axios';
 
 // Standalone sendEmail for React Native app, matching web Bearer token pattern
 export const sendEmail = async (formData: FormData) => {
-  // Get the token from Zustand store
+  const { apiClient } = await import('../hooks/useApi');
   const tokenObj = useToken.getState().token;
   const token = tokenObj?.data?.token || tokenObj?.token || tokenObj;
   if (!token) {
@@ -27,13 +27,18 @@ export const sendEmail = async (formData: FormData) => {
     console.log('[EMAIL SERVICE] FormData (raw):', formData);
   }
 
-  const { apiClient } = await import('../hooks/useApi');
-  const response = await apiClient.post('/sendEmail', formData, {
-    headers: {
-      // Do NOT set Content-Type here; let Axios/React Native handle it for FormData
-      Authorization: `Bearer ${token}`,
+  console.log("Token used for /sendEmail:", token);
+  const response = await axios.post(
+    'https://api.dmail.earth/sendEmail',
+    formData,
+    {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        ...(token && { 'Authorization': `Bearer ${token}` })
+      },
     },
-  });
+  );
+
   console.log(
     '[EMAIL SERVICE] /sendEmail API response:',
     response?.data || response,
