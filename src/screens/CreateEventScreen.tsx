@@ -2431,16 +2431,21 @@ const CreateEventScreen = () => {
       if (response) {
         // --- EMAIL GUESTS IF ANY (CREATE FLOW) ---
         try {
+<<<<<<< HEAD
           console.log(
             '[EMAIL INVITE][CREATE] eventData.list:',
             eventData?.list,
           );
 
+=======
+          // Use the new email template utility
+>>>>>>> repoUI
           const guestEmails = (eventData?.list || [])
             .filter((item: any) => item?.key === 'guest')
             .map((item: any) => item?.value)
             .filter((email: string) => Boolean(email));
 
+<<<<<<< HEAD
           console.log('[EMAIL INVITE][CREATE] Guests:', guestEmails);
 
           if (guestEmails.length > 0) {
@@ -2463,6 +2468,117 @@ const CreateEventScreen = () => {
             const emailResponse = await sendEmail(formData);
 
 
+=======
+          if (guestEmails.length > 0) {
+            // Dynamically import the template generator, ics generator, and react-native-fs
+            const { generateEventInvitationEmail } = await import(
+              '../utils/emailTemplates'
+            );
+            const { generateICS } = await import('../utils/icsGenerator');
+            const RNFS = await import('react-native-fs');
+
+            const eventTitle = eventData?.title || 'Untitled Event';
+            const organizer = activeAccount?.userName || 'Organizer';
+            const eventDate = selectedStartDate
+              ? selectedStartDate.toLocaleDateString(undefined, {
+                  weekday: 'long',
+                  day: 'numeric',
+                  month: 'short',
+                  year: 'numeric',
+                })
+              : '';
+            const startTime = selectedStartTime || '';
+            const endTime = selectedEndTime || '';
+            const timezone = selectedTimezone || '';
+            const meetingLink =
+              eventData?.locationType === 'google' ||
+              eventData?.locationType === 'zoom'
+                ? eventData?.location
+                : '';
+            const meetingType =
+              eventData?.locationType === 'google'
+                ? 'google'
+                : eventData?.locationType === 'zoom'
+                ? 'zoom'
+                : '';
+
+            // Prepare guests array for template
+            const guestsArr = guestEmails.map((email: string) => ({
+              name: email.split('@')[0],
+              email,
+            }));
+
+            const emailBody = generateEventInvitationEmail({
+              eventTitle,
+              organizer: organizer.split('@')[0],
+              organizerEmail: organizer,
+              guests: guestsArr,
+              eventDate,
+              fromTime: startTime,
+              toTime: endTime,
+              timezone,
+              meetingLink,
+              meetingType,
+              location: eventData?.location || '',
+            });
+
+            // Generate .ics content and save to file using react-native-fs
+            let icsFilePath = '';
+            if (selectedStartDate && selectedEndDate) {
+              const icsContent = generateICS({
+                title: eventTitle,
+                description: eventData?.description || '',
+                location: eventData?.location || '',
+                startDate: selectedStartDate,
+                endDate: selectedEndDate,
+                organizerEmail: organizer,
+                guests: guestEmails,
+                meetingUrl: meetingLink,
+                timezone,
+              });
+              // Save to a temporary file
+              const fileName = `invite_${Date.now()}.ics`;
+              icsFilePath = `${RNFS.DocumentDirectoryPath}/${fileName}`;
+              await RNFS.writeFile(icsFilePath, icsContent, 'utf8');
+            }
+
+            await Promise.all(
+              guestEmails.map(async guestEmail => {
+                const formData = new FormData();
+                formData.append('subject', `Invitation: ${eventTitle}`);
+                formData.append('from', organizer);
+                formData.append('to', guestEmail);
+                formData.append('cc', '');
+                formData.append('bcc', '');
+                formData.append('message', emailBody);
+                if (icsFilePath) {
+                  // Attach .ics file as base64 for maximum compatibility
+                  try {
+                    const icsBase64 = await RNFS.readFile(
+                      icsFilePath,
+                      'base64',
+                    );
+                    formData.append('attachment', {
+                      uri: `data:text/calendar;base64,${icsBase64}`,
+                      type: 'text/calendar',
+                      name: 'invite.ics',
+                    });
+                  } catch (err) {
+                    console.error('Failed to read .ics file as base64:', err);
+                  }
+                }
+                try {
+                  await sendEmail(formData);
+                  console.log(`[EMAIL INVITE][CREATE] Sent to: ${guestEmail}`);
+                } catch (emailErr) {
+                  console.error(
+                    `[EMAIL INVITE][CREATE] Failed for ${guestEmail}:`,
+                    emailErr,
+                  );
+                }
+              }),
+            );
+>>>>>>> repoUI
           }
         } catch (err) {
           console.error(
@@ -6495,7 +6611,10 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     fontFamily: Fonts.latoBold,
   },
+<<<<<<< HEAD
 
+=======
+>>>>>>> repoUI
 });
 
 export default CreateEventScreen;
